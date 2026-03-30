@@ -561,6 +561,7 @@ export default function AdminPage() {
             setEditingRestaurant(null);
           }}
           editData={editingRestaurant}
+          existingCuisines={cuisines}
         />
       )}
     </main>

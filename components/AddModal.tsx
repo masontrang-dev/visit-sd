@@ -8,9 +8,110 @@ type Props = {
   onSave: (entry: Omit<Restaurant, "id" | "created_at">) => Promise<boolean>;
   onClose: () => void;
   editData?: Restaurant | null;
+  existingCuisines?: string[];
 };
 
 const PRICES = ["$", "$$", "$$$", "$$$$"];
+
+const GOOGLE_TYPE_TO_CUISINE: Record<string, string> = {
+  mexican_restaurant: "Mexican",
+  italian_restaurant: "Italian",
+  japanese_restaurant: "Japanese",
+  chinese_restaurant: "Chinese",
+  thai_restaurant: "Thai",
+  indian_restaurant: "Indian",
+  korean_restaurant: "Korean",
+  vietnamese_restaurant: "Vietnamese",
+  french_restaurant: "French",
+  greek_restaurant: "Greek",
+  mediterranean_restaurant: "Mediterranean",
+  middle_eastern_restaurant: "Middle Eastern",
+  seafood_restaurant: "Seafood",
+  steak_house: "Steakhouse",
+  sushi_restaurant: "Sushi",
+  pizza_restaurant: "Pizza",
+  hamburger_restaurant: "Burgers",
+  barbecue_restaurant: "BBQ",
+  breakfast_restaurant: "Breakfast",
+  brunch_restaurant: "Brunch",
+  vegan_restaurant: "Vegan",
+  vegetarian_restaurant: "Vegetarian",
+  ramen_restaurant: "Ramen",
+  sandwich_shop: "Sandwiches",
+  cafe: "Cafe",
+  coffee_shop: "Coffee",
+  bakery: "Bakery",
+  ice_cream_shop: "Dessert",
+  bar: "Bar",
+  american_restaurant: "American",
+  spanish_restaurant: "Spanish",
+  turkish_restaurant: "Turkish",
+  brazilian_restaurant: "Brazilian",
+  peruvian_restaurant: "Peruvian",
+  lebanese_restaurant: "Lebanese",
+  african_restaurant: "African",
+  ethiopian_restaurant: "Ethiopian",
+  caribbean_restaurant: "Caribbean",
+};
+
+const PRICE_LEVEL_MAP: Record<number, string> = {
+  1: "$",
+  2: "$$",
+  3: "$$$",
+  4: "$$$$",
+};
+
+function extractCuisine(types: string[]): string | null {
+  for (const t of types) {
+    if (GOOGLE_TYPE_TO_CUISINE[t]) return GOOGLE_TYPE_TO_CUISINE[t];
+  }
+  return null;
+}
+
+const DEFAULT_CUISINE_OPTIONS = [
+  "African",
+  "American",
+  "Asian Fusion",
+  "BBQ",
+  "Bakery",
+  "Bar",
+  "Brazilian",
+  "Breakfast",
+  "Brunch",
+  "Burgers",
+  "Cafe",
+  "Caribbean",
+  "Chinese",
+  "Coffee",
+  "Dessert",
+  "Ethiopian",
+  "French",
+  "Greek",
+  "Hawaiian",
+  "Indian",
+  "Italian",
+  "Japanese",
+  "Korean",
+  "Lebanese",
+  "Mediterranean",
+  "Mexican",
+  "Middle Eastern",
+  "Peruvian",
+  "Pizza",
+  "Ramen",
+  "Sandwiches",
+  "Seafood",
+  "Southern",
+  "Spanish",
+  "Steakhouse",
+  "Sushi",
+  "Tacos",
+  "Thai",
+  "Turkish",
+  "Vegan",
+  "Vegetarian",
+  "Vietnamese",
+];
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -39,7 +140,12 @@ const ADMIN_NAMES = (process.env.NEXT_PUBLIC_ADMIN_NAMES ?? "")
   .split(",")
   .filter(Boolean);
 
-export default function AddModal({ onSave, onClose, editData }: Props) {
+export default function AddModal({
+  onSave,
+  onClose,
+  editData,
+  existingCuisines = [],
+}: Props) {
   const [name, setName] = useState(editData?.name ?? "");
   const [neighborhood, setNeighborhood] = useState(
     editData?.neighborhood ?? "",
@@ -62,6 +168,36 @@ export default function AddModal({ onSave, onClose, editData }: Props) {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [cuisineOpen, setCuisineOpen] = useState(false);
+  const [cuisineHighlight, setCuisineHighlight] = useState(-1);
+  const cuisineWrapperRef = useRef<HTMLDivElement>(null);
+
+  const cuisineOptions = Array.from(
+    new Set([...existingCuisines, ...DEFAULT_CUISINE_OPTIONS]),
+  ).sort();
+  const filteredCuisines = cuisine.trim()
+    ? cuisineOptions.filter((c) =>
+        c.toLowerCase().includes(cuisine.trim().toLowerCase()),
+      )
+    : cuisineOptions;
+  const showCuisineAdd =
+    cuisine.trim() &&
+    !cuisineOptions.some(
+      (c) => c.toLowerCase() === cuisine.trim().toLowerCase(),
+    );
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        cuisineWrapperRef.current &&
+        !cuisineWrapperRef.current.contains(e.target as Node)
+      ) {
+        setCuisineOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const autocompleteRef = useRef<HTMLInputElement>(null);
 
@@ -85,6 +221,15 @@ export default function AddModal({ onSave, onClose, editData }: Props) {
           c.types.includes("neighborhood") || c.types.includes("sublocality"),
       );
       if (hood) setNeighborhood(hood.long_name);
+      // Auto-detect cuisine from place types
+      if (place.types) {
+        const detected = extractCuisine(place.types);
+        if (detected) setCuisine(detected);
+      }
+      // Auto-detect price range from price_level
+      if (place.price_level != null && PRICE_LEVEL_MAP[place.price_level]) {
+        setPrice(PRICE_LEVEL_MAP[place.price_level]);
+      }
     },
     [],
   );
@@ -109,6 +254,8 @@ export default function AddModal({ onSave, onClose, editData }: Props) {
             "place_id",
             "geometry",
             "address_components",
+            "price_level",
+            "types",
           ],
         },
       );
@@ -233,12 +380,6 @@ export default function AddModal({ onSave, onClose, editData }: Props) {
             placeholder: "e.g. Little Italy, North Park...",
           },
           {
-            label: "Cuisine type",
-            value: cuisine,
-            set: setCuisine,
-            placeholder: "e.g. Mexican, Seafood, Italian...",
-          },
-          {
             label: "Address",
             value: address,
             set: setAddress,
@@ -258,6 +399,124 @@ export default function AddModal({ onSave, onClose, editData }: Props) {
             />
           </div>
         ))}
+
+        <div
+          ref={cuisineWrapperRef}
+          style={{ marginBottom: "1rem", position: "relative" }}
+        >
+          <label style={labelStyle}>Cuisine type</label>
+          <input
+            value={cuisine}
+            onChange={(e) => {
+              setCuisine(e.target.value);
+              setCuisineOpen(true);
+              setCuisineHighlight(-1);
+            }}
+            placeholder="Search or type a cuisine..."
+            onFocus={(e) => {
+              e.target.style.borderColor = "var(--accent)";
+              setCuisineOpen(true);
+            }}
+            onBlur={(e) => (e.target.style.borderColor = "var(--brd)")}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setCuisineHighlight((prev) =>
+                  prev < filteredCuisines.length - 1 ? prev + 1 : prev,
+                );
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setCuisineHighlight((prev) => (prev > 0 ? prev - 1 : -1));
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                if (
+                  cuisineHighlight >= 0 &&
+                  filteredCuisines[cuisineHighlight]
+                ) {
+                  setCuisine(filteredCuisines[cuisineHighlight]);
+                  setCuisineOpen(false);
+                  setCuisineHighlight(-1);
+                } else {
+                  setCuisineOpen(false);
+                }
+              } else if (e.key === "Escape") {
+                setCuisineOpen(false);
+              }
+            }}
+            style={inputStyle}
+            autoComplete="off"
+          />
+          {cuisineOpen && (filteredCuisines.length > 0 || showCuisineAdd) && (
+            <ul
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                right: 0,
+                zIndex: 10,
+                background: "var(--bg)",
+                border: "1.5px solid var(--brd)",
+                borderTop: "none",
+                maxHeight: 200,
+                overflowY: "auto",
+                listStyle: "none",
+                margin: 0,
+                padding: 0,
+              }}
+            >
+              {showCuisineAdd && (
+                <li
+                  onMouseDown={() => {
+                    setCuisineOpen(false);
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    fontSize: 14,
+                    cursor: "pointer",
+                    color: "var(--accent)",
+                    fontWeight: 500,
+                    fontFamily: "var(--font-body)",
+                    borderBottom:
+                      filteredCuisines.length > 0
+                        ? "1px solid var(--brd)"
+                        : "none",
+                  }}
+                >
+                  Add &ldquo;{cuisine.trim()}&rdquo;
+                </li>
+              )}
+              {filteredCuisines.map((c, i) => (
+                <li
+                  key={c}
+                  onMouseDown={() => {
+                    setCuisine(c);
+                    setCuisineOpen(false);
+                    setCuisineHighlight(-1);
+                  }}
+                  style={{
+                    padding: "8px 12px",
+                    fontSize: 14,
+                    cursor: "pointer",
+                    fontFamily: "var(--font-body)",
+                    background:
+                      i === cuisineHighlight ? "var(--bg2)" : "transparent",
+                    color: "var(--txt)",
+                    transition: "background 0.08s",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = "var(--bg2)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background =
+                      i === cuisineHighlight ? "var(--bg2)" : "transparent")
+                  }
+                >
+                  {c}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <div style={{ marginBottom: "1rem" }}>
           <label style={labelStyle}>Price range</label>

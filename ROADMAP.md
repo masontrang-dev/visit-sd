@@ -156,7 +156,19 @@ CREATE POLICY "Anon read" ON page_views FOR SELECT USING (true);
 
 ---
 
-## Step 14 — Server-Side Admin Auth _(~1 hr)_
+## Step 14 — Smart Cuisine & Price Detection _(~45 min)_
+
+- [x] Add `price_level` and `types` to Google Places Autocomplete fields
+- [x] Auto-fill cuisine type from Google Place types (e.g. `mexican_restaurant` → `Mexican`)
+- [x] Auto-fill price range from Google `price_level` (1–4 → $–$$$$)
+- [x] Admin can edit auto-detected values after autofill
+- [x] Replace plain cuisine text input with searchable combobox (type-to-filter + custom entry)
+- [x] Combobox options merge existing DB cuisines with default list
+- [x] Keyboard navigation (Arrow keys, Enter, Escape) for combobox
+
+---
+
+## Step 15 — Server-Side Admin Auth _(~1 hr)_
 
 - [ ] Create Route Handler at `app/api/auth/route.ts` for password check
 - [ ] Return HTTP-only cookie on success
@@ -165,7 +177,7 @@ CREATE POLICY "Anon read" ON page_views FOR SELECT USING (true);
 
 ---
 
-## Step 15 — Tailwind CSS Migration _(~2 hr)_
+## Step 16 — Tailwind CSS Migration _(~2 hr)_
 
 - [ ] Install and configure Tailwind CSS
 - [ ] Migrate `globals.css` variables to Tailwind theme config
@@ -174,7 +186,7 @@ CREATE POLICY "Anon read" ON page_views FOR SELECT USING (true);
 
 ---
 
-## Step 16 — Dark Mode _(~30 min)_
+## Step 17 — Dark Mode _(~30 min)_
 
 - [ ] Add dark color scheme to Tailwind config / CSS variables
 - [ ] Add toggle button (or auto-detect via `prefers-color-scheme`)
