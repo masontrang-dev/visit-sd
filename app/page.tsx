@@ -190,6 +190,27 @@ function HomeContent() {
           }
         />
       )}
+
+      <footer
+        style={{
+          padding: "1.5rem",
+          display: "flex",
+          justifyContent: "flex-end",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 500,
+            color: "var(--txt2)",
+            opacity: 0.5,
+            letterSpacing: "0.05em",
+            fontFamily: "var(--font-body)",
+          }}
+        >
+          v{process.env.NEXT_PUBLIC_APP_VERSION}
+        </span>
+      </footer>
     </main>
   );
 }
