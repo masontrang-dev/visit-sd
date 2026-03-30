@@ -25,84 +25,84 @@ ALTER TABLE restaurants
 CREATE POLICY "Anon update" ON restaurants FOR UPDATE USING (true) WITH CHECK (true);
 ```
 
-- [ ] Run migration in Supabase SQL Editor
-- [ ] Update `Restaurant` type in `lib/supabase.ts` with new fields
-- [ ] Verify existing data still loads correctly
+- [x] Run migration in Supabase SQL Editor
+- [x] Update `Restaurant` type in `lib/supabase.ts` with new fields
+- [x] Verify existing data still loads correctly
 
 ---
 
 ## Step 2 — "Added by" Dropdown _(~30 min)_
 
-- [ ] Add `NEXT_PUBLIC_ADMIN_NAMES=Mason,Friend` to `.env.local` and Vercel
-- [ ] Add a `<select>` dropdown in `AddModal.tsx` for choosing who added the restaurant
-- [ ] Save `added_by` to Supabase on insert
-- [ ] Display "Added by X" on each card in `RestaurantGrid.tsx`
+- [x] Add `NEXT_PUBLIC_ADMIN_NAMES=Mason,Friend` to `.env.local` and Vercel
+- [x] Add a `<select>` dropdown in `AddModal.tsx` for choosing who added the restaurant
+- [x] Save `added_by` to Supabase on insert
+- [x] Display "Added by X" on each card in `RestaurantGrid.tsx`
 
 ---
 
 ## Step 3 — Code Cleanup & UX Polish _(~20 min)_
 
-- [ ] Delete unused `PRICE_OPTIONS` constant in `app/admin/page.tsx`
-- [ ] Disable Save button while insert is in-flight (prevent double-clicks)
-- [ ] Disable Delete button while delete is in-flight
-- [ ] Show inline success confirmation after adding a restaurant
-- [ ] Show error message if a Supabase call fails
+- [x] Delete unused `PRICE_OPTIONS` constant in `app/admin/page.tsx`
+- [x] Disable Save button while insert is in-flight (prevent double-clicks)
+- [x] Disable Delete button while delete is in-flight
+- [x] Show inline success confirmation after adding a restaurant
+- [x] Show error message if a Supabase call fails
 
 ---
 
 ## Step 4 — Google Cloud Setup _(~15 min, manual)_
 
-- [ ] Create a Google Cloud project (or use existing)
-- [ ] Enable **Places API**
-- [ ] Enable **Maps JavaScript API**
-- [ ] Create an API key → restrict to your domain(s) + only these 2 APIs
-- [ ] Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to `.env.local` and Vercel
-- [ ] Set daily quota cap (e.g. 100 req/day) — see [Cost Management](#cost-management) below
-- [ ] Set billing budget alert at $1
+- [x] Create a Google Cloud project (or use existing)
+- [x] Enable **Places API**
+- [x] Enable **Maps JavaScript API**
+- [x] Create an API key → restrict to your domain(s) + only these 2 APIs
+- [x] Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to `.env.local` and Vercel
+- [x] Set daily quota cap (e.g. 100 req/day) — see [Cost Management](#cost-management) below
+- [x] Set billing budget alert at $1
 
 ---
 
 ## Step 5 — Places Autocomplete in Add Modal _(~1 hr)_
 
-- [ ] Install `@googlemaps/js-api-loader`
-- [ ] Add Places Autocomplete input to `AddModal.tsx`
-- [ ] On place selection, auto-fill: `name`, `neighborhood`, `address`, `google_maps_url`, `lat`, `lng`, `place_id`
-- [ ] Keep all fields manually editable after autofill
+- [x] Install `@googlemaps/js-api-loader`
+- [x] Add Places Autocomplete input to `AddModal.tsx`
+- [x] On place selection, auto-fill: `name`, `neighborhood`, `address`, `google_maps_url`, `lat`, `lng`, `place_id`
+- [x] Keep all fields manually editable after autofill
 - [ ] Test with a few real San Diego restaurants
 
 ---
 
 ## Step 6 — Google Maps Link on Cards _(~15 min)_
 
-- [ ] Show address on each card in `RestaurantGrid.tsx`
-- [ ] Render clickable "View on Maps ↗" link using stored `google_maps_url`
+- [x] Show address on each card in `RestaurantGrid.tsx`
+- [x] Render clickable "View on Maps ↗" link using stored `google_maps_url`
 
 ---
 
 ## Step 7 — Interactive Map View _(~1 hr)_
 
-- [ ] Install `@vis.gl/react-google-maps`
-- [ ] Create `MapView.tsx` — Google Map with markers for each restaurant
-- [ ] Add info windows on marker click (name, cuisine, price)
-- [ ] Add **List / Map** toggle to `FilterBar.tsx`
-- [ ] Cuisine filters apply in map view too
+- [x] Install `@vis.gl/react-google-maps`
+- [x] Create `MapView.tsx` — Google Map with markers for each restaurant
+- [x] Add info windows on marker click (name, cuisine, price)
+- [x] Add **List / Map** toggle to `FilterBar.tsx`
+- [x] Cuisine filters apply in map view too
 
 ---
 
 ## Step 8 — Edit Restaurants _(~45 min)_
 
-- [ ] Add "Edit" button on cards (admin view only)
-- [ ] Re-use `AddModal` in edit mode, pre-filled with existing data
-- [ ] Call Supabase `update` instead of `insert` when editing
-- [ ] Refresh list after successful edit
+- [x] Add "Edit" button on cards (admin view only)
+- [x] Re-use `AddModal` in edit mode, pre-filled with existing data
+- [x] Call Supabase `update` instead of `insert` when editing
+- [x] Refresh list after successful edit
 
 ---
 
 ## Step 9 — Must-Try Badge _(~30 min)_
 
-- [ ] Add "Must-Try" toggle in `AddModal.tsx` (and edit mode)
-- [ ] Display a badge/star on flagged cards in `RestaurantGrid.tsx`
-- [ ] Add "Must-Try" filter option in `FilterBar.tsx`
+- [x] Add "Must-Try" toggle in `AddModal.tsx` (and edit mode)
+- [x] Display a badge/star on flagged cards in `RestaurantGrid.tsx`
+- [x] Add "Must-Try" filter option in `FilterBar.tsx`
 
 ---
 

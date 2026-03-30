@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import { supabase, type Restaurant } from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar from "@/components/FilterBar";
+import MapView from "@/components/MapView";
 
 export default function HomePage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [mustTryFilter, setMustTryFilter] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -26,10 +29,11 @@ export default function HomePage() {
   const cuisines = Array.from(
     new Set(restaurants.map((r) => r.cuisine).filter(Boolean)),
   ).sort();
-  const filtered =
-    activeFilter === "all"
-      ? restaurants
-      : restaurants.filter((r) => r.cuisine === activeFilter);
+  const filtered = restaurants.filter((r) => {
+    if (activeFilter !== "all" && r.cuisine !== activeFilter) return false;
+    if (mustTryFilter && !r.must_try) return false;
+    return true;
+  });
 
   const totalCount = restaurants.length;
   const cuisineCount = cuisines.length;
@@ -94,16 +98,22 @@ export default function HomePage() {
         active={activeFilter}
         onChange={setActiveFilter}
         showAdmin
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        mustTryFilter={mustTryFilter}
+        onMustTryFilterChange={setMustTryFilter}
       />
 
       {loading ? (
         <p style={{ padding: "3rem 1.5rem", color: "var(--txt2)" }}>
           Loading...
         </p>
+      ) : viewMode === "map" ? (
+        <MapView restaurants={filtered} />
       ) : (
         <RestaurantGrid
           restaurants={filtered}
-          grouped={activeFilter === "all"}
+          grouped={activeFilter === "all" && !mustTryFilter}
         />
       )}
     </main>

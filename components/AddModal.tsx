@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import { type Restaurant } from "@/lib/supabase";
 
 type Props = {
   onSave: (entry: Omit<Restaurant, "id" | "created_at">) => Promise<boolean>;
   onClose: () => void;
+  editData?: Restaurant | null;
 };
 
 const PRICES = ["$", "$$", "$$$", "$$$$"];
@@ -37,16 +39,88 @@ const ADMIN_NAMES = (process.env.NEXT_PUBLIC_ADMIN_NAMES ?? "")
   .split(",")
   .filter(Boolean);
 
-export default function AddModal({ onSave, onClose }: Props) {
-  const [name, setName] = useState("");
-  const [neighborhood, setNeighborhood] = useState("");
-  const [cuisine, setCuisine] = useState("");
-  const [price, setPrice] = useState("$$$");
-  const [note, setNote] = useState("");
-  const [addedBy, setAddedBy] = useState(ADMIN_NAMES[0] ?? "");
+export default function AddModal({ onSave, onClose, editData }: Props) {
+  const [name, setName] = useState(editData?.name ?? "");
+  const [neighborhood, setNeighborhood] = useState(
+    editData?.neighborhood ?? "",
+  );
+  const [cuisine, setCuisine] = useState(editData?.cuisine ?? "");
+  const [price, setPrice] = useState(editData?.price ?? "$$$");
+  const [note, setNote] = useState(editData?.note ?? "");
+  const [addedBy, setAddedBy] = useState(
+    editData?.added_by ?? ADMIN_NAMES[0] ?? "",
+  );
+  const [mustTry, setMustTry] = useState(editData?.must_try ?? false);
+  const [address, setAddress] = useState(editData?.address ?? "");
+  const [googleMapsUrl, setGoogleMapsUrl] = useState(
+    editData?.google_maps_url ?? "",
+  );
+  const [placeId, setPlaceId] = useState(editData?.place_id ?? "");
+  const [lat, setLat] = useState<number | null>(editData?.lat ?? null);
+  const [lng, setLng] = useState<number | null>(editData?.lng ?? null);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+
+  const autocompleteRef = useRef<HTMLInputElement>(null);
+
+  const handlePlaceSelect = useCallback(
+    (place: google.maps.places.PlaceResult) => {
+      if (place.name) setName(place.name);
+      if (place.formatted_address) setAddress(place.formatted_address);
+      if (place.place_id) {
+        setPlaceId(place.place_id);
+        setGoogleMapsUrl(
+          `https://www.google.com/maps/place/?q=place_id:${place.place_id}`,
+        );
+      }
+      if (place.geometry?.location) {
+        setLat(place.geometry.location.lat());
+        setLng(place.geometry.location.lng());
+      }
+      // Try to extract neighborhood from address components
+      const hood = place.address_components?.find(
+        (c) =>
+          c.types.includes("neighborhood") || c.types.includes("sublocality"),
+      );
+      if (hood) setNeighborhood(hood.long_name);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey || !autocompleteRef.current) return;
+
+    let autocomplete: google.maps.places.Autocomplete | null = null;
+
+    setOptions({ key: apiKey });
+    importLibrary("places").then(() => {
+      if (!autocompleteRef.current) return;
+      autocomplete = new google.maps.places.Autocomplete(
+        autocompleteRef.current,
+        {
+          types: ["establishment"],
+          componentRestrictions: { country: "us" },
+          fields: [
+            "name",
+            "formatted_address",
+            "place_id",
+            "geometry",
+            "address_components",
+          ],
+        },
+      );
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete!.getPlace();
+        if (place) handlePlaceSelect(place);
+      });
+    });
+
+    return () => {
+      if (autocomplete) google.maps.event.clearInstanceListeners(autocomplete);
+    };
+  }, [handlePlaceSelect]);
 
   async function handleSave() {
     if (!name.trim() || saving) return;
@@ -59,13 +133,13 @@ export default function AddModal({ onSave, onClose }: Props) {
       price,
       note: note.trim(),
       added_by: addedBy || null,
-      address: null,
-      google_maps_url: null,
-      place_id: null,
-      lat: null,
-      lng: null,
-      photo_url: null,
-      must_try: false,
+      address: address.trim() || null,
+      google_maps_url: googleMapsUrl || null,
+      place_id: placeId || null,
+      lat,
+      lng,
+      photo_url: editData?.photo_url ?? null,
+      must_try: mustTry,
     });
     setSaving(false);
     if (ok) {
@@ -108,7 +182,13 @@ export default function AddModal({ onSave, onClose }: Props) {
             marginBottom: "1.25rem",
           }}
         >
-          {success ? "Spot added!" : "Add a spot"}
+          {success
+            ? editData
+              ? "Spot updated!"
+              : "Spot added!"
+            : editData
+              ? "Edit spot"
+              : "Add a spot"}
         </p>
 
         {success && (
@@ -119,8 +199,23 @@ export default function AddModal({ onSave, onClose }: Props) {
               marginBottom: "1rem",
             }}
           >
-            Restaurant saved successfully.
+            {editData
+              ? "Changes saved successfully."
+              : "Restaurant saved successfully."}
           </p>
+        )}
+
+        {!editData && (
+          <div style={{ marginBottom: "1rem" }}>
+            <label style={labelStyle}>Search Google Places</label>
+            <input
+              ref={autocompleteRef}
+              placeholder="Search for a restaurant..."
+              style={inputStyle}
+              onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+              onBlur={(e) => (e.target.style.borderColor = "var(--brd)")}
+            />
+          </div>
         )}
 
         {[
@@ -141,6 +236,12 @@ export default function AddModal({ onSave, onClose }: Props) {
             value: cuisine,
             set: setCuisine,
             placeholder: "e.g. Mexican, Seafood, Italian...",
+          },
+          {
+            label: "Address",
+            value: address,
+            set: setAddress,
+            placeholder: "e.g. 2228 Kettner Blvd, San Diego",
           },
         ].map((field) => (
           <div key={field.label} style={{ marginBottom: "1rem" }}>
@@ -183,6 +284,29 @@ export default function AddModal({ onSave, onClose }: Props) {
               </button>
             ))}
           </div>
+        </div>
+
+        <div style={{ marginBottom: "1rem" }}>
+          <label style={labelStyle}>Must-Try</label>
+          <button
+            type="button"
+            onClick={() => setMustTry(!mustTry)}
+            style={{
+              padding: "8px 16px",
+              fontSize: 13,
+              fontWeight: 500,
+              border: "1.5px solid",
+              cursor: "pointer",
+              fontFamily: "var(--font-body)",
+              borderRadius: 20,
+              background: mustTry ? "var(--accent)" : "transparent",
+              color: mustTry ? "#fff" : "var(--txt2)",
+              borderColor: mustTry ? "var(--accent)" : "var(--brd)",
+              transition: "all 0.12s",
+            }}
+          >
+            {mustTry ? "★ Must-Try" : "☆ Mark as Must-Try"}
+          </button>
         </div>
 
         {ADMIN_NAMES.length > 0 && (
@@ -239,7 +363,13 @@ export default function AddModal({ onSave, onClose }: Props) {
               opacity: saving || success ? 0.6 : 1,
             }}
           >
-            {saving ? "Saving..." : success ? "Saved!" : "Save restaurant"}
+            {saving
+              ? "Saving..."
+              : success
+                ? "Saved!"
+                : editData
+                  ? "Save changes"
+                  : "Save restaurant"}
           </button>
           <button
             onClick={onClose}

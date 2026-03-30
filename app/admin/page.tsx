@@ -14,8 +14,12 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
   const [showModal, setShowModal] = useState(false);
+  const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(
+    null,
+  );
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [opError, setOpError] = useState("");
+  const [mustTryFilter, setMustTryFilter] = useState(false);
 
   function checkPassword() {
     if (pwInput === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
@@ -50,6 +54,23 @@ export default function AdminPage() {
     return true;
   }
 
+  async function handleEdit(
+    entry: Omit<Restaurant, "id" | "created_at">,
+  ): Promise<boolean> {
+    if (!editingRestaurant) return false;
+    setOpError("");
+    const { error } = await supabase
+      .from("restaurants")
+      .update(entry)
+      .eq("id", editingRestaurant.id);
+    if (error) {
+      setOpError("Failed to update restaurant.");
+      return false;
+    }
+    loadData();
+    return true;
+  }
+
   async function handleDelete(id: number) {
     if (!confirm("Remove this restaurant?")) return;
     setDeletingId(id);
@@ -66,10 +87,11 @@ export default function AdminPage() {
   const cuisines = Array.from(
     new Set(restaurants.map((r) => r.cuisine).filter(Boolean)),
   ).sort();
-  const filtered =
-    activeFilter === "all"
-      ? restaurants
-      : restaurants.filter((r) => r.cuisine === activeFilter);
+  const filtered = restaurants.filter((r) => {
+    if (activeFilter !== "all" && r.cuisine !== activeFilter) return false;
+    if (mustTryFilter && !r.must_try) return false;
+    return true;
+  });
 
   if (!authed) {
     return (
@@ -210,7 +232,12 @@ export default function AdminPage() {
         cuisines={cuisines}
         active={activeFilter}
         onChange={setActiveFilter}
-        onAdd={() => setShowModal(true)}
+        onAdd={() => {
+          setEditingRestaurant(null);
+          setShowModal(true);
+        }}
+        mustTryFilter={mustTryFilter}
+        onMustTryFilterChange={setMustTryFilter}
       />
 
       {opError && (
@@ -232,14 +259,25 @@ export default function AdminPage() {
       ) : (
         <RestaurantGrid
           restaurants={filtered}
-          grouped={activeFilter === "all"}
+          grouped={activeFilter === "all" && !mustTryFilter}
           onDelete={handleDelete}
           deletingId={deletingId}
+          onEdit={(r) => {
+            setEditingRestaurant(r);
+            setShowModal(true);
+          }}
         />
       )}
 
       {showModal && (
-        <AddModal onSave={handleAdd} onClose={() => setShowModal(false)} />
+        <AddModal
+          onSave={editingRestaurant ? handleEdit : handleAdd}
+          onClose={() => {
+            setShowModal(false);
+            setEditingRestaurant(null);
+          }}
+          editData={editingRestaurant}
+        />
       )}
     </main>
   );

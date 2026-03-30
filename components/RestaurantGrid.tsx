@@ -7,16 +7,20 @@ type Props = {
   grouped: boolean;
   onDelete?: (id: number) => void;
   deletingId?: number | null;
+  onEdit?: (r: Restaurant) => void;
+  mustTryFilter?: boolean;
 };
 
 function Card({
   r,
   onDelete,
   deletingId,
+  onEdit,
 }: {
   r: Restaurant;
   onDelete?: (id: number) => void;
   deletingId?: number | null;
+  onEdit?: (r: Restaurant) => void;
 }) {
   return (
     <div
@@ -30,18 +34,42 @@ function Card({
       onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg2)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "var(--bg)")}
     >
-      <p
+      <div
         style={{
-          fontSize: 10,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          fontWeight: 500,
-          color: "var(--accent)",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
           marginBottom: 4,
         }}
       >
-        {r.cuisine}
-      </p>
+        <p
+          style={{
+            fontSize: 10,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            fontWeight: 500,
+            color: "var(--accent)",
+          }}
+        >
+          {r.cuisine}
+        </p>
+        {r.must_try && (
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 500,
+              padding: "2px 8px",
+              borderRadius: 20,
+              background: "var(--accent)",
+              color: "#fff",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}
+          >
+            ★ Must-Try
+          </span>
+        )}
+      </div>
       <p
         style={{
           fontFamily: "var(--font-display)",
@@ -103,6 +131,34 @@ function Card({
           {r.note}
         </p>
       )}
+      {r.address && (
+        <p
+          style={{
+            marginTop: 8,
+            fontSize: 12,
+            color: "var(--txt2)",
+          }}
+        >
+          {r.address}
+        </p>
+      )}
+      {r.google_maps_url && (
+        <a
+          href={r.google_maps_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-block",
+            marginTop: 4,
+            fontSize: 12,
+            fontWeight: 500,
+            color: "var(--accent2)",
+            textDecoration: "none",
+          }}
+        >
+          View on Maps ↗
+        </a>
+      )}
       {r.added_by && (
         <p
           style={{
@@ -114,6 +170,27 @@ function Card({
         >
           Added by {r.added_by}
         </p>
+      )}
+      {onEdit && (
+        <button
+          onClick={() => onEdit(r)}
+          style={{
+            position: "absolute",
+            bottom: "1rem",
+            right: onDelete ? "5rem" : "1rem",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            fontSize: 14,
+            color: "var(--txt2)",
+            fontFamily: "var(--font-body)",
+            opacity: 0.6,
+            padding: 0,
+          }}
+          title="Edit"
+        >
+          Edit
+        </button>
       )}
       {onDelete && (
         <button
@@ -154,6 +231,8 @@ export default function RestaurantGrid({
   grouped,
   onDelete,
   deletingId,
+  onEdit,
+  mustTryFilter,
 }: Props) {
   if (restaurants.length === 0) {
     return (
@@ -181,7 +260,13 @@ export default function RestaurantGrid({
     return (
       <div style={gridStyle}>
         {restaurants.map((r) => (
-          <Card key={r.id} r={r} onDelete={onDelete} deletingId={deletingId} />
+          <Card
+            key={r.id}
+            r={r}
+            onDelete={onDelete}
+            deletingId={deletingId}
+            onEdit={onEdit}
+          />
         ))}
       </div>
     );
@@ -229,6 +314,7 @@ export default function RestaurantGrid({
                   r={r}
                   onDelete={onDelete}
                   deletingId={deletingId}
+                  onEdit={onEdit}
                 />
               ))}
             </div>
