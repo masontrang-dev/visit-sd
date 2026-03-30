@@ -1,17 +1,66 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { supabase, type Restaurant } from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar from "@/components/FilterBar";
 import MapView from "@/components/MapView";
 
 export default function HomePage() {
+  return (
+    <Suspense
+      fallback={
+        <p style={{ padding: "3rem 1.5rem", color: "var(--txt2)" }}>
+          Loading...
+        </p>
+      }
+    >
+      <HomeContent />
+    </Suspense>
+  );
+}
+
+function HomeContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState("all");
+  const [activeFilter, setActiveFilter] = useState(
+    searchParams.get("cuisine") || "all",
+  );
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState(
+    searchParams.get("neighborhood") || "all",
+  );
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
-  const [mustTryFilter, setMustTryFilter] = useState(false);
+  const [mustTryFilter, setMustTryFilter] = useState(
+    searchParams.get("must_try") === "true",
+  );
+
+  const syncParams = useCallback(
+    (cuisine: string, neighborhood: string, mustTry: boolean) => {
+      const params = new URLSearchParams();
+      if (cuisine !== "all") params.set("cuisine", cuisine);
+      if (neighborhood !== "all") params.set("neighborhood", neighborhood);
+      if (mustTry) params.set("must_try", "true");
+      const qs = params.toString();
+      router.replace(qs ? `/?${qs}` : "/", { scroll: false });
+    },
+    [router],
+  );
+
+  function handleCuisineChange(v: string) {
+    setActiveFilter(v);
+    syncParams(v, neighborhoodFilter, mustTryFilter);
+  }
+  function handleNeighborhoodChange(v: string) {
+    setNeighborhoodFilter(v);
+    syncParams(activeFilter, v, mustTryFilter);
+  }
+  function handleMustTryChange(v: boolean) {
+    setMustTryFilter(v);
+    syncParams(activeFilter, neighborhoodFilter, v);
+  }
 
   useEffect(() => {
     async function load() {
@@ -24,13 +73,30 @@ export default function HomePage() {
       setLoading(false);
     }
     load();
+
+    // Fire-and-forget page view log
+    supabase
+      .from("page_views")
+      .insert([
+        {
+          path: window.location.pathname + window.location.search,
+          referrer: document.referrer || null,
+          user_agent: navigator.userAgent || null,
+        },
+      ])
+      .then(() => {});
   }, []);
 
   const cuisines = Array.from(
     new Set(restaurants.map((r) => r.cuisine).filter(Boolean)),
   ).sort();
+  const neighborhoods = Array.from(
+    new Set(restaurants.map((r) => r.neighborhood).filter(Boolean)),
+  ).sort();
   const filtered = restaurants.filter((r) => {
     if (activeFilter !== "all" && r.cuisine !== activeFilter) return false;
+    if (neighborhoodFilter !== "all" && r.neighborhood !== neighborhoodFilter)
+      return false;
     if (mustTryFilter && !r.must_try) return false;
     return true;
   });
@@ -96,12 +162,16 @@ export default function HomePage() {
       <FilterBar
         cuisines={cuisines}
         active={activeFilter}
-        onChange={setActiveFilter}
+        onChange={handleCuisineChange}
+        neighborhoods={neighborhoods}
+        activeNeighborhood={neighborhoodFilter}
+        onNeighborhoodChange={handleNeighborhoodChange}
         showAdmin
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         mustTryFilter={mustTryFilter}
-        onMustTryFilterChange={setMustTryFilter}
+        onMustTryFilterChange={handleMustTryChange}
+        showCopyLink
       />
 
       {loading ? (
@@ -113,7 +183,11 @@ export default function HomePage() {
       ) : (
         <RestaurantGrid
           restaurants={filtered}
-          grouped={activeFilter === "all" && !mustTryFilter}
+          grouped={
+            activeFilter === "all" &&
+            neighborhoodFilter === "all" &&
+            !mustTryFilter
+          }
         />
       )}
     </main>

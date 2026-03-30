@@ -51,6 +51,7 @@ export default function AddModal({ onSave, onClose, editData }: Props) {
     editData?.added_by ?? ADMIN_NAMES[0] ?? "",
   );
   const [mustTry, setMustTry] = useState(editData?.must_try ?? false);
+  const [photoUrl, setPhotoUrl] = useState(editData?.photo_url ?? "");
   const [address, setAddress] = useState(editData?.address ?? "");
   const [googleMapsUrl, setGoogleMapsUrl] = useState(
     editData?.google_maps_url ?? "",
@@ -138,7 +139,7 @@ export default function AddModal({ onSave, onClose, editData }: Props) {
       place_id: placeId || null,
       lat,
       lng,
-      photo_url: editData?.photo_url ?? null,
+      photo_url: photoUrl.trim() || null,
       must_try: mustTry,
     });
     setSaving(false);
@@ -325,6 +326,34 @@ export default function AddModal({ onSave, onClose, editData }: Props) {
             </select>
           </div>
         )}
+
+        <div style={{ marginBottom: "1rem" }}>
+          <label style={labelStyle}>Photo URL</label>
+          <input
+            value={photoUrl}
+            onChange={(e) => setPhotoUrl(e.target.value)}
+            placeholder="https://example.com/photo.jpg"
+            style={inputStyle}
+            onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+            onBlur={(e) => (e.target.style.borderColor = "var(--brd)")}
+          />
+          {photoUrl.trim() && (
+            <img
+              src={photoUrl.trim()}
+              alt="Preview"
+              style={{
+                marginTop: 8,
+                width: "100%",
+                height: 120,
+                objectFit: "cover",
+                border: "1px solid var(--brd)",
+              }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          )}
+        </div>
 
         <div style={{ marginBottom: "1rem" }}>
           <label style={labelStyle}>Why you love it</label>

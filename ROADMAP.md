@@ -108,25 +108,25 @@ CREATE POLICY "Anon update" ON restaurants FOR UPDATE USING (true) WITH CHECK (t
 
 ## Step 10 — Shareable Filtered Links _(~20 min)_
 
-- [ ] Sync active filter to URL query params (e.g. `/?cuisine=Mexican`)
-- [ ] Read filter from URL on page load
-- [ ] Add "Copy link" button to filter bar
+- [x] Sync active filter to URL query params (e.g. `/?cuisine=Mexican`)
+- [x] Read filter from URL on page load
+- [x] Add "Copy link" button to filter bar
 
 ---
 
 ## Step 11 — Neighborhood Filter _(~20 min)_
 
-- [ ] Add second row of filter buttons for neighborhoods
-- [ ] Both filters (cuisine + neighborhood) can be active simultaneously
-- [ ] Include neighborhood in shareable URL params
+- [x] Add second row of filter buttons for neighborhoods
+- [x] Both filters (cuisine + neighborhood) can be active simultaneously
+- [x] Include neighborhood in shareable URL params
 
 ---
 
 ## Step 12 — Photo Support _(~45 min)_
 
-- [ ] Add optional photo URL field in `AddModal.tsx`
-- [ ] Display photo as card header/thumbnail in `RestaurantGrid.tsx`
-- [ ] Graceful fallback when no photo is set
+- [x] Add optional photo URL field in `AddModal.tsx`
+- [x] Display photo as card header/thumbnail in `RestaurantGrid.tsx`
+- [x] Graceful fallback when no photo is set
 
 ---
 
@@ -150,9 +150,9 @@ CREATE POLICY "Anon read" ON page_views FOR SELECT USING (true);
 ```
 
 - [ ] Run `page_views` migration in Supabase SQL Editor
-- [ ] Log a row on each public page load (fire-and-forget, non-blocking)
-- [ ] Build Admin → Stats section: total views, views per day, top referrers
-- [ ] Auto-delete rows older than 90 days (Supabase cron or app-level cleanup)
+- [x] Log a row on each public page load (fire-and-forget, non-blocking)
+- [x] Build Admin → Stats section: total views, views per day, top referrers
+- [x] Auto-delete rows older than 90 days (Supabase cron or app-level cleanup)
 
 ---
 

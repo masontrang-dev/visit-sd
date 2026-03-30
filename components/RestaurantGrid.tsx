@@ -26,7 +26,6 @@ function Card({
     <div
       style={{
         background: "var(--bg)",
-        padding: "1.25rem",
         position: "relative",
         borderBottom: "0.5px solid var(--brd)",
         transition: "background 0.1s",
@@ -34,186 +33,203 @@ function Card({
       onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg2)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "var(--bg)")}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          marginBottom: 4,
-        }}
-      >
-        <p
+      {r.photo_url && (
+        <img
+          src={r.photo_url}
+          alt={r.name}
           style={{
-            fontSize: 10,
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            fontWeight: 500,
-            color: "var(--accent)",
+            width: "100%",
+            height: 140,
+            objectFit: "cover",
+            display: "block",
           }}
-        >
-          {r.cuisine}
-        </p>
-        {r.must_try && (
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 500,
-              padding: "2px 8px",
-              borderRadius: 20,
-              background: "var(--accent)",
-              color: "#fff",
-              letterSpacing: "0.05em",
-              textTransform: "uppercase",
-            }}
-          >
-            ★ Must-Try
-          </span>
-        )}
-      </div>
-      <p
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: 28,
-          lineHeight: 1,
-          color: "var(--txt)",
-          marginBottom: 4,
-        }}
-      >
-        {r.name}
-      </p>
-      <p
-        style={
-          {
-            fontSize: 13,
-            color: "var(--txt2)",
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-          } as React.CSSProperties
-        }
-      >
-        <span
-          style={{
-            display: "inline-block",
-            width: 6,
-            height: 6,
-            borderRadius: "50%",
-            background: "var(--accent2)",
-            flexShrink: 0,
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = "none";
           }}
         />
-        {r.neighborhood}
-      </p>
-      <p
-        style={{
-          position: "absolute",
-          top: "1.25rem",
-          right: "1.25rem",
-          fontSize: 13,
-          fontWeight: 500,
-          color: "var(--txt2)",
-        }}
-      >
-        {r.price}
-      </p>
-      {r.note && (
+      )}
+      <div style={{ padding: "1.25rem" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: 4,
+          }}
+        >
+          <p
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              fontWeight: 500,
+              color: "var(--accent)",
+            }}
+          >
+            {r.cuisine}
+          </p>
+          {r.must_try && (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 500,
+                padding: "2px 8px",
+                borderRadius: 20,
+                background: "var(--accent)",
+                color: "#fff",
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+              }}
+            >
+              ★ Must-Try
+            </span>
+          )}
+        </div>
         <p
           style={{
-            marginTop: 10,
+            fontFamily: "var(--font-display)",
+            fontSize: 28,
+            lineHeight: 1,
+            color: "var(--txt)",
+            marginBottom: 4,
+          }}
+        >
+          {r.name}
+        </p>
+        <p
+          style={
+            {
+              fontSize: 13,
+              color: "var(--txt2)",
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+            } as React.CSSProperties
+          }
+        >
+          <span
+            style={{
+              display: "inline-block",
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: "var(--accent2)",
+              flexShrink: 0,
+            }}
+          />
+          {r.neighborhood}
+        </p>
+        <p
+          style={{
+            position: "absolute",
+            top: "1.25rem",
+            right: "1.25rem",
             fontSize: 13,
-            color: "var(--txt2)",
-            lineHeight: 1.5,
-            borderTop: "0.5px solid var(--brd)",
-            paddingTop: 10,
-            fontStyle: "italic",
-          }}
-        >
-          {r.note}
-        </p>
-      )}
-      {r.address && (
-        <p
-          style={{
-            marginTop: 8,
-            fontSize: 12,
-            color: "var(--txt2)",
-          }}
-        >
-          {r.address}
-        </p>
-      )}
-      {r.google_maps_url && (
-        <a
-          href={r.google_maps_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: "inline-block",
-            marginTop: 4,
-            fontSize: 12,
             fontWeight: 500,
-            color: "var(--accent2)",
-            textDecoration: "none",
-          }}
-        >
-          View on Maps ↗
-        </a>
-      )}
-      {r.added_by && (
-        <p
-          style={{
-            marginTop: 8,
-            fontSize: 11,
             color: "var(--txt2)",
-            letterSpacing: "0.05em",
           }}
         >
-          Added by {r.added_by}
+          {r.price}
         </p>
-      )}
-      {onEdit && (
-        <button
-          onClick={() => onEdit(r)}
-          style={{
-            position: "absolute",
-            bottom: "1rem",
-            right: onDelete ? "5rem" : "1rem",
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            fontSize: 14,
-            color: "var(--txt2)",
-            fontFamily: "var(--font-body)",
-            opacity: 0.6,
-            padding: 0,
-          }}
-          title="Edit"
-        >
-          Edit
-        </button>
-      )}
-      {onDelete && (
-        <button
-          onClick={() => onDelete(r.id)}
-          disabled={deletingId === r.id}
-          style={{
-            position: "absolute",
-            bottom: "1rem",
-            right: "1rem",
-            background: "transparent",
-            border: "none",
-            cursor: deletingId === r.id ? "default" : "pointer",
-            fontSize: 14,
-            color: "var(--accent)",
-            fontFamily: "var(--font-body)",
-            opacity: deletingId === r.id ? 0.3 : 0.6,
-            padding: 0,
-          }}
-          title="Remove"
-        >
-          {deletingId === r.id ? "Removing..." : "Remove"}
-        </button>
-      )}
+        {r.note && (
+          <p
+            style={{
+              marginTop: 10,
+              fontSize: 13,
+              color: "var(--txt2)",
+              lineHeight: 1.5,
+              borderTop: "0.5px solid var(--brd)",
+              paddingTop: 10,
+              fontStyle: "italic",
+            }}
+          >
+            {r.note}
+          </p>
+        )}
+        {r.address && (
+          <p
+            style={{
+              marginTop: 8,
+              fontSize: 12,
+              color: "var(--txt2)",
+            }}
+          >
+            {r.address}
+          </p>
+        )}
+        {r.google_maps_url && (
+          <a
+            href={r.google_maps_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-block",
+              marginTop: 4,
+              fontSize: 12,
+              fontWeight: 500,
+              color: "var(--accent2)",
+              textDecoration: "none",
+            }}
+          >
+            View on Maps ↗
+          </a>
+        )}
+        {r.added_by && (
+          <p
+            style={{
+              marginTop: 8,
+              fontSize: 11,
+              color: "var(--txt2)",
+              letterSpacing: "0.05em",
+            }}
+          >
+            Added by {r.added_by}
+          </p>
+        )}
+        {onEdit && (
+          <button
+            onClick={() => onEdit(r)}
+            style={{
+              position: "absolute",
+              bottom: "1rem",
+              right: onDelete ? "5rem" : "1rem",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 14,
+              color: "var(--txt2)",
+              fontFamily: "var(--font-body)",
+              opacity: 0.6,
+              padding: 0,
+            }}
+            title="Edit"
+          >
+            Edit
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={() => onDelete(r.id)}
+            disabled={deletingId === r.id}
+            style={{
+              position: "absolute",
+              bottom: "1rem",
+              right: "1rem",
+              background: "transparent",
+              border: "none",
+              cursor: deletingId === r.id ? "default" : "pointer",
+              fontSize: 14,
+              color: "var(--accent)",
+              fontFamily: "var(--font-body)",
+              opacity: deletingId === r.id ? 0.3 : 0.6,
+              padding: 0,
+            }}
+            title="Remove"
+          >
+            {deletingId === r.id ? "Removing..." : "Remove"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

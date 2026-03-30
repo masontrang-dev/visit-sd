@@ -23,4 +23,13 @@ const supabaseUrl =
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
 
+export type PageView = {
+  id: number;
+  path: string;
+  referrer: string | null;
+  user_agent: string | null;
+  city: string | null;
+  created_at: string;
+};
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
