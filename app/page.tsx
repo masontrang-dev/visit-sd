@@ -9,13 +9,7 @@ import MapView from "@/components/MapView";
 
 export default function HomePage() {
   return (
-    <Suspense
-      fallback={
-        <p style={{ padding: "3rem 1.5rem", color: "var(--txt2)" }}>
-          Loading...
-        </p>
-      }
-    >
+    <Suspense fallback={<p className="py-12 px-6 text-txt2">Loading...</p>}>
       <HomeContent />
     </Suspense>
   );
@@ -105,53 +99,25 @@ function HomeContent() {
   const cuisineCount = cuisines.length;
 
   return (
-    <main style={{ minHeight: "100vh" }}>
+    <main className="min-h-screen">
       {/* Hero */}
-      <header
-        style={{
-          padding: "2.5rem 1.5rem 1.5rem",
-          borderBottom: "2px solid var(--txt)",
-        }}
-      >
-        <p
-          style={{
-            fontSize: 11,
-            letterSpacing: "0.15em",
-            textTransform: "uppercase",
-            color: "var(--accent)",
-            fontWeight: 500,
-            marginBottom: 6,
-          }}
-        >
+      <header className="pt-10 px-6 pb-6 border-b-2 border-txt">
+        <p className="text-[11px] tracking-[0.15em] uppercase text-accent font-medium mb-1.5">
           Local Picks · San Diego
         </p>
-        <h1
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "clamp(56px,12vw,96px)",
-            lineHeight: 0.88,
-            letterSpacing: "0.02em",
-          }}
-        >
+        <h1 className="font-display text-[clamp(56px,12vw,96px)] leading-[0.88] tracking-[0.02em]">
           VISIT
           <br />
-          <span style={{ color: "var(--accent)" }}>SD</span>
+          <span className="text-accent">SD</span>
         </h1>
-        <p style={{ fontSize: 14, color: "var(--txt2)", marginTop: 12 }}>
+        <p className="text-sm text-txt2 mt-3">
           Our go-to spots for visitors &amp; friends
         </p>
-        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+        <div className="flex gap-2.5 mt-4">
           {[`${totalCount} spots`, `${cuisineCount} cuisines`].map((label) => (
             <span
               key={label}
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-                padding: "4px 12px",
-                borderRadius: 20,
-                border: "1.5px solid var(--txt)",
-                color: "var(--txt)",
-              }}
+              className="text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt text-txt"
             >
               {label}
             </span>
@@ -175,9 +141,7 @@ function HomeContent() {
       />
 
       {loading ? (
-        <p style={{ padding: "3rem 1.5rem", color: "var(--txt2)" }}>
-          Loading...
-        </p>
+        <p className="py-12 px-6 text-txt2">Loading...</p>
       ) : viewMode === "map" ? (
         <MapView restaurants={filtered} />
       ) : (
@@ -191,23 +155,8 @@ function HomeContent() {
         />
       )}
 
-      <footer
-        style={{
-          padding: "1.5rem",
-          display: "flex",
-          justifyContent: "flex-end",
-        }}
-      >
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 500,
-            color: "var(--txt2)",
-            opacity: 0.5,
-            letterSpacing: "0.05em",
-            fontFamily: "var(--font-body)",
-          }}
-        >
+      <footer className="p-6 flex justify-end">
+        <span className="text-[11px] font-medium text-txt2 opacity-50 tracking-[0.05em] font-body">
           v{process.env.NEXT_PUBLIC_APP_VERSION}
         </span>
       </footer>

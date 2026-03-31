@@ -8,6 +8,7 @@ import AddModal from "@/components/AddModal";
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState(false);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -77,8 +78,26 @@ export default function AdminPage() {
     loadStats();
   }
 
-  function checkPassword() {
-    if (pwInput === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+  useEffect(() => {
+    fetch("/api/auth")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.authed) {
+          setAuthed(true);
+          loadData();
+        }
+      })
+      .finally(() => setAuthLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function checkPassword() {
+    const res = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pwInput }),
+    });
+    if (res.ok) {
       setAuthed(true);
       loadData();
     } else {
@@ -101,7 +120,12 @@ export default function AdminPage() {
     entry: Omit<Restaurant, "id" | "created_at">,
   ): Promise<boolean> {
     setOpError("");
-    const { error } = await supabase.from("restaurants").insert([entry]);
+    console.log("INSERT payload:", JSON.stringify(entry, null, 2));
+    const { error, data } = await supabase
+      .from("restaurants")
+      .insert([entry])
+      .select();
+    console.log("INSERT response:", { error, data });
     if (error) {
       setOpError("Failed to add restaurant.");
       return false;
@@ -154,28 +178,20 @@ export default function AdminPage() {
     return true;
   });
 
+  if (authLoading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center p-8">
+        <p className="text-txt2 text-sm">Loading...</p>
+      </main>
+    );
+  }
+
   if (!authed) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "2rem",
-        }}
-      >
-        <div style={{ width: "100%", maxWidth: 360 }}>
-          <p
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 48,
-              marginBottom: 8,
-            }}
-          >
-            ADMIN
-          </p>
-          <p style={{ color: "var(--txt2)", fontSize: 14, marginBottom: 24 }}>
+      <main className="min-h-screen flex items-center justify-center p-8">
+        <div className="w-full max-w-[360px]">
+          <p className="font-display text-5xl mb-2">ADMIN</p>
+          <p className="text-txt2 text-sm mb-6">
             Enter your admin password to manage restaurants.
           </p>
           <input
@@ -187,40 +203,16 @@ export default function AdminPage() {
               setPwError(false);
             }}
             onKeyDown={(e) => e.key === "Enter" && checkPassword()}
-            style={{
-              width: "100%",
-              padding: "10px 14px",
-              fontSize: 15,
-              border: `1.5px solid ${pwError ? "var(--accent)" : "var(--brd)"}`,
-              background: "var(--bg)",
-              color: "var(--txt)",
-              borderRadius: 0,
-              outline: "none",
-              fontFamily: "var(--font-body)",
-              marginBottom: 8,
-            }}
+            className={`w-full py-2.5 px-3.5 text-[15px] border-[1.5px] ${
+              pwError ? "border-accent" : "border-brd"
+            } bg-bg text-txt rounded-none outline-none font-body mb-2`}
           />
           {pwError && (
-            <p
-              style={{ color: "var(--accent)", fontSize: 13, marginBottom: 12 }}
-            >
-              Incorrect password
-            </p>
+            <p className="text-accent text-[13px] mb-3">Incorrect password</p>
           )}
           <button
             onClick={checkPassword}
-            style={{
-              width: "100%",
-              padding: 10,
-              background: "var(--txt)",
-              color: "var(--bg)",
-              border: "none",
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: "pointer",
-              fontFamily: "var(--font-body)",
-              borderRadius: 0,
-            }}
+            className="w-full p-2.5 bg-txt text-bg border-none text-sm font-medium cursor-pointer font-body rounded-none"
           >
             Sign in
           </button>
@@ -230,59 +222,23 @@ export default function AdminPage() {
   }
 
   return (
-    <main style={{ minHeight: "100vh" }}>
-      <header
-        style={{
-          padding: "2.5rem 1.5rem 1.5rem",
-          borderBottom: "2px solid var(--txt)",
-        }}
-      >
-        <p
-          style={{
-            fontSize: 11,
-            letterSpacing: "0.15em",
-            textTransform: "uppercase",
-            color: "var(--accent)",
-            fontWeight: 500,
-            marginBottom: 6,
-          }}
-        >
+    <main className="min-h-screen">
+      <header className="pt-10 px-6 pb-6 border-b-2 border-txt">
+        <p className="text-[11px] tracking-[0.15em] uppercase text-accent font-medium mb-1.5">
           Admin · San Diego
         </p>
-        <h1
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "clamp(48px,10vw,80px)",
-            lineHeight: 0.88,
-          }}
-        >
+        <h1 className="font-display text-[clamp(48px,10vw,80px)] leading-[0.88]">
           MANAGE
           <br />
-          <span style={{ color: "var(--accent)" }}>SPOTS</span>
+          <span className="text-accent">SPOTS</span>
         </h1>
-        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              padding: "4px 12px",
-              borderRadius: 20,
-              border: "1.5px solid var(--txt)",
-            }}
-          >
+        <div className="flex gap-2.5 mt-4">
+          <span className="text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt">
             {restaurants.length} spots
           </span>
           <a
             href="/"
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              padding: "4px 12px",
-              borderRadius: 20,
-              border: "1.5px solid var(--brd)",
-              color: "var(--txt2)",
-              textDecoration: "none",
-            }}
+            className="text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-brd text-txt2 no-underline"
           >
             ← Public view
           </a>
@@ -305,21 +261,11 @@ export default function AdminPage() {
       />
 
       {opError && (
-        <p
-          style={{
-            padding: "0.75rem 1.5rem",
-            color: "var(--accent)",
-            fontSize: 13,
-          }}
-        >
-          {opError}
-        </p>
+        <p className="py-3 px-6 text-accent text-[13px]">{opError}</p>
       )}
 
       {loading ? (
-        <p style={{ padding: "3rem 1.5rem", color: "var(--txt2)" }}>
-          Loading...
-        </p>
+        <p className="py-12 px-6 text-txt2">Loading...</p>
       ) : (
         <RestaurantGrid
           restaurants={filtered}
@@ -338,100 +284,35 @@ export default function AdminPage() {
       )}
 
       {/* Stats Section */}
-      <section
-        style={{
-          borderTop: "2px solid var(--txt)",
-          padding: "1.5rem",
-        }}
-      >
+      <section className="border-t-2 border-txt p-6">
         <button
           onClick={() => {
             setShowStats(!showStats);
             if (!showStats) loadStats();
           }}
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 22,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "var(--txt)",
-            padding: 0,
-            letterSpacing: "0.04em",
-          }}
+          className="font-display text-[22px] bg-none border-none cursor-pointer text-txt p-0 tracking-[0.04em]"
         >
           {showStats ? "▾ STATS" : "▸ STATS"}
         </button>
 
         {showStats && (
-          <div style={{ marginTop: "1rem" }}>
+          <div className="mt-4">
             {statsLoading ? (
-              <p style={{ color: "var(--txt2)", fontSize: 14 }}>
-                Loading stats...
-              </p>
+              <p className="text-txt2 text-sm">Loading stats...</p>
             ) : (
               <>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 16,
-                    marginBottom: "1.5rem",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "1rem 1.25rem",
-                      border: "1.5px solid var(--brd)",
-                      minWidth: 140,
-                    }}
-                  >
-                    <p
-                      style={{
-                        fontSize: 10,
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                        fontWeight: 500,
-                        color: "var(--txt2)",
-                        marginBottom: 4,
-                      }}
-                    >
+                <div className="flex gap-4 mb-6 flex-wrap">
+                  <div className="p-4 pr-5 border-[1.5px] border-brd min-w-[140px]">
+                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1">
                       Total views
                     </p>
-                    <p
-                      style={{
-                        fontFamily: "var(--font-display)",
-                        fontSize: 36,
-                      }}
-                    >
-                      {totalViews}
-                    </p>
+                    <p className="font-display text-4xl">{totalViews}</p>
                   </div>
-                  <div
-                    style={{
-                      padding: "1rem 1.25rem",
-                      border: "1.5px solid var(--brd)",
-                      minWidth: 140,
-                    }}
-                  >
-                    <p
-                      style={{
-                        fontSize: 10,
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                        fontWeight: 500,
-                        color: "var(--txt2)",
-                        marginBottom: 4,
-                      }}
-                    >
+                  <div className="p-4 pr-5 border-[1.5px] border-brd min-w-[140px]">
+                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1">
                       Today
                     </p>
-                    <p
-                      style={{
-                        fontFamily: "var(--font-display)",
-                        fontSize: 36,
-                      }}
-                    >
+                    <p className="font-display text-4xl">
                       {viewsByDay.length > 0
                         ? viewsByDay[viewsByDay.length - 1].date ===
                           new Date().toISOString().slice(0, 10)
@@ -444,29 +325,11 @@ export default function AdminPage() {
 
                 {/* Views per day bar chart */}
                 {viewsByDay.length > 0 && (
-                  <div style={{ marginBottom: "1.5rem" }}>
-                    <p
-                      style={{
-                        fontSize: 10,
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                        fontWeight: 500,
-                        color: "var(--txt2)",
-                        marginBottom: 8,
-                      }}
-                    >
+                  <div className="mb-6">
+                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-2">
                       Views per day (last 30 days)
                     </p>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-end",
-                        gap: 2,
-                        height: 80,
-                        borderBottom: "1px solid var(--brd)",
-                        paddingBottom: 4,
-                      }}
-                    >
+                    <div className="flex items-end gap-0.5 h-20 border-b border-brd pb-1">
                       {viewsByDay.map((d) => {
                         const max = Math.max(...viewsByDay.map((v) => v.count));
                         const h = max > 0 ? (d.count / max) * 70 : 0;
@@ -474,13 +337,8 @@ export default function AdminPage() {
                           <div
                             key={d.date}
                             title={`${d.date}: ${d.count}`}
-                            style={{
-                              flex: 1,
-                              height: Math.max(h, 2),
-                              background: "var(--accent)",
-                              borderRadius: "2px 2px 0 0",
-                              minWidth: 4,
-                            }}
+                            className="flex-1 bg-accent rounded-t-sm min-w-[4px]"
+                            style={{ height: Math.max(h, 2) }}
                           />
                         );
                       })}
@@ -490,42 +348,19 @@ export default function AdminPage() {
 
                 {/* Top referrers */}
                 {topReferrers.length > 0 && (
-                  <div style={{ marginBottom: "1.5rem" }}>
-                    <p
-                      style={{
-                        fontSize: 10,
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                        fontWeight: 500,
-                        color: "var(--txt2)",
-                        marginBottom: 8,
-                      }}
-                    >
+                  <div className="mb-6">
+                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-2">
                       Top referrers
                     </p>
                     {topReferrers.map((ref) => (
                       <div
                         key={ref.referrer}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          padding: "6px 0",
-                          borderBottom: "0.5px solid var(--brd)",
-                          fontSize: 13,
-                        }}
+                        className="flex justify-between py-1.5 border-b border-brd text-[13px]"
                       >
-                        <span
-                          style={{
-                            color: "var(--txt2)",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            maxWidth: "80%",
-                          }}
-                        >
+                        <span className="text-txt2 overflow-hidden text-ellipsis whitespace-nowrap max-w-[80%]">
                           {ref.referrer}
                         </span>
-                        <span style={{ fontWeight: 500 }}>{ref.count}</span>
+                        <span className="font-medium">{ref.count}</span>
                       </div>
                     ))}
                   </div>
@@ -533,17 +368,7 @@ export default function AdminPage() {
 
                 <button
                   onClick={cleanupOldViews}
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    padding: "6px 14px",
-                    borderRadius: 20,
-                    border: "1.5px solid var(--brd)",
-                    background: "transparent",
-                    cursor: "pointer",
-                    color: "var(--txt2)",
-                    fontFamily: "var(--font-body)",
-                  }}
+                  className="text-xs font-medium py-1.5 px-3.5 rounded-pill border-[1.5px] border-brd bg-transparent cursor-pointer text-txt2 font-body"
                 >
                   Delete views older than 90 days
                 </button>
@@ -553,23 +378,8 @@ export default function AdminPage() {
         )}
       </section>
 
-      <footer
-        style={{
-          padding: "1.5rem",
-          display: "flex",
-          justifyContent: "flex-end",
-        }}
-      >
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 500,
-            color: "var(--txt2)",
-            opacity: 0.5,
-            letterSpacing: "0.05em",
-            fontFamily: "var(--font-body)",
-          }}
-        >
+      <footer className="p-6 flex justify-end">
+        <span className="text-[11px] font-medium text-txt2 opacity-50 tracking-[0.05em] font-body">
           v{process.env.NEXT_PUBLIC_APP_VERSION}
         </span>
       </footer>

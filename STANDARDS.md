@@ -97,10 +97,11 @@ All colors, fonts, and shared values are defined as CSS custom properties in `gl
 ### Rules
 
 - **Always reference CSS variables** — never hardcode color hex values in components. The only exception is `#fff` for white text on colored backgrounds.
-- **Inline styles via `React.CSSProperties`** — this is the current convention. Do not introduce CSS modules or styled-components.
-- **After Tailwind migration (Step 15)**: Tailwind utility classes replace inline styles. CSS variables migrate to Tailwind theme config.
-- **Shared style objects** (e.g. `inputStyle`, `labelStyle`, `gridStyle`) are defined as `const` at the top of the file, not inline.
+- **Tailwind utility classes** — all styling uses Tailwind classes via `className`. Do not use inline `style` objects except for truly dynamic values (e.g. computed heights).
+- **CSS variables remain in `globals.css`** and are referenced via Tailwind theme config (`tailwind.config.js`). Custom colors (`accent`, `bg`, `txt`, etc.) and fonts (`font-display`, `font-body`) are available as Tailwind utilities.
+- **Shared class strings** (e.g. `inputCls`, `labelCls`, `btnBase`) are defined as `const` at the top of the file.
 - **No external CSS files per component** — all styling is colocated in the component file.
+- **Dark mode**: Uses `class` strategy via `darkMode: "class"` in Tailwind config. CSS variables swap in `.dark` class on `<html>`. Toggle persists to `localStorage` and auto-detects `prefers-color-scheme` on first visit.
 
 ### Typography
 

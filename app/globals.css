@@ -1,22 +1,33 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;1,400&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;1,400&display=swap");
 
-:root {
-  --accent: #D85A30;
-  --accent2: #1D9E75;
-  --bg: #FAFAF8;
-  --bg2: #F1EFE8;
-  --txt: #1a1a18;
-  --txt2: #5F5E5A;
-  --brd: rgba(26,26,24,0.12);
-  --font-display: 'Bebas Neue', sans-serif;
-  --font-body: 'DM Sans', sans-serif;
-}
+@layer base {
+  :root {
+    --accent: #d85a30;
+    --accent2: #1d9e75;
+    --bg: #fafaf8;
+    --bg2: #f1efe8;
+    --txt: #1a1a18;
+    --txt2: #5f5e5a;
+    --brd: rgba(26, 26, 24, 0.12);
+    --font-display: "Bebas Neue", sans-serif;
+    --font-body: "DM Sans", sans-serif;
+  }
 
-body {
-  font-family: var(--font-body);
-  background: var(--bg);
-  color: var(--txt);
-  -webkit-font-smoothing: antialiased;
+  .dark {
+    --accent: #e8734f;
+    --accent2: #2bbf8e;
+    --bg: #1a1a18;
+    --bg2: #2a2a26;
+    --txt: #fafaf8;
+    --txt2: #a8a7a3;
+    --brd: rgba(250, 250, 248, 0.12);
+  }
+
+  body {
+    @apply font-body bg-bg text-txt antialiased;
+  }
 }

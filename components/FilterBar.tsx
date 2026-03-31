@@ -18,6 +18,11 @@ type Props = {
   showCopyLink?: boolean;
 };
 
+const btnBase =
+  "font-body text-[13px] font-medium py-1.5 px-3.5 rounded-pill border-[1.5px] border-brd bg-transparent cursor-pointer text-txt2 transition-all duration-[0.12s] whitespace-nowrap";
+const btnActive =
+  "font-body text-[13px] font-medium py-1.5 px-3.5 rounded-pill border-[1.5px] border-txt bg-txt cursor-pointer text-bg transition-all duration-[0.12s] whitespace-nowrap";
+
 export default function FilterBar({
   cuisines,
   active,
@@ -34,41 +39,12 @@ export default function FilterBar({
   showCopyLink,
 }: Props) {
   const [copied, setCopied] = useState(false);
-  const btnBase: React.CSSProperties = {
-    fontFamily: "var(--font-body)",
-    fontSize: 13,
-    fontWeight: 500,
-    padding: "6px 14px",
-    borderRadius: 20,
-    border: "1.5px solid var(--brd)",
-    background: "transparent",
-    cursor: "pointer",
-    color: "var(--txt2)",
-    transition: "all 0.12s",
-    whiteSpace: "nowrap",
-  };
-  const btnActive: React.CSSProperties = {
-    ...btnBase,
-    background: "var(--txt)",
-    color: "var(--bg)",
-    borderColor: "var(--txt)",
-  };
 
   return (
     <>
-      <div
-        style={{
-          display: "flex",
-          gap: 6,
-          padding: "0.875rem 1.5rem",
-          borderBottom: "0.5px solid var(--brd)",
-          flexWrap: "wrap",
-          alignItems: "center",
-          overflowX: "auto",
-        }}
-      >
+      <div className="flex gap-1.5 py-3.5 px-6 border-b border-brd flex-wrap items-center overflow-x-auto">
         <button
-          style={active === "all" ? btnActive : btnBase}
+          className={active === "all" ? btnActive : btnBase}
           onClick={() => onChange("all")}
         >
           All
@@ -76,7 +52,7 @@ export default function FilterBar({
         {cuisines.map((c) => (
           <button
             key={c}
-            style={active === c ? btnActive : btnBase}
+            className={active === c ? btnActive : btnBase}
             onClick={() => onChange(c)}
           >
             {c}
@@ -84,13 +60,9 @@ export default function FilterBar({
         ))}
         {onMustTryFilterChange && (
           <button
-            style={
+            className={
               mustTryFilter
-                ? {
-                    ...btnActive,
-                    background: "var(--accent)",
-                    borderColor: "var(--accent)",
-                  }
+                ? "font-body text-[13px] font-medium py-1.5 px-3.5 rounded-pill border-[1.5px] border-accent bg-accent cursor-pointer text-white transition-all duration-[0.12s] whitespace-nowrap"
                 : btnBase
             }
             onClick={() => onMustTryFilterChange(!mustTryFilter)}
@@ -101,38 +73,21 @@ export default function FilterBar({
         {onAdd && (
           <button
             onClick={onAdd}
-            style={{
-              fontFamily: "var(--font-body)",
-              marginLeft: "auto",
-              fontSize: 13,
-              fontWeight: 500,
-              padding: "6px 18px",
-              borderRadius: 20,
-              border: "none",
-              background: "var(--accent)",
-              color: "#fff",
-              cursor: "pointer",
-            }}
+            className="font-body ml-auto text-[13px] font-medium py-1.5 px-[18px] rounded-pill border-none bg-accent text-white cursor-pointer"
           >
             + Add restaurant
           </button>
         )}
         {onViewModeChange && (
-          <div
-            style={{
-              display: "flex",
-              gap: 4,
-              marginLeft: onAdd || showAdmin ? 0 : "auto",
-            }}
-          >
+          <div className={`flex gap-1 ${onAdd || showAdmin ? "" : "ml-auto"}`}>
             <button
-              style={viewMode === "list" ? btnActive : btnBase}
+              className={viewMode === "list" ? btnActive : btnBase}
               onClick={() => onViewModeChange("list")}
             >
               List
             </button>
             <button
-              style={viewMode === "map" ? btnActive : btnBase}
+              className={viewMode === "map" ? btnActive : btnBase}
               onClick={() => onViewModeChange("map")}
             >
               Map
@@ -141,10 +96,7 @@ export default function FilterBar({
         )}
         {showCopyLink && (
           <button
-            style={{
-              ...btnBase,
-              marginLeft: onAdd ? 0 : undefined,
-            }}
+            className={`${btnBase} ${onAdd ? "" : "ml-auto"}`}
             onClick={() => {
               navigator.clipboard.writeText(window.location.href);
               setCopied(true);
@@ -157,46 +109,19 @@ export default function FilterBar({
         {showAdmin && (
           <a
             href="/admin"
-            style={{
-              marginLeft: "auto",
-              fontFamily: "var(--font-body)",
-              fontSize: 12,
-              color: "var(--txt2)",
-              textDecoration: "none",
-              padding: "6px 0",
-              opacity: 0.5,
-            }}
+            className="ml-auto font-body text-xs text-txt2 no-underline py-1.5 opacity-50"
           >
             Admin ↗
           </a>
         )}
       </div>
       {neighborhoods && neighborhoods.length > 0 && onNeighborhoodChange && (
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            padding: "0.5rem 1.5rem 0.875rem",
-            borderBottom: "0.5px solid var(--brd)",
-            flexWrap: "wrap",
-            alignItems: "center",
-            overflowX: "auto",
-          }}
-        >
-          <span
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              fontWeight: 500,
-              color: "var(--txt2)",
-              marginRight: 4,
-            }}
-          >
+        <div className="flex gap-1.5 py-2 px-6 pb-3.5 border-b border-brd flex-wrap items-center overflow-x-auto">
+          <span className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mr-1">
             Area
           </span>
           <button
-            style={activeNeighborhood === "all" ? btnActive : btnBase}
+            className={activeNeighborhood === "all" ? btnActive : btnBase}
             onClick={() => onNeighborhoodChange("all")}
           >
             All
@@ -204,7 +129,7 @@ export default function FilterBar({
           {neighborhoods.map((n) => (
             <button
               key={n}
-              style={activeNeighborhood === n ? btnActive : btnBase}
+              className={activeNeighborhood === n ? btnActive : btnBase}
               onClick={() => onNeighborhoodChange(n)}
             >
               {n}

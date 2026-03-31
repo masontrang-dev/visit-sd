@@ -170,27 +170,27 @@ CREATE POLICY "Anon read" ON page_views FOR SELECT USING (true);
 
 ## Step 15 — Server-Side Admin Auth _(~1 hr)_
 
-- [ ] Create Route Handler at `app/api/auth/route.ts` for password check
-- [ ] Return HTTP-only cookie on success
-- [ ] Admin page reads cookie instead of checking `NEXT_PUBLIC_ADMIN_PASSWORD`
-- [ ] Remove `NEXT_PUBLIC_ADMIN_PASSWORD` env var (no longer in client bundle)
+- [x] Create Route Handler at `app/api/auth/route.ts` for password check
+- [x] Return HTTP-only cookie on success
+- [x] Admin page reads cookie instead of checking `NEXT_PUBLIC_ADMIN_PASSWORD`
+- [x] Remove `NEXT_PUBLIC_ADMIN_PASSWORD` env var (no longer in client bundle)
 
 ---
 
 ## Step 16 — Tailwind CSS Migration _(~2 hr)_
 
-- [ ] Install and configure Tailwind CSS
-- [ ] Migrate `globals.css` variables to Tailwind theme config
-- [ ] Replace inline `React.CSSProperties` in all components with Tailwind classes
-- [ ] Verify responsive behavior on mobile
+- [x] Install and configure Tailwind CSS
+- [x] Migrate `globals.css` variables to Tailwind theme config
+- [x] Replace inline `React.CSSProperties` in all components with Tailwind classes
+- [x] Verify responsive behavior on mobile
 
 ---
 
 ## Step 17 — Dark Mode _(~30 min)_
 
-- [ ] Add dark color scheme to Tailwind config / CSS variables
-- [ ] Add toggle button (or auto-detect via `prefers-color-scheme`)
-- [ ] Test all components in both themes
+- [x] Add dark color scheme to Tailwind config / CSS variables
+- [x] Add toggle button (or auto-detect via `prefers-color-scheme`)
+- [x] Test all components in both themes
 
 ---
 
@@ -200,7 +200,7 @@ CREATE POLICY "Anon read" ON page_views FOR SELECT USING (true);
 # Existing
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-NEXT_PUBLIC_ADMIN_PASSWORD=           # removed in Step 14
+ADMIN_PASSWORD=                      # server-only, removed from client in Step 15
 
 # Added in Step 2
 NEXT_PUBLIC_ADMIN_NAMES=Mason,Friend  # comma-separated

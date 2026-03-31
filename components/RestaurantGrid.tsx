@@ -23,185 +23,63 @@ function Card({
   onEdit?: (r: Restaurant) => void;
 }) {
   return (
-    <div
-      style={{
-        background: "var(--bg)",
-        position: "relative",
-        borderBottom: "0.5px solid var(--brd)",
-        transition: "background 0.1s",
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg2)")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "var(--bg)")}
-    >
+    <div className="bg-bg relative border-b border-brd transition-colors duration-100 hover:bg-bg2">
       {r.photo_url && (
         <img
           src={r.photo_url}
           alt={r.name}
-          style={{
-            width: "100%",
-            height: 140,
-            objectFit: "cover",
-            display: "block",
-          }}
+          className="w-full h-[140px] object-cover block"
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = "none";
           }}
         />
       )}
-      <div style={{ padding: "1.25rem" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            marginBottom: 4,
-          }}
-        >
-          <p
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              fontWeight: 500,
-              color: "var(--accent)",
-            }}
-          >
+      <div className="p-5">
+        <div className="flex items-center gap-1.5 mb-1">
+          <p className="text-[10px] tracking-[0.12em] uppercase font-medium text-accent">
             {r.cuisine}
           </p>
           {r.must_try && (
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 500,
-                padding: "2px 8px",
-                borderRadius: 20,
-                background: "var(--accent)",
-                color: "#fff",
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-              }}
-            >
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-[0.05em] uppercase">
               ★ Must-Try
             </span>
           )}
         </div>
-        <p
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 28,
-            lineHeight: 1,
-            color: "var(--txt)",
-            marginBottom: 4,
-          }}
-        >
+        <p className="font-display text-[28px] leading-none text-txt mb-1">
           {r.name}
         </p>
-        <p
-          style={
-            {
-              fontSize: 13,
-              color: "var(--txt2)",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-            } as React.CSSProperties
-          }
-        >
-          <span
-            style={{
-              display: "inline-block",
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              background: "var(--accent2)",
-              flexShrink: 0,
-            }}
-          />
+        <p className="text-[13px] text-txt2 flex items-center gap-[5px]">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent2 shrink-0" />
           {r.neighborhood}
         </p>
-        <p
-          style={{
-            position: "absolute",
-            top: "1.25rem",
-            right: "1.25rem",
-            fontSize: 13,
-            fontWeight: 500,
-            color: "var(--txt2)",
-          }}
-        >
+        <p className="absolute top-5 right-5 text-[13px] font-medium text-txt2">
           {r.price}
         </p>
         {r.note && (
-          <p
-            style={{
-              marginTop: 10,
-              fontSize: 13,
-              color: "var(--txt2)",
-              lineHeight: 1.5,
-              borderTop: "0.5px solid var(--brd)",
-              paddingTop: 10,
-              fontStyle: "italic",
-            }}
-          >
+          <p className="mt-2.5 text-[13px] text-txt2 leading-relaxed border-t border-brd pt-2.5 italic">
             {r.note}
           </p>
         )}
-        {r.address && (
-          <p
-            style={{
-              marginTop: 8,
-              fontSize: 12,
-              color: "var(--txt2)",
-            }}
-          >
-            {r.address}
-          </p>
-        )}
+        {r.address && <p className="mt-2 text-xs text-txt2">{r.address}</p>}
         {r.google_maps_url && (
           <a
             href={r.google_maps_url}
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              display: "inline-block",
-              marginTop: 4,
-              fontSize: 12,
-              fontWeight: 500,
-              color: "var(--accent2)",
-              textDecoration: "none",
-            }}
+            className="inline-block mt-1 text-xs font-medium text-accent2 no-underline"
           >
             View on Maps ↗
           </a>
         )}
         {r.added_by && (
-          <p
-            style={{
-              marginTop: 8,
-              fontSize: 11,
-              color: "var(--txt2)",
-              letterSpacing: "0.05em",
-            }}
-          >
+          <p className="mt-2 text-[11px] text-txt2 tracking-[0.05em]">
             Added by {r.added_by}
           </p>
         )}
         {onEdit && (
           <button
             onClick={() => onEdit(r)}
-            style={{
-              position: "absolute",
-              bottom: "1rem",
-              right: onDelete ? "5rem" : "1rem",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 14,
-              color: "var(--txt2)",
-              fontFamily: "var(--font-body)",
-              opacity: 0.6,
-              padding: 0,
-            }}
+            className={`absolute bottom-4 ${onDelete ? "right-20" : "right-4"} bg-transparent border-none cursor-pointer text-sm text-txt2 font-body opacity-60 p-0`}
             title="Edit"
           >
             Edit
@@ -211,19 +89,7 @@ function Card({
           <button
             onClick={() => onDelete(r.id)}
             disabled={deletingId === r.id}
-            style={{
-              position: "absolute",
-              bottom: "1rem",
-              right: "1rem",
-              background: "transparent",
-              border: "none",
-              cursor: deletingId === r.id ? "default" : "pointer",
-              fontSize: 14,
-              color: "var(--accent)",
-              fontFamily: "var(--font-body)",
-              opacity: deletingId === r.id ? 0.3 : 0.6,
-              padding: 0,
-            }}
+            className={`absolute bottom-4 right-4 bg-transparent border-none text-sm text-accent font-body p-0 ${deletingId === r.id ? "cursor-default opacity-30" : "cursor-pointer opacity-60"}`}
             title="Remove"
           >
             {deletingId === r.id ? "Removing..." : "Remove"}
@@ -234,13 +100,8 @@ function Card({
   );
 }
 
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-  gap: 0,
-  background: "var(--brd)",
-  borderLeft: "0.5px solid var(--brd)",
-};
+const gridClass =
+  "grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-0 bg-brd border-l border-brd";
 
 export default function RestaurantGrid({
   restaurants,
@@ -252,18 +113,9 @@ export default function RestaurantGrid({
 }: Props) {
   if (restaurants.length === 0) {
     return (
-      <div style={{ padding: "3rem 1.5rem", textAlign: "center" }}>
-        <p
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 48,
-            color: "var(--brd)",
-            marginBottom: 12,
-          }}
-        >
-          NO SPOTS YET
-        </p>
-        <p style={{ color: "var(--txt2)", fontSize: 15 }}>
+      <div className="py-12 px-6 text-center">
+        <p className="font-display text-5xl text-brd mb-3">NO SPOTS YET</p>
+        <p className="text-txt2 text-[15px]">
           {grouped
             ? "Add your first recommendation"
             : "No spots in this category"}
@@ -274,7 +126,7 @@ export default function RestaurantGrid({
 
   if (!grouped) {
     return (
-      <div style={gridStyle}>
+      <div className={gridClass}>
         {restaurants.map((r) => (
           <Card
             key={r.id}
@@ -302,28 +154,17 @@ export default function RestaurantGrid({
         .map((cuisine, i) => (
           <section key={cuisine}>
             <div
-              style={{
-                padding: "1rem 1.5rem 0.5rem",
-                borderTop: i === 0 ? "none" : "2px solid var(--txt)",
-              }}
+              className={`py-4 px-6 pb-2 ${i === 0 ? "" : "border-t-2 border-txt"}`}
             >
-              <span
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 22,
-                  letterSpacing: "0.04em",
-                }}
-              >
+              <span className="font-display text-[22px] tracking-[0.04em]">
                 {cuisine}
               </span>
-              <span
-                style={{ fontSize: 13, color: "var(--txt2)", marginLeft: 10 }}
-              >
+              <span className="text-[13px] text-txt2 ml-2.5">
                 {byCuisine[cuisine].length} spot
                 {byCuisine[cuisine].length !== 1 ? "s" : ""}
               </span>
             </div>
-            <div style={gridStyle}>
+            <div className={gridClass}>
               {byCuisine[cuisine].map((r) => (
                 <Card
                   key={r.id}

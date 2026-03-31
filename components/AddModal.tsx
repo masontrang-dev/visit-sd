@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import { type Restaurant } from "@/lib/supabase";
+import imageCompression from "browser-image-compression";
 
 type Props = {
   onSave: (entry: Omit<Restaurant, "id" | "created_at">) => Promise<boolean>;
@@ -113,28 +115,11 @@ const DEFAULT_CUISINE_OPTIONS = [
   "Vietnamese",
 ];
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "8px 12px",
-  fontSize: 15,
-  border: "1.5px solid var(--brd)",
-  background: "var(--bg)",
-  color: "var(--txt)",
-  borderRadius: 0,
-  outline: "none",
-  fontFamily: "var(--font-body)",
-  transition: "border-color 0.12s",
-};
+const inputCls =
+  "w-full py-2 px-3 text-[15px] border-[1.5px] border-brd bg-bg text-txt rounded-none outline-none font-body transition-[border-color] duration-[0.12s] focus:border-accent";
 
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: 11,
-  letterSpacing: "0.1em",
-  textTransform: "uppercase",
-  fontWeight: 500,
-  color: "var(--txt2)",
-  marginBottom: 5,
-};
+const labelCls =
+  "block text-[11px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1";
 
 const ADMIN_NAMES = (process.env.NEXT_PUBLIC_ADMIN_NAMES ?? "")
   .split(",")
@@ -158,6 +143,8 @@ export default function AddModal({
   );
   const [mustTry, setMustTry] = useState(editData?.must_try ?? false);
   const [photoUrl, setPhotoUrl] = useState(editData?.photo_url ?? "");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [address, setAddress] = useState(editData?.address ?? "");
   const [googleMapsUrl, setGoogleMapsUrl] = useState(
     editData?.google_maps_url ?? "",
@@ -274,6 +261,54 @@ export default function AddModal({
     if (!name.trim() || saving) return;
     setSaving(true);
     setError("");
+
+    let finalPhotoUrl = photoUrl;
+
+    // Upload photo file if one was selected
+    if (photoFile) {
+      setUploading(true);
+
+      // Compress image before upload
+      let fileToUpload = photoFile;
+      try {
+        const options = {
+          maxSizeMB: 0.5, // Max 500KB
+          maxWidthOrHeight: 1920, // Max dimension
+          useWebWorker: true,
+          fileType: "image/jpeg", // Convert to JPEG for better compression
+        };
+        fileToUpload = await imageCompression(photoFile, options);
+      } catch (compressionError) {
+        console.warn(
+          "Image compression failed, uploading original:",
+          compressionError,
+        );
+      }
+
+      const fileExt = "jpg"; // Always use jpg after compression
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("restaurant-photos")
+        .upload(fileName, fileToUpload, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+      setUploading(false);
+
+      if (uploadError) {
+        setError("Failed to upload photo. Please try again.");
+        setSaving(false);
+        return;
+      }
+
+      if (uploadData) {
+        const { data: urlData } = supabase.storage
+          .from("restaurant-photos")
+          .getPublicUrl(uploadData.path);
+        finalPhotoUrl = urlData.publicUrl;
+      }
+    }
+
     const ok = await onSave({
       name: name.trim(),
       neighborhood: neighborhood.trim(),
@@ -286,7 +321,7 @@ export default function AddModal({
       place_id: placeId || null,
       lat,
       lng,
-      photo_url: photoUrl.trim() || null,
+      photo_url: finalPhotoUrl.trim() || null,
       must_try: mustTry,
     });
     setSaving(false);
@@ -301,35 +336,10 @@ export default function AddModal({
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.55)",
-        zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "1rem",
-      }}
+      className="fixed inset-0 bg-black/55 z-[100] flex items-center justify-center p-4"
     >
-      <div
-        style={{
-          background: "var(--bg)",
-          border: "2px solid var(--txt)",
-          padding: "1.75rem",
-          width: "100%",
-          maxWidth: 480,
-          maxHeight: "90vh",
-          overflowY: "auto",
-        }}
-      >
-        <p
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 36,
-            marginBottom: "1.25rem",
-          }}
-        >
+      <div className="bg-bg border-2 border-txt p-7 w-full max-w-[480px] max-h-[90vh] overflow-y-auto">
+        <p className="font-display text-4xl mb-5">
           {success
             ? editData
               ? "Spot updated!"
@@ -340,13 +350,7 @@ export default function AddModal({
         </p>
 
         {success && (
-          <p
-            style={{
-              color: "var(--accent)",
-              fontSize: 14,
-              marginBottom: "1rem",
-            }}
-          >
+          <p className="text-accent text-sm mb-4">
             {editData
               ? "Changes saved successfully."
               : "Restaurant saved successfully."}
@@ -354,14 +358,12 @@ export default function AddModal({
         )}
 
         {!editData && (
-          <div style={{ marginBottom: "1rem" }}>
-            <label style={labelStyle}>Search Google Places</label>
+          <div className="mb-4">
+            <label className={labelCls}>Search Google Places</label>
             <input
               ref={autocompleteRef}
               placeholder="Search for a restaurant..."
-              style={inputStyle}
-              onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-              onBlur={(e) => (e.target.style.borderColor = "var(--brd)")}
+              className={inputCls}
             />
           </div>
         )}
@@ -386,25 +388,20 @@ export default function AddModal({
             placeholder: "e.g. 2228 Kettner Blvd, San Diego",
           },
         ].map((field) => (
-          <div key={field.label} style={{ marginBottom: "1rem" }}>
-            <label style={labelStyle}>{field.label}</label>
+          <div key={field.label} className="mb-4">
+            <label className={labelCls}>{field.label}</label>
             <input
               value={field.value}
               onChange={(e) => field.set(e.target.value)}
               placeholder={field.placeholder}
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
-              style={inputStyle}
-              onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-              onBlur={(e) => (e.target.style.borderColor = "var(--brd)")}
+              className={inputCls}
             />
           </div>
         ))}
 
-        <div
-          ref={cuisineWrapperRef}
-          style={{ marginBottom: "1rem", position: "relative" }}
-        >
-          <label style={labelStyle}>Cuisine type</label>
+        <div ref={cuisineWrapperRef} className="mb-4 relative">
+          <label className={labelCls}>Cuisine type</label>
           <input
             value={cuisine}
             onChange={(e) => {
@@ -413,11 +410,7 @@ export default function AddModal({
               setCuisineHighlight(-1);
             }}
             placeholder="Search or type a cuisine..."
-            onFocus={(e) => {
-              e.target.style.borderColor = "var(--accent)";
-              setCuisineOpen(true);
-            }}
-            onBlur={(e) => (e.target.style.borderColor = "var(--brd)")}
+            onFocus={() => setCuisineOpen(true)}
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
@@ -443,44 +436,17 @@ export default function AddModal({
                 setCuisineOpen(false);
               }
             }}
-            style={inputStyle}
+            className={inputCls}
             autoComplete="off"
           />
           {cuisineOpen && (filteredCuisines.length > 0 || showCuisineAdd) && (
-            <ul
-              style={{
-                position: "absolute",
-                top: "100%",
-                left: 0,
-                right: 0,
-                zIndex: 10,
-                background: "var(--bg)",
-                border: "1.5px solid var(--brd)",
-                borderTop: "none",
-                maxHeight: 200,
-                overflowY: "auto",
-                listStyle: "none",
-                margin: 0,
-                padding: 0,
-              }}
-            >
+            <ul className="absolute top-full left-0 right-0 z-10 bg-bg border-[1.5px] border-brd border-t-0 max-h-[200px] overflow-y-auto list-none m-0 p-0">
               {showCuisineAdd && (
                 <li
                   onMouseDown={() => {
                     setCuisineOpen(false);
                   }}
-                  style={{
-                    padding: "8px 12px",
-                    fontSize: 14,
-                    cursor: "pointer",
-                    color: "var(--accent)",
-                    fontWeight: 500,
-                    fontFamily: "var(--font-body)",
-                    borderBottom:
-                      filteredCuisines.length > 0
-                        ? "1px solid var(--brd)"
-                        : "none",
-                  }}
+                  className={`py-2 px-3 text-sm cursor-pointer text-accent font-medium font-body ${filteredCuisines.length > 0 ? "border-b border-brd" : ""}`}
                 >
                   Add &ldquo;{cuisine.trim()}&rdquo;
                 </li>
@@ -493,23 +459,7 @@ export default function AddModal({
                     setCuisineOpen(false);
                     setCuisineHighlight(-1);
                   }}
-                  style={{
-                    padding: "8px 12px",
-                    fontSize: 14,
-                    cursor: "pointer",
-                    fontFamily: "var(--font-body)",
-                    background:
-                      i === cuisineHighlight ? "var(--bg2)" : "transparent",
-                    color: "var(--txt)",
-                    transition: "background 0.08s",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "var(--bg2)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background =
-                      i === cuisineHighlight ? "var(--bg2)" : "transparent")
-                  }
+                  className={`py-2 px-3 text-sm cursor-pointer font-body text-txt transition-colors duration-75 hover:bg-bg2 ${i === cuisineHighlight ? "bg-bg2" : "bg-transparent"}`}
                 >
                   {c}
                 </li>
@@ -518,27 +468,18 @@ export default function AddModal({
           )}
         </div>
 
-        <div style={{ marginBottom: "1rem" }}>
-          <label style={labelStyle}>Price range</label>
-          <div style={{ display: "flex", gap: 8 }}>
+        <div className="mb-4">
+          <label className={labelCls}>Price range</label>
+          <div className="flex gap-2">
             {PRICES.map((p) => (
               <button
                 key={p}
                 onClick={() => setPrice(p)}
-                style={{
-                  flex: 1,
-                  padding: 8,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  border: "1.5px solid var(--brd)",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-body)",
-                  borderRadius: 0,
-                  background: price === p ? "var(--txt)" : "transparent",
-                  color: price === p ? "var(--bg)" : "var(--txt2)",
-                  borderColor: price === p ? "var(--txt)" : "var(--brd)",
-                  transition: "all 0.12s",
-                }}
+                className={`flex-1 p-2 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                  price === p
+                    ? "bg-txt text-bg border-txt"
+                    : "bg-transparent text-txt2 border-brd"
+                }`}
               >
                 {p}
               </button>
@@ -546,36 +487,28 @@ export default function AddModal({
           </div>
         </div>
 
-        <div style={{ marginBottom: "1rem" }}>
-          <label style={labelStyle}>Must-Try</label>
+        <div className="mb-4">
+          <label className={labelCls}>Must-Try</label>
           <button
             type="button"
             onClick={() => setMustTry(!mustTry)}
-            style={{
-              padding: "8px 16px",
-              fontSize: 13,
-              fontWeight: 500,
-              border: "1.5px solid",
-              cursor: "pointer",
-              fontFamily: "var(--font-body)",
-              borderRadius: 20,
-              background: mustTry ? "var(--accent)" : "transparent",
-              color: mustTry ? "#fff" : "var(--txt2)",
-              borderColor: mustTry ? "var(--accent)" : "var(--brd)",
-              transition: "all 0.12s",
-            }}
+            className={`py-2 px-4 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
+              mustTry
+                ? "bg-accent text-white border-accent"
+                : "bg-transparent text-txt2 border-brd"
+            }`}
           >
             {mustTry ? "★ Must-Try" : "☆ Mark as Must-Try"}
           </button>
         </div>
 
         {ADMIN_NAMES.length > 0 && (
-          <div style={{ marginBottom: "1rem" }}>
-            <label style={labelStyle}>Added by</label>
+          <div className="mb-4">
+            <label className={labelCls}>Added by</label>
             <select
               value={addedBy}
               onChange={(e) => setAddedBy(e.target.value)}
-              style={{ ...inputStyle, cursor: "pointer" }}
+              className={`${inputCls} cursor-pointer`}
             >
               {ADMIN_NAMES.map((n) => (
                 <option key={n} value={n}>
@@ -586,27 +519,44 @@ export default function AddModal({
           </div>
         )}
 
-        <div style={{ marginBottom: "1rem" }}>
-          <label style={labelStyle}>Photo URL</label>
-          <input
-            value={photoUrl}
-            onChange={(e) => setPhotoUrl(e.target.value)}
-            placeholder="https://example.com/photo.jpg"
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-            onBlur={(e) => (e.target.style.borderColor = "var(--brd)")}
-          />
-          {photoUrl.trim() && (
-            <img
-              src={photoUrl.trim()}
-              alt="Preview"
-              style={{
-                marginTop: 8,
-                width: "100%",
-                height: 120,
-                objectFit: "cover",
-                border: "1px solid var(--brd)",
+        <div className="mb-4">
+          <label className={labelCls}>Photo</label>
+          <div className="flex flex-col gap-2">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setPhotoFile(file);
+                  setPhotoUrl(""); // Clear URL if file is selected
+                }
               }}
+              className="text-sm text-txt2 file:mr-4 file:py-2 file:px-4 file:rounded-none file:border-[1.5px] file:border-brd file:text-sm file:font-medium file:bg-transparent file:text-txt2 file:cursor-pointer hover:file:bg-bg2"
+            />
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-brd" />
+              <span className="text-xs text-txt2 uppercase tracking-wider">
+                or
+              </span>
+              <div className="flex-1 h-px bg-brd" />
+            </div>
+            <input
+              value={photoUrl}
+              onChange={(e) => {
+                setPhotoUrl(e.target.value);
+                setPhotoFile(null); // Clear file if URL is entered
+              }}
+              placeholder="Paste image URL"
+              className={inputCls}
+              disabled={!!photoFile}
+            />
+          </div>
+          {(photoFile || photoUrl.trim()) && (
+            <img
+              src={photoFile ? URL.createObjectURL(photoFile) : photoUrl.trim()}
+              alt="Preview"
+              className="mt-2 w-full h-[120px] object-cover border border-brd"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
               }}
@@ -614,63 +564,38 @@ export default function AddModal({
           )}
         </div>
 
-        <div style={{ marginBottom: "1rem" }}>
-          <label style={labelStyle}>Why you love it</label>
+        <div className="mb-4">
+          <label className={labelCls}>Why you love it</label>
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="What makes this place special?"
             rows={3}
-            style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
-            onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-            onBlur={(e) => (e.target.style.borderColor = "var(--brd)")}
+            className={`${inputCls} resize-y leading-relaxed`}
           />
         </div>
 
-        {error && (
-          <p style={{ color: "var(--accent)", fontSize: 13, marginBottom: 8 }}>
-            {error}
-          </p>
-        )}
+        {error && <p className="text-accent text-[13px] mb-2">{error}</p>}
 
-        <div style={{ display: "flex", gap: 8, marginTop: "1.5rem" }}>
+        <div className="flex gap-2 mt-6">
           <button
             onClick={handleSave}
             disabled={saving || success}
-            style={{
-              flex: 1,
-              padding: 10,
-              background: "var(--accent)",
-              color: "#fff",
-              border: "none",
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: saving || success ? "default" : "pointer",
-              fontFamily: "var(--font-body)",
-              borderRadius: 0,
-              opacity: saving || success ? 0.6 : 1,
-            }}
+            className={`flex-1 p-2.5 bg-accent text-white border-none text-sm font-medium font-body rounded-none ${saving || success ? "cursor-default opacity-60" : "cursor-pointer opacity-100"}`}
           >
-            {saving
-              ? "Saving..."
-              : success
-                ? "Saved!"
-                : editData
-                  ? "Save changes"
-                  : "Save restaurant"}
+            {uploading
+              ? "Uploading photo..."
+              : saving
+                ? "Saving..."
+                : success
+                  ? "Saved!"
+                  : editData
+                    ? "Save changes"
+                    : "Save restaurant"}
           </button>
           <button
             onClick={onClose}
-            style={{
-              padding: "10px 18px",
-              background: "transparent",
-              color: "var(--txt2)",
-              border: "1.5px solid var(--brd)",
-              fontSize: 14,
-              cursor: "pointer",
-              fontFamily: "var(--font-body)",
-              borderRadius: 0,
-            }}
+            className="py-2.5 px-[18px] bg-transparent text-txt2 border-[1.5px] border-brd text-sm cursor-pointer font-body rounded-none"
           >
             Cancel
           </button>

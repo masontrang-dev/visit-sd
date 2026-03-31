@@ -25,14 +25,8 @@ export default function MapView({ restaurants }: Props) {
 
   if (!apiKey) {
     return (
-      <div
-        style={{
-          padding: "3rem 1.5rem",
-          textAlign: "center",
-          color: "var(--txt2)",
-        }}
-      >
-        <p style={{ fontSize: 15 }}>
+      <div className="py-12 px-6 text-center text-txt2">
+        <p className="text-[15px]">
           Google Maps API key not configured. Add{" "}
           <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to your environment.
         </p>
@@ -43,7 +37,7 @@ export default function MapView({ restaurants }: Props) {
   const markersData = restaurants.filter((r) => r.lat != null && r.lng != null);
 
   return (
-    <div style={{ height: "calc(100vh - 200px)", minHeight: 400 }}>
+    <div className="h-[calc(100vh-200px)] min-h-[400px]">
       <APIProvider apiKey={apiKey}>
         <Map
           defaultCenter={SD_CENTER}
@@ -65,50 +59,18 @@ export default function MapView({ restaurants }: Props) {
               position={{ lat: selected.lat, lng: selected.lng }}
               onCloseClick={() => setSelected(null)}
             >
-              <div
-                style={{
-                  fontFamily: "var(--font-body)",
-                  maxWidth: 220,
-                  padding: 4,
-                }}
-              >
-                <p
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontSize: 20,
-                    lineHeight: 1.1,
-                    marginBottom: 4,
-                  }}
-                >
+              <div className="font-body max-w-[220px] p-1">
+                <p className="font-display text-xl leading-tight mb-1">
                   {selected.name}
                 </p>
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: "var(--txt2)",
-                    marginBottom: 2,
-                  }}
-                >
+                <p className="text-xs text-txt2 mb-0.5">
                   {selected.cuisine} · {selected.price}
                 </p>
                 {selected.neighborhood && (
-                  <p style={{ fontSize: 12, color: "var(--txt2)" }}>
-                    {selected.neighborhood}
-                  </p>
+                  <p className="text-xs text-txt2">{selected.neighborhood}</p>
                 )}
                 {selected.must_try && (
-                  <span
-                    style={{
-                      display: "inline-block",
-                      marginTop: 4,
-                      fontSize: 10,
-                      fontWeight: 500,
-                      padding: "2px 8px",
-                      borderRadius: 20,
-                      background: "var(--accent)",
-                      color: "#fff",
-                    }}
-                  >
+                  <span className="inline-block mt-1 text-[10px] font-medium px-2 py-0.5 rounded-pill bg-accent text-white">
                     ★ Must-Try
                   </span>
                 )}
