@@ -13,7 +13,8 @@ import FilterBar from "@/components/FilterBar";
 import AddModal from "@/components/AddModal";
 
 export default function AdminPage() {
-  const { isAdmin, isLoading: authLoading, login } = useAuth();
+  const { isAdmin, isLoading: authLoading, username, login } = useAuth();
+  const [usernameInput, setUsernameInput] = useState("");
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState(false);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -129,7 +130,7 @@ export default function AdminPage() {
   }, [isAdmin, authLoading]);
 
   async function checkPassword() {
-    const success = await login(pwInput);
+    const success = await login(usernameInput, pwInput);
     if (success) {
       loadData();
     } else {
@@ -274,8 +275,21 @@ export default function AdminPage() {
         <div className="w-full max-w-[360px]">
           <p className="font-display text-5xl mb-2">ADMIN</p>
           <p className="text-txt2 text-sm mb-6">
-            Enter your admin password to manage restaurants.
+            Sign in to manage restaurants.
           </p>
+          <input
+            type="text"
+            placeholder="Username"
+            value={usernameInput}
+            onChange={(e) => {
+              setUsernameInput(e.target.value);
+              setPwError(false);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && checkPassword()}
+            className={`w-full py-2.5 px-3.5 text-[15px] border-[1.5px] ${
+              pwError ? "border-accent" : "border-brd"
+            } bg-bg text-txt rounded-none outline-none font-body mb-2`}
+          />
           <input
             type="password"
             placeholder="Password"
@@ -290,7 +304,9 @@ export default function AdminPage() {
             } bg-bg text-txt rounded-none outline-none font-body mb-2`}
           />
           {pwError && (
-            <p className="text-accent text-[13px] mb-3">Incorrect password</p>
+            <p className="text-accent text-[13px] mb-3">
+              Invalid username or password
+            </p>
           )}
           <button
             onClick={checkPassword}

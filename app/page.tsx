@@ -6,6 +6,7 @@ import { supabase, type Restaurant } from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar from "@/components/FilterBar";
 import MapView from "@/components/MapView";
+import Link from "next/link";
 
 export default function HomePage() {
   return (
@@ -168,10 +169,16 @@ function HomeContent() {
         />
       )}
 
-      <footer className="p-6 flex justify-end">
+      <footer className="p-6 flex justify-end items-center gap-4">
         <span className="text-[11px] font-medium text-txt2 opacity-50 tracking-[0.05em] font-body">
           v{process.env.NEXT_PUBLIC_APP_VERSION}
         </span>
+        <Link
+          href="/admin"
+          className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline flex items-center gap-1"
+        >
+          Admin <span className="text-[8px]">→</span>
+        </Link>
       </footer>
     </main>
   );

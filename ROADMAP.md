@@ -283,14 +283,14 @@ Default to mobile-optimized view for better phone experience.
 
 Dedicated page for each restaurant with full details and visit history.
 
-- [ ] Create `app/restaurant/[id]/page.tsx` route
-- [ ] Display full restaurant info: photo, name, cuisine, price, address, description
-- [ ] Show complete visit history timeline
-- [ ] Add "View on Google Maps" button
-- [ ] Add "Mark as Visited" action (admin only)
-- [ ] Add "Edit" and "Delete" buttons (admin only)
-- [ ] Link restaurant cards to detail page
-- [ ] Add breadcrumb navigation back to main list
+- [x] Create `app/restaurant/[id]/page.tsx` route
+- [x] Display full restaurant info: photo, name, cuisine, price, address, description
+- [x] Show complete visit history timeline
+- [x] Add "View on Google Maps" button
+- [x] Add "Mark as Visited" action (admin only)
+- [x] Add "Edit" and "Delete" buttons (admin only)
+- [x] Link restaurant cards to detail page
+- [x] Add breadcrumb navigation back to main list
 
 ---
 
@@ -312,19 +312,18 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Anon read" ON users FOR SELECT USING (true);
 ```
 
-- [ ] Run migration in Supabase SQL Editor
-- [ ] Add password hashing utility (bcrypt or similar)
-- [ ] Seed users table with Mason and Linli accounts
-- [ ] Update `app/api/auth/route.ts` to check username + password
-- [ ] Store username in session cookie
-- [ ] Auto-populate "Added by" field based on logged-in user
-- [ ] Fix "Added by" dropdown display bug (ensure clean option rendering)
-- [ ] Update environment variables:
+- [x] Run migration in Supabase SQL Editor (see `MIGRATION_STEP_21.sql`)
+- [x] Add password hashing utility (bcrypt)
+- [x] Seed users table with Mason and Linli accounts (use `scripts/seed-users.ts`)
+- [x] Update `app/api/auth/route.ts` to check username + password
+- [x] Store username in session cookie
+- [x] Auto-populate "Added by" field based on logged-in user
+- [x] Remove "Added by" dropdown (auto-populated from logged-in user)
+- [x] Update environment variables:
   ```bash
-  # Remove NEXT_PUBLIC_ADMIN_NAMES
-  # Add user credentials (or manage in Supabase directly)
-  MASON_PASSWORD_HASH=
-  LINLI_PASSWORD_HASH=
+  # Removed ADMIN_PASSWORD
+  # Removed NEXT_PUBLIC_ADMIN_NAMES
+  # User credentials managed in Supabase users table
   ```
 
 ---
@@ -406,10 +405,122 @@ Feasibility study: Use AI to aggregate reviews and descriptions from Google Maps
 
 ---
 
+## Step 24 — Item Ordering, Reviews & Drink Customization _(~4 hr)_
+
+Track individual dishes and drinks ordered at each restaurant with photos, ratings, and reviews. Boba/cafe shops get additional drink customization fields.
+
+**Database migration:**
+
+```sql
+-- Add restaurant type
+ALTER TABLE restaurants
+  ADD COLUMN restaurant_type text default 'standard';
+
+-- Menu items table
+CREATE TABLE menu_items (
+  id            bigint generated always as identity primary key,
+  restaurant_id bigint references restaurants(id) on delete cascade,
+  name          text not null,
+  category      text,
+  description   text,
+  is_recommended boolean default false,
+  created_at    timestamptz default now()
+);
+
+-- Item orders table
+CREATE TABLE item_orders (
+  id             bigint generated always as identity primary key,
+  menu_item_id   bigint references menu_items(id) on delete cascade,
+  restaurant_id  bigint references restaurants(id) on delete cascade,
+  ordered_at     date default current_date,
+  rating         int check (rating between 1 and 5),
+  notes          text,
+  photo_url      text,
+  drink_details  jsonb,
+  created_at     timestamptz default now()
+);
+
+-- RLS policies
+ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE item_orders ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read menu_items"  ON menu_items  FOR SELECT USING (true);
+CREATE POLICY "Anon insert menu_items"  ON menu_items  FOR INSERT WITH CHECK (true);
+CREATE POLICY "Anon update menu_items"  ON menu_items  FOR UPDATE USING (true);
+CREATE POLICY "Anon delete menu_items"  ON menu_items  FOR DELETE USING (true);
+
+CREATE POLICY "Public read item_orders" ON item_orders FOR SELECT USING (true);
+CREATE POLICY "Anon insert item_orders" ON item_orders FOR INSERT WITH CHECK (true);
+CREATE POLICY "Anon update item_orders" ON item_orders FOR UPDATE USING (true);
+CREATE POLICY "Anon delete item_orders" ON item_orders FOR DELETE USING (true);
+
+-- Indexes
+CREATE INDEX item_orders_restaurant_id_idx ON item_orders(restaurant_id);
+CREATE INDEX item_orders_menu_item_id_idx  ON item_orders(menu_item_id);
+CREATE INDEX item_orders_ordered_at_idx    ON item_orders(ordered_at desc);
+CREATE INDEX menu_items_restaurant_id_idx  ON menu_items(restaurant_id);
+
+-- Storage bucket for item photos
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('item-photos', 'item-photos', true);
+
+CREATE POLICY "Public read item-photos"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'item-photos');
+
+CREATE POLICY "Anon upload item-photos"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'item-photos');
+
+CREATE POLICY "Anon delete item-photos"
+  ON storage.objects FOR DELETE
+  USING (bucket_id = 'item-photos');
+```
+
+**Implementation tasks:**
+
+- [ ] Run database migration in Supabase SQL Editor
+- [ ] Update `Restaurant` type in `lib/supabase.ts` with `restaurant_type` field
+- [ ] Create `MenuItem` and `ItemOrder` types in `lib/supabase.ts`
+- [ ] Add "Log an order" button on restaurant detail page (admin only)
+- [ ] Create order logging modal with:
+  - Menu item autocomplete (search existing or create new)
+  - Category selector (food/drink/dessert/signature)
+  - Photo upload to Supabase Storage
+  - 1-5 star rating
+  - Notes/review textarea
+  - Date picker (defaults to today)
+- [ ] Add restaurant type selector in restaurant add/edit modal
+- [ ] Implement boba-specific fields (sweetness, ice, toppings, size, temperature):
+  - Toggle between descriptive pills and percentage slider (0-100%, 5% increments)
+  - Multi-select toppings with custom entry
+  - Store as JSONB with normalized 0-100 values
+- [ ] Implement cafe-specific fields (size, temperature, milk type, shots)
+- [ ] Add "Menu highlights" section to restaurant detail page:
+  - Show items marked `is_recommended: true`
+  - Display average rating and order count
+  - Show most recent photo and notes
+- [ ] Create `/admin/boba` dashboard page with:
+  - Summary stats (total check-ins, unique shops, unique drinks)
+  - Per-shop breakdown (visits, most ordered drink, common customization)
+  - Preference analysis (sweetness/ice distribution, top toppings)
+  - "Haven't been in a while" nudges (3+ visits, 30+ days ago)
+- [ ] Add "Usual order" card on boba shop pages (most frequent drink + customization)
+
+**Reference:** See `item-ordering.md` for complete specification including:
+
+- Sweetness/ice scale mappings (descriptive ↔ percentage)
+- Default toppings list
+- JSONB schema for `drink_details`
+- Field availability by restaurant type
+- Sample queries for aggregations
+
+---
+
 ## Notes
 
 - The "1 spot" / "2 spots" text next to cuisine headers is a count of restaurants in that group — not a bug.
 - All steps are additive — nothing breaks the existing public/admin flow.
 - Steps 1–3 have no external dependencies. Steps 4–7 require a Google Cloud API key. Steps 8–16 are independent of each other and can be done in any order.
 - No third-party analytics needed — a single Supabase table replaces Google Analytics for this use case.
-- **New features (Steps 18-23)** focus on visit tracking, mobile UX, user management, and AI enhancements.
+- **New features (Steps 18-24)** focus on visit tracking, mobile UX, user management, AI enhancements, and item-level ordering/reviews.

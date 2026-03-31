@@ -17,7 +17,7 @@ type Props = {
 
 export default function RestaurantDetailPage({ params }: Props) {
   const router = useRouter();
-  const { isAdmin } = useAuth();
+  const { isAdmin, username } = useAuth();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [visits, setVisits] = useState<RestaurantVisit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,12 +77,9 @@ export default function RestaurantDetailPage({ params }: Props) {
   }, [params]);
 
   async function handleMarkVisited() {
-    if (!restaurant) return;
+    if (!restaurant || !username) return;
 
-    const adminNames = (process.env.NEXT_PUBLIC_ADMIN_NAMES ?? "")
-      .split(",")
-      .filter(Boolean);
-    const visitedBy = adminNames[0] || "Admin";
+    const visitedBy = username;
 
     setVisitingId(restaurant.id);
 

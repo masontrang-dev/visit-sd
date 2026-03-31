@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { type Restaurant, type RestaurantVisit } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth-context";
 
 type Props = {
   restaurants: Restaurant[];
@@ -15,6 +16,34 @@ type Props = {
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
 };
+
+function MarkVisitedButton({
+  restaurantId,
+  onMarkVisited,
+  visitingId,
+}: {
+  restaurantId: number;
+  onMarkVisited: (id: number, visitedBy: string) => Promise<void>;
+  visitingId?: number | null;
+}) {
+  const { username } = useAuth();
+
+  return (
+    <button
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (username) {
+          onMarkVisited(restaurantId, username);
+        }
+      }}
+      disabled={visitingId === restaurantId}
+      className={`mt-2 text-[13px] font-medium py-1.5 px-3 rounded-pill border-[1.5px] font-body ${visitingId === restaurantId ? "cursor-default opacity-30 bg-transparent border-brd text-txt2" : "cursor-pointer bg-accent2 text-white border-accent2"}`}
+    >
+      {visitingId === restaurantId ? "Marking..." : "✓ Mark as Visited"}
+    </button>
+  );
+}
 
 function Card({
   r,
@@ -144,21 +173,11 @@ function Card({
           </div>
         )}
         {onMarkVisited && (
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const adminNames = (process.env.NEXT_PUBLIC_ADMIN_NAMES ?? "")
-                .split(",")
-                .filter(Boolean);
-              const visitedBy = adminNames[0] || "Admin";
-              onMarkVisited(r.id, visitedBy);
-            }}
-            disabled={visitingId === r.id}
-            className={`mt-2 text-[13px] font-medium py-1.5 px-3 rounded-pill border-[1.5px] font-body ${visitingId === r.id ? "cursor-default opacity-30 bg-transparent border-brd text-txt2" : "cursor-pointer bg-accent2 text-white border-accent2"}`}
-          >
-            {visitingId === r.id ? "Marking..." : "✓ Mark as Visited"}
-          </button>
+          <MarkVisitedButton
+            restaurantId={r.id}
+            onMarkVisited={onMarkVisited}
+            visitingId={visitingId}
+          />
         )}
         {onEdit && (
           <button

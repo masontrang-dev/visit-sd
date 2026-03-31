@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import { type Restaurant } from "@/lib/supabase";
 import imageCompression from "browser-image-compression";
+import { useAuth } from "@/lib/auth-context";
 
 type Props = {
   onSave: (entry: Omit<Restaurant, "id" | "created_at">) => Promise<boolean>;
@@ -121,16 +122,13 @@ const inputCls =
 const labelCls =
   "block text-[11px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1";
 
-const ADMIN_NAMES = (process.env.NEXT_PUBLIC_ADMIN_NAMES ?? "")
-  .split(",")
-  .filter(Boolean);
-
 export default function AddModal({
   onSave,
   onClose,
   editData,
   existingCuisines = [],
 }: Props) {
+  const { username } = useAuth();
   const [name, setName] = useState(editData?.name ?? "");
   const [neighborhood, setNeighborhood] = useState(
     editData?.neighborhood ?? "",
@@ -138,9 +136,7 @@ export default function AddModal({
   const [cuisine, setCuisine] = useState(editData?.cuisine ?? "");
   const [price, setPrice] = useState(editData?.price ?? "$$$");
   const [note, setNote] = useState(editData?.note ?? "");
-  const [addedBy, setAddedBy] = useState(
-    editData?.added_by ?? ADMIN_NAMES[0] ?? "",
-  );
+  const [addedBy, setAddedBy] = useState(editData?.added_by ?? username ?? "");
   const [mustTry, setMustTry] = useState(editData?.must_try ?? false);
   const [photoUrl, setPhotoUrl] = useState(editData?.photo_url ?? "");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -532,23 +528,6 @@ export default function AddModal({
             {mustTry ? "★ Must-Try" : "☆ Mark as Must-Try"}
           </button>
         </div>
-
-        {ADMIN_NAMES.length > 0 && (
-          <div className="mb-4">
-            <label className={labelCls}>Added by</label>
-            <select
-              value={addedBy}
-              onChange={(e) => setAddedBy(e.target.value)}
-              className={`${inputCls} cursor-pointer`}
-            >
-              {ADMIN_NAMES.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
 
         <div className="mb-4">
           <label className={labelCls}>Photo</label>
