@@ -43,6 +43,7 @@ export default function AdminPage() {
   const [deviceData, setDeviceData] = useState<
     { device: string; count: number }[]
   >([]);
+  const [lastCleanup, setLastCleanup] = useState<string | null>(null);
   const [visits, setVisits] = useState<Record<number, RestaurantVisit[]>>({});
   const [visitingId, setVisitingId] = useState<number | null>(null);
 
@@ -108,18 +109,14 @@ export default function AdminPage() {
         .map(([device, count]) => ({ device, count }))
         .sort((a, b) => b.count - a.count);
       setDeviceData(devices);
+
+      // Fetch last cleanup run time from cleanup_log
+      const { data: cronData } = await supabase.rpc("get_last_cleanup_run");
+      if (cronData && cronData.length > 0) {
+        setLastCleanup(cronData[0].executed_at);
+      }
     }
     setStatsLoading(false);
-  }
-
-  async function cleanupOldViews() {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 90);
-    await supabase
-      .from("page_views")
-      .delete()
-      .lt("created_at", cutoff.toISOString());
-    loadStats();
   }
 
   useEffect(() => {
@@ -417,6 +414,22 @@ export default function AdminPage() {
                         : 0}
                     </p>
                   </div>
+                  <div className="p-4 pr-5 border-[1.5px] border-brd min-w-[200px]">
+                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1">
+                      Cleanup last run
+                    </p>
+                    <p className="text-[13px] text-txt">
+                      {lastCleanup
+                        ? new Date(lastCleanup).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })
+                        : "Not yet run"}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Views per day bar chart */}
@@ -506,12 +519,10 @@ export default function AdminPage() {
                   </div>
                 )}
 
-                <button
-                  onClick={cleanupOldViews}
-                  className="text-xs font-medium py-1.5 px-3.5 rounded-pill border-[1.5px] border-brd bg-transparent cursor-pointer text-txt2 font-body"
-                >
-                  Delete views older than 90 days
-                </button>
+                <p className="text-xs text-txt2 mt-4">
+                  Analytics data older than 90 days is automatically deleted
+                  daily.
+                </p>
               </>
             )}
           </div>

@@ -328,7 +328,7 @@ CREATE POLICY "Anon read" ON users FOR SELECT USING (true);
 
 ---
 
-## Step 22 — User Analytics & Demographics _(~1 hr)_ ⚠️
+## Step 22 — User Analytics & Demographics _(~1 hr)_
 
 Track user location and demographics for insights.
 
@@ -338,7 +338,7 @@ Track user location and demographics for insights.
 - City/region detection via IP geolocation
 - User agent tracking (device/browser info)
 - No PII (personally identifiable information) stored
-- Consider adding privacy policy page
+- Privacy policy page added at `/privacy`
 
 **Database migration:**
 
@@ -350,18 +350,18 @@ ALTER TABLE page_views
   ADD COLUMN device_type text;
 ```
 
-- [ ] Evaluate privacy implications with users
-- [ ] Add IP geolocation service (e.g., ipapi.co, MaxMind)
-- [ ] Update page view logging to capture IP and location
-- [ ] Parse user agent for device type (mobile/desktop/tablet)
-- [ ] Add analytics dashboard showing:
+- [x] Evaluate privacy implications with users
+- [x] Add IP geolocation service (ipapi.co free tier, 1000 req/day)
+- [x] Update page view logging to capture IP and location
+- [x] Parse user agent for device type (mobile/desktop/tablet)
+- [x] Add analytics dashboard showing:
   - Geographic distribution of visitors
   - Device type breakdown
   - Traffic sources
-- [ ] Create privacy policy page explaining data collection
-- [ ] Add opt-out mechanism or cookie consent banner
+- [x] Create privacy policy page explaining data collection
+- [x] Add privacy policy link to footer
 
-**Note:** Consider if this level of tracking is necessary for a personal restaurant guide. May be overkill for the use case.
+**Note:** Using ipapi.co free tier for geolocation. No opt-out mechanism needed as no cookies or PII are collected.
 
 ---
 

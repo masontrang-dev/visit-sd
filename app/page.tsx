@@ -174,6 +174,12 @@ function HomeContent() {
           v{process.env.NEXT_PUBLIC_APP_VERSION}
         </span>
         <Link
+          href="/privacy"
+          className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline"
+        >
+          Privacy
+        </Link>
+        <Link
           href="/admin"
           className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline flex items-center gap-1"
         >
