@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { type Restaurant, type RestaurantVisit } from "@/lib/supabase";
 
 type Props = {
@@ -68,9 +69,12 @@ function Card({
             </span>
           )}
         </div>
-        <p className="font-display text-[28px] leading-none text-txt mb-1">
+        <Link
+          href={`/restaurant/${r.id}`}
+          className="font-display text-[28px] leading-none text-txt mb-1 no-underline block hover:text-accent transition-colors duration-100"
+        >
           {r.name}
-        </p>
+        </Link>
         <p className="text-[13px] text-txt2 flex items-center gap-[5px]">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent2 shrink-0" />
           {r.neighborhood}

@@ -39,6 +39,10 @@ export type PageView = {
   user_agent: string | null;
   city: string | null;
   created_at: string;
+  ip_address: string | null;
+  country: string | null;
+  region: string | null;
+  device_type: string | null;
 };
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

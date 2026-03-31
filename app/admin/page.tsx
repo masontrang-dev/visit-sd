@@ -36,6 +36,12 @@ export default function AdminPage() {
   const [topReferrers, setTopReferrers] = useState<
     { referrer: string; count: number }[]
   >([]);
+  const [geoData, setGeoData] = useState<{ location: string; count: number }[]>(
+    [],
+  );
+  const [deviceData, setDeviceData] = useState<
+    { device: string; count: number }[]
+  >([]);
   const [visits, setVisits] = useState<Record<number, RestaurantVisit[]>>({});
   const [visitingId, setVisitingId] = useState<number | null>(null);
 
@@ -71,6 +77,36 @@ export default function AdminPage() {
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
       setTopReferrers(topRefs);
+
+      // Geographic distribution
+      const geoCounts: Record<string, number> = {};
+      data.forEach((row: PageView) => {
+        if (row.city && row.region && row.country) {
+          const location = `${row.city}, ${row.region}, ${row.country}`;
+          geoCounts[location] = (geoCounts[location] || 0) + 1;
+        } else if (row.city && row.country) {
+          const location = `${row.city}, ${row.country}`;
+          geoCounts[location] = (geoCounts[location] || 0) + 1;
+        } else if (row.country) {
+          geoCounts[row.country] = (geoCounts[row.country] || 0) + 1;
+        }
+      });
+      const topGeo = Object.entries(geoCounts)
+        .map(([location, count]) => ({ location, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+      setGeoData(topGeo);
+
+      // Device type breakdown
+      const deviceCounts: Record<string, number> = {};
+      data.forEach((row: PageView) => {
+        const device = row.device_type || "unknown";
+        deviceCounts[device] = (deviceCounts[device] || 0) + 1;
+      });
+      const devices = Object.entries(deviceCounts)
+        .map(([device, count]) => ({ device, count }))
+        .sort((a, b) => b.count - a.count);
+      setDeviceData(devices);
     }
     setStatsLoading(false);
   }
@@ -418,6 +454,50 @@ export default function AdminPage() {
                         <span className="font-medium">{ref.count}</span>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Geographic distribution */}
+                {geoData.length > 0 && (
+                  <div className="mb-6">
+                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-2">
+                      Geographic distribution
+                    </p>
+                    {geoData.map((geo) => (
+                      <div
+                        key={geo.location}
+                        className="flex justify-between py-1.5 border-b border-brd text-[13px]"
+                      >
+                        <span className="text-txt2 overflow-hidden text-ellipsis whitespace-nowrap max-w-[80%]">
+                          {geo.location}
+                        </span>
+                        <span className="font-medium">{geo.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Device breakdown */}
+                {deviceData.length > 0 && (
+                  <div className="mb-6">
+                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-2">
+                      Device type breakdown
+                    </p>
+                    <div className="flex gap-4 flex-wrap">
+                      {deviceData.map((device) => (
+                        <div
+                          key={device.device}
+                          className="p-3 border-[1.5px] border-brd min-w-[100px]"
+                        >
+                          <p className="text-[11px] text-txt2 mb-1 capitalize">
+                            {device.device}
+                          </p>
+                          <p className="font-display text-2xl">
+                            {device.count}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
