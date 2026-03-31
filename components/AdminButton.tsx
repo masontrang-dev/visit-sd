@@ -1,0 +1,71 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { usePathname } from "next/navigation";
+
+export default function AdminButton() {
+  const { isAdmin, logout } = useAuth();
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const isAdminPage = pathname === "/admin";
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    if (showMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showMenu]);
+
+  if (!isAdmin) return null;
+
+  return (
+    <div className="fixed top-4 right-16 z-50" ref={menuRef}>
+      <button
+        onClick={() => setShowMenu(!showMenu)}
+        aria-label="Admin menu"
+        className="w-9 h-9 flex items-center justify-center rounded-full border border-accent bg-accent text-white hover:opacity-90 transition-opacity duration-150 text-sm font-medium"
+      >
+        A
+      </button>
+      {showMenu && (
+        <div className="absolute right-0 top-full mt-2 bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[140px]">
+          {!isAdminPage && (
+            <a
+              href="/admin"
+              className="block px-4 py-2.5 text-[13px] text-txt hover:bg-brd/20 no-underline transition-colors"
+              onClick={() => setShowMenu(false)}
+            >
+              Manage spots
+            </a>
+          )}
+          {isAdminPage && (
+            <a
+              href="/"
+              className="block px-4 py-2.5 text-[13px] text-txt hover:bg-brd/20 no-underline transition-colors"
+              onClick={() => setShowMenu(false)}
+            >
+              Public view
+            </a>
+          )}
+          <button
+            onClick={async () => {
+              await logout();
+              setShowMenu(false);
+              window.location.href = "/";
+            }}
+            className="w-full text-left px-4 py-2.5 text-[13px] text-accent hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
+          >
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

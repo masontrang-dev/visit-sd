@@ -47,7 +47,10 @@ function Card({
     });
   }
   return (
-    <div className="bg-bg relative border-b border-brd transition-colors duration-100 hover:bg-bg2">
+    <Link
+      href={`/restaurant/${r.id}`}
+      className="bg-bg relative border-b border-brd transition-colors duration-100 hover:bg-bg2 block no-underline cursor-pointer"
+    >
       {r.photo_url && (
         <img
           src={r.photo_url}
@@ -69,12 +72,9 @@ function Card({
             </span>
           )}
         </div>
-        <Link
-          href={`/restaurant/${r.id}`}
-          className="font-display text-[28px] leading-none text-txt mb-1 no-underline block hover:text-accent transition-colors duration-100"
-        >
+        <h3 className="font-display text-[28px] leading-none text-txt mb-1 transition-colors duration-100">
           {r.name}
-        </Link>
+        </h3>
         <p className="text-[13px] text-txt2 flex items-center gap-[5px]">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent2 shrink-0" />
           {r.neighborhood}
@@ -93,7 +93,8 @@ function Card({
             href={r.google_maps_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-block mt-1 text-xs font-medium text-accent2 no-underline"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-block mt-2.5 text-[13px] font-medium py-1.5 px-3 rounded-pill border-[1.5px] border-accent2 bg-transparent text-accent2 no-underline hover:bg-accent2 hover:text-white transition-colors duration-150"
           >
             View on Maps ↗
           </a>
@@ -118,7 +119,11 @@ function Card({
             </p>
             {visitCount > 0 && (
               <button
-                onClick={() => setShowHistory(!showHistory)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowHistory(!showHistory);
+                }}
                 className="mt-1 text-[11px] text-accent2 font-medium bg-transparent border-none cursor-pointer p-0 tracking-[0.05em]"
               >
                 {showHistory ? "Hide" : "Show"} history
@@ -137,7 +142,9 @@ function Card({
         )}
         {onMarkVisited && (
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               const adminNames = (process.env.NEXT_PUBLIC_ADMIN_NAMES ?? "")
                 .split(",")
                 .filter(Boolean);
@@ -152,7 +159,11 @@ function Card({
         )}
         {onEdit && (
           <button
-            onClick={() => onEdit(r)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onEdit(r);
+            }}
             className={`absolute ${onMarkVisited ? "bottom-[72px]" : "bottom-4"} ${onDelete ? "right-20" : "right-4"} bg-transparent border-none cursor-pointer text-sm text-txt2 font-body opacity-60 p-0`}
             title="Edit"
           >
@@ -161,7 +172,11 @@ function Card({
         )}
         {onDelete && (
           <button
-            onClick={() => onDelete(r.id)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete(r.id);
+            }}
             disabled={deletingId === r.id}
             className={`absolute ${onMarkVisited ? "bottom-[72px]" : "bottom-4"} right-4 bg-transparent border-none text-sm text-accent font-body p-0 ${deletingId === r.id ? "cursor-default opacity-30" : "cursor-pointer opacity-60"}`}
             title="Remove"
@@ -170,7 +185,7 @@ function Card({
           </button>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 

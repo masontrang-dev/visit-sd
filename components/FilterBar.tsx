@@ -10,12 +10,11 @@ type Props = {
   activeNeighborhood?: string;
   onNeighborhoodChange?: (f: string) => void;
   onAdd?: () => void;
-  showAdmin?: boolean;
   viewMode?: "list" | "map";
   onViewModeChange?: (mode: "list" | "map") => void;
   mustTryFilter?: boolean;
   onMustTryFilterChange?: (v: boolean) => void;
-  showCopyLink?: boolean;
+  isAdminView?: boolean;
 };
 
 const btnBase =
@@ -31,18 +30,19 @@ export default function FilterBar({
   activeNeighborhood,
   onNeighborhoodChange,
   onAdd,
-  showAdmin,
   viewMode,
   onViewModeChange,
   mustTryFilter,
   onMustTryFilterChange,
-  showCopyLink,
+  isAdminView,
 }: Props) {
-  const [copied, setCopied] = useState(false);
-
   return (
     <>
-      <div className="flex gap-1.5 py-3.5 px-6 border-b border-brd flex-wrap items-center overflow-x-auto">
+      {/* Cuisine filter row */}
+      <div className="flex gap-1.5 py-3 px-6 border-b border-brd flex-wrap items-center">
+        <span className="text-[11px] tracking-[0.12em] uppercase font-medium text-txt2 mr-2">
+          Cuisine
+        </span>
         <button
           className={active === "all" ? btnActive : btnBase}
           onClick={() => onChange("all")}
@@ -70,16 +70,16 @@ export default function FilterBar({
             ★ Must-Try
           </button>
         )}
-        {onAdd && (
-          <button
-            onClick={onAdd}
-            className="font-body ml-auto text-[13px] font-medium py-1.5 px-[18px] rounded-pill border-none bg-accent text-white cursor-pointer"
-          >
-            + Add restaurant
-          </button>
-        )}
+      </div>
+
+      {/* Controls row */}
+      <div className="flex gap-1.5 py-3 px-6 border-b border-brd flex-wrap items-center">
+        <span className="text-[11px] tracking-[0.12em] uppercase font-medium text-txt2 mr-2">
+          View
+        </span>
+
         {onViewModeChange && (
-          <div className={`flex gap-1 ${onAdd || showAdmin ? "" : "ml-auto"}`}>
+          <div className="flex gap-1">
             <button
               className={viewMode === "list" ? btnActive : btnBase}
               onClick={() => onViewModeChange("list")}
@@ -94,30 +94,21 @@ export default function FilterBar({
             </button>
           </div>
         )}
-        {showCopyLink && (
+
+        {onAdd && (
           <button
-            className={`${btnBase} ${onAdd ? "" : "ml-auto"}`}
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            }}
+            onClick={onAdd}
+            className="font-body text-[13px] font-medium py-1.5 px-[18px] rounded-pill border-none bg-accent text-white cursor-pointer"
           >
-            {copied ? "Copied!" : "Copy link"}
+            + Add
           </button>
         )}
-        {showAdmin && (
-          <a
-            href="/admin"
-            className="ml-auto font-body text-xs text-txt2 no-underline py-1.5 opacity-50"
-          >
-            Admin ↗
-          </a>
-        )}
       </div>
+
+      {/* Neighborhood filter row */}
       {neighborhoods && neighborhoods.length > 0 && onNeighborhoodChange && (
-        <div className="flex gap-1.5 py-2 px-6 pb-3.5 border-b border-brd flex-wrap items-center overflow-x-auto">
-          <span className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mr-1">
+        <div className="flex gap-1.5 py-3 px-6 border-b border-brd flex-wrap items-center">
+          <span className="text-[11px] tracking-[0.12em] uppercase font-medium text-txt2 mr-2">
             Area
           </span>
           <button

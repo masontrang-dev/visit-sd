@@ -7,13 +7,13 @@ import {
   type PageView,
   type RestaurantVisit,
 } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth-context";
 import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar from "@/components/FilterBar";
 import AddModal from "@/components/AddModal";
 
 export default function AdminPage() {
-  const [authed, setAuthed] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
+  const { isAdmin, isLoading: authLoading, login } = useAuth();
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState(false);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -122,26 +122,15 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    fetch("/api/auth")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.authed) {
-          setAuthed(true);
-          loadData();
-        }
-      })
-      .finally(() => setAuthLoading(false));
+    if (!authLoading && isAdmin) {
+      loadData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAdmin, authLoading]);
 
   async function checkPassword() {
-    const res = await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pwInput }),
-    });
-    if (res.ok) {
-      setAuthed(true);
+    const success = await login(pwInput);
+    if (success) {
       loadData();
     } else {
       setPwError(true);
@@ -209,12 +198,14 @@ export default function AdminPage() {
   ): Promise<boolean> {
     setOpError("");
     console.log("INSERT payload:", JSON.stringify(entry, null, 2));
+    console.log("Photo URL being saved:", entry.photo_url);
     const { error, data } = await supabase
       .from("restaurants")
       .insert([entry])
       .select();
     console.log("INSERT response:", { error, data });
     if (error) {
+      console.error("Insert error:", error);
       setOpError("Failed to add restaurant.");
       return false;
     }
@@ -227,11 +218,14 @@ export default function AdminPage() {
   ): Promise<boolean> {
     if (!editingRestaurant) return false;
     setOpError("");
+    console.log("UPDATE payload:", JSON.stringify(entry, null, 2));
+    console.log("Photo URL being updated:", entry.photo_url);
     const { error } = await supabase
       .from("restaurants")
       .update(entry)
       .eq("id", editingRestaurant.id);
     if (error) {
+      console.error("Update error:", error);
       setOpError("Failed to update restaurant.");
       return false;
     }
@@ -274,7 +268,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!authed) {
+  if (!isAdmin) {
     return (
       <main className="min-h-screen flex items-center justify-center p-8">
         <div className="w-full max-w-[360px]">
@@ -324,12 +318,6 @@ export default function AdminPage() {
           <span className="text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt">
             {restaurants.length} spots
           </span>
-          <a
-            href="/"
-            className="text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-brd text-txt2 no-underline"
-          >
-            ← Public view
-          </a>
         </div>
       </header>
 
@@ -346,6 +334,7 @@ export default function AdminPage() {
         }}
         mustTryFilter={mustTryFilter}
         onMustTryFilterChange={setMustTryFilter}
+        isAdminView
       />
 
       {opError && (

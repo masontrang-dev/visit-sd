@@ -306,9 +306,11 @@ export default function AddModal({
           .from("restaurant-photos")
           .getPublicUrl(uploadData.path);
         finalPhotoUrl = urlData.publicUrl;
+        console.log("Photo uploaded successfully. URL:", finalPhotoUrl);
       }
     }
 
+    console.log("Saving restaurant with photo_url:", finalPhotoUrl);
     const ok = await onSave({
       name: name.trim(),
       neighborhood: neighborhood.trim(),

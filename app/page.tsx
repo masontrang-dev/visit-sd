@@ -147,12 +147,10 @@ function HomeContent() {
         neighborhoods={neighborhoods}
         activeNeighborhood={neighborhoodFilter}
         onNeighborhoodChange={handleNeighborhoodChange}
-        showAdmin
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         mustTryFilter={mustTryFilter}
         onMustTryFilterChange={handleMustTryChange}
-        showCopyLink
       />
 
       {loading ? (
