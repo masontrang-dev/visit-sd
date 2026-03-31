@@ -11,6 +11,8 @@ import { useAuth } from "@/lib/auth-context";
 import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar from "@/components/FilterBar";
 import AddModal from "@/components/AddModal";
+import OrderModal from "@/components/OrderModal";
+import Link from "next/link";
 
 export default function AdminPage() {
   const { isAdmin, isLoading: authLoading, username, login } = useAuth();
@@ -21,10 +23,12 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
   const [showModal, setShowModal] = useState(false);
+  const [showOrderModal, setShowOrderModal] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(
     null,
   );
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [orderingRestaurant, setOrderingRestaurant] =
+    useState<Restaurant | null>(null);
   const [opError, setOpError] = useState("");
   const [mustTryFilter, setMustTryFilter] = useState(false);
   const [neighborhoodFilter, setNeighborhoodFilter] = useState("all");
@@ -231,17 +235,9 @@ export default function AdminPage() {
     return true;
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Remove this restaurant?")) return;
-    setDeletingId(id);
-    setOpError("");
-    const { error } = await supabase.from("restaurants").delete().eq("id", id);
-    setDeletingId(null);
-    if (error) {
-      setOpError("Failed to delete restaurant.");
-      return;
-    }
-    loadData();
+  function handleOrder(restaurant: Restaurant) {
+    setOrderingRestaurant(restaurant);
+    setShowOrderModal(true);
   }
 
   const cuisines = Array.from(
@@ -364,12 +360,11 @@ export default function AdminPage() {
             neighborhoodFilter === "all" &&
             !mustTryFilter
           }
-          onDelete={handleDelete}
-          deletingId={deletingId}
           onEdit={(r) => {
             setEditingRestaurant(r);
             setShowModal(true);
           }}
+          onOrder={handleOrder}
           onMarkVisited={handleMarkVisited}
           visitingId={visitingId}
           visits={visits}
@@ -430,6 +425,15 @@ export default function AdminPage() {
                         : "Not yet run"}
                     </p>
                   </div>
+                  <Link
+                    href="/admin/boba"
+                    className="p-4 pr-5 border-[1.5px] border-brd min-w-[140px] no-underline block hover:bg-bg2 transition-colors duration-[0.12s]"
+                  >
+                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1">
+                      🧋 Boba Analytics
+                    </p>
+                    <p className="font-display text-2xl text-accent">View</p>
+                  </Link>
                 </div>
 
                 {/* Views per day bar chart */}
@@ -544,6 +548,21 @@ export default function AdminPage() {
           }}
           editData={editingRestaurant}
           existingCuisines={cuisines}
+        />
+      )}
+
+      {/* Order Modal */}
+      {showOrderModal && orderingRestaurant && (
+        <OrderModal
+          restaurantId={orderingRestaurant.id}
+          onClose={() => {
+            setShowOrderModal(false);
+            setOrderingRestaurant(null);
+          }}
+          onSaved={() => {
+            setShowOrderModal(false);
+            setOrderingRestaurant(null);
+          }}
         />
       )}
     </main>

@@ -3,15 +3,17 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
-import { type Restaurant } from "@/lib/supabase";
-import imageCompression from "browser-image-compression";
 import { useAuth } from "@/lib/auth-context";
+import imageCompression from "browser-image-compression";
+import ConfirmModal from "@/components/ConfirmModal";
+import { type Restaurant } from "@/lib/supabase";
 
 type Props = {
   onSave: (entry: Omit<Restaurant, "id" | "created_at">) => Promise<boolean>;
   onClose: () => void;
   editData?: Restaurant | null;
   existingCuisines?: string[];
+  onDeleteSuccess?: () => void;
 };
 
 const PRICES = ["$", "$$", "$$$", "$$$$"];
@@ -126,7 +128,8 @@ export default function AddModal({
   onSave,
   onClose,
   editData,
-  existingCuisines = [],
+  existingCuisines,
+  onDeleteSuccess,
 }: Props) {
   const { username } = useAuth();
   const [name, setName] = useState(editData?.name ?? "");
@@ -151,12 +154,13 @@ export default function AddModal({
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [cuisineOpen, setCuisineOpen] = useState(false);
   const [cuisineHighlight, setCuisineHighlight] = useState(-1);
   const cuisineWrapperRef = useRef<HTMLDivElement>(null);
 
   const cuisineOptions = Array.from(
-    new Set([...existingCuisines, ...DEFAULT_CUISINE_OPTIONS]),
+    new Set([...(existingCuisines ?? []), ...DEFAULT_CUISINE_OPTIONS]),
   ).sort();
   const filteredCuisines = cuisine.trim()
     ? cuisineOptions.filter((c) =>
@@ -360,6 +364,36 @@ export default function AddModal({
     }
   }
 
+  function handleDeleteClick() {
+    if (!editData) return;
+    setShowDeleteConfirm(true);
+  }
+
+  async function handleDeleteConfirm() {
+    if (!editData) return;
+    setSaving(true);
+    setError("");
+    setShowDeleteConfirm(false);
+
+    const { error } = await supabase
+      .from("restaurants")
+      .delete()
+      .eq("id", editData.id);
+
+    if (error) {
+      setError("Failed to delete restaurant.");
+      setSaving(false);
+      return;
+    }
+
+    setSaving(false);
+    setSuccess(true);
+    setTimeout(() => {
+      onClose();
+      onDeleteSuccess?.();
+    }, 800);
+  }
+
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -453,7 +487,8 @@ export default function AddModal({
                   cuisineHighlight >= 0 &&
                   filteredCuisines[cuisineHighlight]
                 ) {
-                  setCuisine(filteredCuisines[cuisineHighlight]);
+                  const picked = filteredCuisines[cuisineHighlight];
+                  setCuisine(picked);
                   setCuisineOpen(false);
                   setCuisineHighlight(-1);
                 } else {
@@ -603,6 +638,19 @@ export default function AddModal({
                     ? "Save changes"
                     : "Save restaurant"}
           </button>
+          {editData && (
+            <button
+              onClick={handleDeleteClick}
+              disabled={saving || success}
+              className={`py-2.5 px-4 text-sm font-medium border-[1.5px] border-accent text-accent bg-transparent font-body rounded-none ${
+                saving || success
+                  ? "cursor-default opacity-30"
+                  : "cursor-pointer hover:bg-accent hover:text-white transition-colors duration-[0.12s]"
+              }`}
+            >
+              Delete
+            </button>
+          )}
           <button
             onClick={onClose}
             className="py-2.5 px-[18px] bg-transparent text-txt2 border-[1.5px] border-brd text-sm cursor-pointer font-body rounded-none"
@@ -611,6 +659,18 @@ export default function AddModal({
           </button>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && editData && (
+        <ConfirmModal
+          title="Delete Restaurant"
+          message={`Are you sure you want to delete "${editData.name}"? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 }

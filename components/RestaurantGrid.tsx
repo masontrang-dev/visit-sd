@@ -8,9 +8,8 @@ import { useAuth } from "@/lib/auth-context";
 type Props = {
   restaurants: Restaurant[];
   grouped: boolean;
-  onDelete?: (id: number) => void;
-  deletingId?: number | null;
   onEdit?: (r: Restaurant) => void;
+  onOrder?: (r: Restaurant) => void;
   mustTryFilter?: boolean;
   onMarkVisited?: (id: number, visitedBy: string) => Promise<void>;
   visitingId?: number | null;
@@ -38,7 +37,7 @@ function MarkVisitedButton({
         }
       }}
       disabled={visitingId === restaurantId}
-      className={`mt-2 text-[13px] font-medium py-1.5 px-3 rounded-pill border-[1.5px] font-body ${visitingId === restaurantId ? "cursor-default opacity-30 bg-transparent border-brd text-txt2" : "cursor-pointer bg-accent2 text-white border-accent2"}`}
+      className={`text-[13px] font-medium py-1.5 px-3 rounded-pill border-[1.5px] font-body h-[38px] flex items-center justify-center ${visitingId === restaurantId ? "cursor-default opacity-30 bg-transparent border-brd text-txt2" : "cursor-pointer bg-accent2 text-white border-accent2"}`}
     >
       {visitingId === restaurantId ? "Marking..." : "✓ Mark as Visited"}
     </button>
@@ -47,17 +46,15 @@ function MarkVisitedButton({
 
 function Card({
   r,
-  onDelete,
-  deletingId,
   onEdit,
+  onOrder,
   onMarkVisited,
   visitingId,
   visits,
 }: {
   r: Restaurant;
-  onDelete?: (id: number) => void;
-  deletingId?: number | null;
   onEdit?: (r: Restaurant) => void;
+  onOrder?: (r: Restaurant) => void;
   onMarkVisited?: (id: number, visitedBy: string) => Promise<void>;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
@@ -173,11 +170,25 @@ function Card({
           </div>
         )}
         {onMarkVisited && (
-          <MarkVisitedButton
-            restaurantId={r.id}
-            onMarkVisited={onMarkVisited}
-            visitingId={visitingId}
-          />
+          <div className="flex gap-2 mt-2 items-center">
+            <MarkVisitedButton
+              restaurantId={r.id}
+              onMarkVisited={onMarkVisited}
+              visitingId={visitingId}
+            />
+            {onOrder && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOrder(r);
+                }}
+                className="text-[13px] font-medium py-1.5 px-3 rounded-pill border-[1.5px] bg-accent text-white border-accent font-body h-[38px] flex items-center justify-center"
+              >
+                + Order
+              </button>
+            )}
+          </div>
         )}
         {onEdit && (
           <button
@@ -186,24 +197,10 @@ function Card({
               e.stopPropagation();
               onEdit(r);
             }}
-            className={`absolute ${onMarkVisited ? "bottom-[72px]" : "bottom-4"} ${onDelete ? "right-20" : "right-4"} bg-transparent border-none cursor-pointer text-sm text-txt2 font-body opacity-60 p-0`}
+            className={`absolute ${onMarkVisited ? "bottom-[72px]" : "bottom-4"} right-4 bg-transparent border-none cursor-pointer text-sm text-txt2 font-body opacity-60 p-0`}
             title="Edit"
           >
             Edit
-          </button>
-        )}
-        {onDelete && (
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onDelete(r.id);
-            }}
-            disabled={deletingId === r.id}
-            className={`absolute ${onMarkVisited ? "bottom-[72px]" : "bottom-4"} right-4 bg-transparent border-none text-sm text-accent font-body p-0 ${deletingId === r.id ? "cursor-default opacity-30" : "cursor-pointer opacity-60"}`}
-            title="Remove"
-          >
-            {deletingId === r.id ? "Removing..." : "Remove"}
           </button>
         )}
       </div>
@@ -217,9 +214,8 @@ const gridClass =
 export default function RestaurantGrid({
   restaurants,
   grouped,
-  onDelete,
-  deletingId,
   onEdit,
+  onOrder,
   mustTryFilter,
   onMarkVisited,
   visitingId,
@@ -245,9 +241,8 @@ export default function RestaurantGrid({
           <Card
             key={r.id}
             r={r}
-            onDelete={onDelete}
-            deletingId={deletingId}
             onEdit={onEdit}
+            onOrder={onOrder}
             onMarkVisited={onMarkVisited}
             visitingId={visitingId}
             visits={visits}
@@ -286,9 +281,8 @@ export default function RestaurantGrid({
                 <Card
                   key={r.id}
                   r={r}
-                  onDelete={onDelete}
-                  deletingId={deletingId}
                   onEdit={onEdit}
+                  onOrder={onOrder}
                   onMarkVisited={onMarkVisited}
                   visitingId={visitingId}
                   visits={visits}

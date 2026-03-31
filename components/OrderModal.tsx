@@ -1,0 +1,864 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import {
+  supabase,
+  type MenuItem,
+  type ItemOrder,
+  type DrinkDetails,
+} from "@/lib/supabase";
+import imageCompression from "browser-image-compression";
+
+type Props = {
+  restaurantId: number;
+  onClose: () => void;
+  onSaved: () => void;
+  editOrder?: ItemOrder | null;
+  editMenuItem?: MenuItem | null;
+};
+
+const CATEGORIES = ["food", "drink", "dessert", "boba"];
+
+const SWEETNESS_DESCRIPTORS: { label: string; value: number }[] = [
+  { label: "No sugar", value: 0 },
+  { label: "25%", value: 25 },
+  { label: "Half sweet", value: 50 },
+  { label: "Less sweet", value: 75 },
+  { label: "Full sweet", value: 100 },
+];
+
+const ICE_DESCRIPTORS: { label: string; value: number }[] = [
+  { label: "No ice", value: 0 },
+  { label: "Light ice", value: 25 },
+  { label: "Less ice", value: 40 },
+  { label: "Regular", value: 50 },
+  { label: "Extra ice", value: 100 },
+];
+
+const DEFAULT_TOPPINGS = [
+  "Tapioca pearls (boba)",
+  "Popping boba",
+  "Grass jelly",
+  "Pudding",
+  "Lychee jelly",
+  "Aloe vera",
+  "Red bean",
+  "Cheese foam",
+];
+
+const BOBA_SIZES = ["Small", "Medium", "Large", "Extra Large"];
+const CAFE_SIZES = ["Small", "Medium", "Large"];
+const BOBA_TEMPS = ["Hot", "Warm", "Iced"];
+const CAFE_TEMPS = ["Hot", "Iced"];
+const MILK_TYPES = ["Whole", "Oat", "Almond", "Soy", "Coconut", "None"];
+
+const inputCls =
+  "w-full py-2 px-3 text-[15px] border-[1.5px] border-brd bg-bg text-txt rounded-none outline-none font-body transition-[border-color] duration-[0.12s] focus:border-accent";
+
+const labelCls =
+  "block text-[11px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1";
+
+export default function OrderModal({
+  restaurantId,
+  onClose,
+  onSaved,
+  editOrder = null,
+  editMenuItem = null,
+}: Props) {
+  const isEditing = !!editOrder;
+  const editDrink = (editOrder?.drink_details as DrinkDetails) ?? null;
+
+  // Menu item state
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuSearch, setMenuSearch] = useState(editMenuItem?.name ?? "");
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(
+    editMenuItem ?? null,
+  );
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Order fields
+  const [selectedCategory, setSelectedCategory] = useState(
+    editMenuItem?.category ?? "food",
+  );
+  const [rating, setRating] = useState<number | null>(
+    editOrder?.rating ?? null,
+  );
+
+  // Determine form type based on current category selection
+  const formType =
+    selectedCategory === "boba"
+      ? "boba"
+      : selectedCategory === "drink"
+        ? "cafe"
+        : "standard";
+  const [notes, setNotes] = useState(editOrder?.notes ?? "");
+  const [orderedAt, setOrderedAt] = useState(
+    editOrder?.ordered_at ?? new Date().toISOString().slice(0, 10),
+  );
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoUrl, setPhotoUrl] = useState(editOrder?.photo_url ?? "");
+
+  // Boba fields
+  const [sweetnessStyle, setSweetnessStyle] = useState<
+    "descriptive" | "percentage"
+  >(editDrink?.sweetness?.style ?? "descriptive");
+  const [sweetnessValue, setSweetnessValue] = useState(
+    editDrink?.sweetness?.value ?? 75,
+  );
+  const [iceStyle, setIceStyle] = useState<"descriptive" | "percentage">(
+    editDrink?.ice?.style ?? "descriptive",
+  );
+  const [iceValue, setIceValue] = useState(editDrink?.ice?.value ?? 50);
+  const [toppings, setToppings] = useState<string[]>(editDrink?.toppings ?? []);
+  const [customTopping, setCustomTopping] = useState("");
+
+  // Shared cafe/boba fields
+  const [size, setSize] = useState<string | null>(editDrink?.size ?? null);
+  const [temperature, setTemperature] = useState<string | null>(
+    editDrink?.temperature ?? null,
+  );
+
+  // Cafe-only fields
+  const [milkType, setMilkType] = useState<string | null>(
+    editDrink?.milk_type ?? null,
+  );
+  const [shots, setShots] = useState<number | null>(editDrink?.shots ?? null);
+
+  // UI state
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    async function loadMenuItems() {
+      const { data } = await supabase
+        .from("menu_items")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .order("name");
+      setMenuItems(data ?? []);
+    }
+    loadMenuItems();
+  }, [restaurantId]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredItems = menuSearch.trim()
+    ? menuItems.filter((m) =>
+        m.name.toLowerCase().includes(menuSearch.trim().toLowerCase()),
+      )
+    : menuItems;
+
+  const showCreateNew =
+    menuSearch.trim() &&
+    !menuItems.some(
+      (m) => m.name.toLowerCase() === menuSearch.trim().toLowerCase(),
+    );
+
+  function selectMenuItem(item: MenuItem) {
+    setSelectedItem(item);
+    setMenuSearch(item.name);
+    if (item.category) setSelectedCategory(item.category);
+    setShowDropdown(false);
+    setHighlightIdx(-1);
+  }
+
+  function getSweetnessLabel(value: number): string {
+    const match = SWEETNESS_DESCRIPTORS.find((d) => d.value === value);
+    return match ? match.label : `${value}%`;
+  }
+
+  function getIceLabel(value: number): string {
+    const match = ICE_DESCRIPTORS.find((d) => d.value === value);
+    return match ? match.label : `${value}%`;
+  }
+
+  function buildDrinkDetails(): DrinkDetails | null {
+    if (formType === "standard") return null;
+
+    const details: DrinkDetails = {};
+
+    if (formType === "boba") {
+      details.sweetness = {
+        style: sweetnessStyle,
+        value: sweetnessValue,
+        label: getSweetnessLabel(sweetnessValue),
+      };
+      details.ice = {
+        style: iceStyle,
+        value: iceValue,
+        label: getIceLabel(iceValue),
+      };
+      if (toppings.length > 0) details.toppings = toppings;
+    }
+
+    if (formType === "boba" || formType === "cafe") {
+      if (size) details.size = size;
+      if (temperature) details.temperature = temperature;
+    }
+
+    if (formType === "cafe") {
+      if (milkType) details.milk_type = milkType;
+      if (shots) details.shots = shots;
+    }
+
+    return Object.keys(details).length > 0 ? details : null;
+  }
+
+  async function handleSave() {
+    if (!menuSearch.trim() || saving) return;
+    setSaving(true);
+    setError("");
+
+    let menuItemId: number;
+
+    // Create or use existing menu item
+    if (selectedItem) {
+      menuItemId = selectedItem.id;
+      // Update category if changed
+      if (selectedItem.category !== selectedCategory) {
+        await supabase
+          .from("menu_items")
+          .update({ category: selectedCategory })
+          .eq("id", menuItemId);
+      }
+    } else {
+      // Create new menu item
+      const { data: newItem, error: createError } = await supabase
+        .from("menu_items")
+        .insert([
+          {
+            restaurant_id: restaurantId,
+            name: menuSearch.trim(),
+            category: selectedCategory,
+          },
+        ])
+        .select()
+        .single();
+
+      if (createError || !newItem) {
+        setError("Failed to create menu item.");
+        setSaving(false);
+        return;
+      }
+      menuItemId = newItem.id;
+    }
+
+    // Upload photo if present
+    let finalPhotoUrl: string | null = null;
+    if (photoFile) {
+      setUploading(true);
+      let fileToUpload = photoFile;
+      try {
+        fileToUpload = await imageCompression(photoFile, {
+          maxSizeMB: 0.5,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+          fileType: "image/jpeg",
+        });
+      } catch {
+        // Use original if compression fails
+      }
+
+      const fileName = `${restaurantId}/${menuItemId}/${Date.now()}.jpg`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("item-photos")
+        .upload(fileName, fileToUpload, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+      setUploading(false);
+
+      if (uploadError) {
+        setError("Failed to upload photo.");
+        setSaving(false);
+        return;
+      }
+
+      if (uploadData) {
+        const { data: urlData } = supabase.storage
+          .from("item-photos")
+          .getPublicUrl(uploadData.path);
+        finalPhotoUrl = urlData.publicUrl;
+      }
+    } else if (photoUrl.trim()) {
+      finalPhotoUrl = photoUrl.trim();
+    }
+
+    // Insert or update order
+    const drinkDetails = buildDrinkDetails();
+    const orderPayload = {
+      menu_item_id: menuItemId,
+      restaurant_id: restaurantId,
+      ordered_at: orderedAt,
+      rating,
+      notes: notes.trim() || null,
+      photo_url: finalPhotoUrl,
+      drink_details: drinkDetails,
+    };
+
+    if (isEditing) {
+      const { error: orderError } = await supabase
+        .from("item_orders")
+        .update(orderPayload)
+        .eq("id", editOrder!.id);
+      if (orderError) {
+        setError("Failed to update order.");
+        setSaving(false);
+        return;
+      }
+    } else {
+      const { error: orderError } = await supabase
+        .from("item_orders")
+        .insert([orderPayload]);
+      if (orderError) {
+        setError("Failed to save order.");
+        setSaving(false);
+        return;
+      }
+    }
+
+    setSaving(false);
+    setSuccess(true);
+    setTimeout(() => {
+      onSaved();
+      onClose();
+    }, 800);
+  }
+
+  function toggleTopping(topping: string) {
+    setToppings((prev) =>
+      prev.includes(topping)
+        ? prev.filter((t) => t !== topping)
+        : [...prev, topping],
+    );
+  }
+
+  function addCustomTopping() {
+    const t = customTopping.trim();
+    if (t && !toppings.includes(t)) {
+      setToppings((prev) => [...prev, t]);
+      setCustomTopping("");
+    }
+  }
+
+  // Snap slider to 5% increments
+  function snapTo5(value: number): number {
+    return Math.round(value / 5) * 5;
+  }
+
+  return (
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 bg-black/55 z-[100] flex items-center justify-center p-4"
+    >
+      <div className="bg-bg border-2 border-txt p-7 w-full max-w-[480px] max-h-[90vh] overflow-y-auto">
+        <p className="font-display text-4xl mb-5">
+          {success
+            ? isEditing
+              ? "Order updated!"
+              : "Order logged!"
+            : isEditing
+              ? "Edit order"
+              : "Log an order"}
+        </p>
+
+        {success && (
+          <p className="text-accent2 text-sm mb-4">
+            {isEditing
+              ? "Order updated successfully."
+              : "Order saved successfully."}
+          </p>
+        )}
+
+        {/* Menu item search/select */}
+        <div ref={dropdownRef} className="mb-4 relative">
+          <label className={labelCls}>Menu item</label>
+          <input
+            value={menuSearch}
+            onChange={(e) => {
+              setMenuSearch(e.target.value);
+              setSelectedItem(null);
+              setShowDropdown(true);
+              setHighlightIdx(-1);
+            }}
+            onFocus={() => setShowDropdown(true)}
+            onKeyDown={(e) => {
+              const items = filteredItems;
+              const offset = showCreateNew ? 1 : 0;
+              const total = items.length + offset;
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setHighlightIdx((prev) => (prev < total - 1 ? prev + 1 : prev));
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setHighlightIdx((prev) => (prev > 0 ? prev - 1 : -1));
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                if (showCreateNew && highlightIdx === 0) {
+                  // "Create new" selected — just close dropdown, use typed name
+                  setShowDropdown(false);
+                  setHighlightIdx(-1);
+                } else if (
+                  highlightIdx >= offset &&
+                  items[highlightIdx - offset]
+                ) {
+                  selectMenuItem(items[highlightIdx - offset]);
+                } else {
+                  setShowDropdown(false);
+                }
+              } else if (e.key === "Escape") {
+                setShowDropdown(false);
+              }
+            }}
+            placeholder="Search or type a new item..."
+            className={inputCls}
+            autoComplete="off"
+          />
+          {showDropdown && (filteredItems.length > 0 || showCreateNew) && (
+            <ul className="absolute top-full left-0 right-0 z-10 bg-bg border-[1.5px] border-brd border-t-0 max-h-[200px] overflow-y-auto list-none m-0 p-0">
+              {showCreateNew && (
+                <li
+                  onMouseDown={() => {
+                    setShowDropdown(false);
+                    setHighlightIdx(-1);
+                  }}
+                  className={`py-2 px-3 text-sm cursor-pointer text-accent font-medium font-body ${filteredItems.length > 0 ? "border-b border-brd" : ""} ${highlightIdx === 0 ? "bg-bg2" : ""}`}
+                >
+                  Create &ldquo;{menuSearch.trim()}&rdquo;
+                </li>
+              )}
+              {filteredItems.map((item, i) => {
+                const idx = i + (showCreateNew ? 1 : 0);
+                return (
+                  <li
+                    key={item.id}
+                    onMouseDown={() => selectMenuItem(item)}
+                    className={`py-2 px-3 text-sm cursor-pointer font-body text-txt transition-colors duration-75 hover:bg-bg2 ${idx === highlightIdx ? "bg-bg2" : "bg-transparent"}`}
+                  >
+                    <span>{item.name}</span>
+                    {item.category && (
+                      <span className="ml-2 text-[11px] text-txt2">
+                        {item.category}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Category */}
+        <div className="mb-4">
+          <label className={labelCls}>Category</label>
+          <div className="flex gap-2">
+            {CATEGORIES.map((c) => (
+              <button
+                key={c}
+                onClick={() => setSelectedCategory(c)}
+                className={`flex-1 p-2 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] capitalize ${
+                  selectedCategory === c
+                    ? "bg-txt text-bg border-txt"
+                    : "bg-transparent text-txt2 border-brd"
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Rating */}
+        <div className="mb-4">
+          <label className={labelCls}>Rating</label>
+          <div className="flex gap-1">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                onClick={() => setRating(rating === star ? null : star)}
+                className={`text-[24px] bg-transparent border-none cursor-pointer p-1 transition-colors duration-[0.12s] ${
+                  rating !== null && star <= rating ? "text-accent" : "text-brd"
+                }`}
+              >
+                ★
+              </button>
+            ))}
+            {rating && (
+              <span className="text-[13px] text-txt2 self-center ml-2">
+                {rating}/5
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Date */}
+        <div className="mb-4">
+          <label className={labelCls}>Date ordered</label>
+          <input
+            type="date"
+            value={orderedAt}
+            onChange={(e) => setOrderedAt(e.target.value)}
+            className={inputCls}
+          />
+        </div>
+
+        {/* Boba-specific fields */}
+        {formType === "boba" && (
+          <>
+            {/* Sweetness */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className={labelCls + " mb-0"}>Sweetness</label>
+                <button
+                  onClick={() =>
+                    setSweetnessStyle(
+                      sweetnessStyle === "descriptive"
+                        ? "percentage"
+                        : "descriptive",
+                    )
+                  }
+                  className="text-[11px] text-accent2 bg-transparent border-none cursor-pointer font-body"
+                >
+                  {sweetnessStyle === "descriptive"
+                    ? "Switch to %"
+                    : "Switch to labels"}
+                </button>
+              </div>
+              {sweetnessStyle === "descriptive" ? (
+                <div className="flex gap-1.5 flex-wrap">
+                  {SWEETNESS_DESCRIPTORS.map((d) => (
+                    <button
+                      key={d.label}
+                      onClick={() => setSweetnessValue(d.value)}
+                      className={`py-1.5 px-3 text-[12px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
+                        sweetnessValue === d.value
+                          ? "bg-txt text-bg border-txt"
+                          : "bg-transparent text-txt2 border-brd"
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={sweetnessValue}
+                    onChange={(e) =>
+                      setSweetnessValue(snapTo5(parseInt(e.target.value)))
+                    }
+                    className="flex-1 accent-accent"
+                  />
+                  <span className="text-[13px] font-medium text-txt min-w-[40px] text-right">
+                    {sweetnessValue}%
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Ice */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className={labelCls + " mb-0"}>Ice level</label>
+                <button
+                  onClick={() =>
+                    setIceStyle(
+                      iceStyle === "descriptive" ? "percentage" : "descriptive",
+                    )
+                  }
+                  className="text-[11px] text-accent2 bg-transparent border-none cursor-pointer font-body"
+                >
+                  {iceStyle === "descriptive"
+                    ? "Switch to %"
+                    : "Switch to labels"}
+                </button>
+              </div>
+              {iceStyle === "descriptive" ? (
+                <div className="flex gap-1.5 flex-wrap">
+                  {ICE_DESCRIPTORS.map((d) => (
+                    <button
+                      key={d.label}
+                      onClick={() => setIceValue(d.value)}
+                      className={`py-1.5 px-3 text-[12px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
+                        iceValue === d.value
+                          ? "bg-txt text-bg border-txt"
+                          : "bg-transparent text-txt2 border-brd"
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={iceValue}
+                    onChange={(e) =>
+                      setIceValue(snapTo5(parseInt(e.target.value)))
+                    }
+                    className="flex-1 accent-accent"
+                  />
+                  <span className="text-[13px] font-medium text-txt min-w-[40px] text-right">
+                    {iceValue}%
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Toppings */}
+            <div className="mb-4">
+              <label className={labelCls}>Toppings</label>
+              <div className="flex gap-1.5 flex-wrap mb-2">
+                {DEFAULT_TOPPINGS.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => toggleTopping(t)}
+                    className={`py-1.5 px-3 text-[12px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
+                      toppings.includes(t)
+                        ? "bg-accent2 text-white border-accent2"
+                        : "bg-transparent text-txt2 border-brd"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+                {/* Custom toppings that aren't in defaults */}
+                {toppings
+                  .filter((t) => !DEFAULT_TOPPINGS.includes(t))
+                  .map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => toggleTopping(t)}
+                      className="py-1.5 px-3 text-[12px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill bg-accent2 text-white border-accent2"
+                    >
+                      {t} ✕
+                    </button>
+                  ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={customTopping}
+                  onChange={(e) => setCustomTopping(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCustomTopping();
+                    }
+                  }}
+                  placeholder="Add custom topping..."
+                  className={inputCls + " flex-1"}
+                />
+                <button
+                  onClick={addCustomTopping}
+                  disabled={!customTopping.trim()}
+                  className="py-2 px-4 text-[13px] font-medium border-[1.5px] border-brd cursor-pointer font-body rounded-none bg-transparent text-txt2 disabled:opacity-30"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Size (boba + cafe) */}
+        {(formType === "boba" || formType === "cafe") && (
+          <div className="mb-4">
+            <label className={labelCls}>Size</label>
+            <div className="flex gap-2">
+              {(formType === "boba" ? BOBA_SIZES : CAFE_SIZES).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSize(size === s ? null : s)}
+                  className={`flex-1 p-2 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                    size === s
+                      ? "bg-txt text-bg border-txt"
+                      : "bg-transparent text-txt2 border-brd"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Temperature (boba + cafe) */}
+        {(formType === "boba" || formType === "cafe") && (
+          <div className="mb-4">
+            <label className={labelCls}>Temperature</label>
+            <div className="flex gap-2">
+              {(formType === "boba" ? BOBA_TEMPS : CAFE_TEMPS).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTemperature(temperature === t ? null : t)}
+                  className={`flex-1 p-2 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                    temperature === t
+                      ? "bg-txt text-bg border-txt"
+                      : "bg-transparent text-txt2 border-brd"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cafe-only: Milk type */}
+        {formType === "cafe" && (
+          <div className="mb-4">
+            <label className={labelCls}>Milk type</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {MILK_TYPES.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMilkType(milkType === m ? null : m)}
+                  className={`py-1.5 px-3 text-[12px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
+                    milkType === m
+                      ? "bg-txt text-bg border-txt"
+                      : "bg-transparent text-txt2 border-brd"
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cafe-only: Shots */}
+        {formType === "cafe" && (
+          <div className="mb-4">
+            <label className={labelCls}>Espresso shots</label>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setShots(shots === s ? null : s)}
+                  className={`w-10 h-10 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                    shots === s
+                      ? "bg-txt text-bg border-txt"
+                      : "bg-transparent text-txt2 border-brd"
+                  }`}
+                >
+                  {s === 4 ? "4+" : s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Photo */}
+        <div className="mb-4">
+          <label className={labelCls}>Photo</label>
+          <div className="flex flex-col gap-2">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setPhotoFile(file);
+                  setPhotoUrl("");
+                }
+              }}
+              className="text-sm text-txt2 file:mr-4 file:py-2 file:px-4 file:rounded-none file:border-[1.5px] file:border-brd file:text-sm file:font-medium file:bg-transparent file:text-txt2 file:cursor-pointer hover:file:bg-bg2"
+            />
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-brd" />
+              <span className="text-xs text-txt2 uppercase tracking-wider">
+                or
+              </span>
+              <div className="flex-1 h-px bg-brd" />
+            </div>
+            <input
+              value={photoUrl}
+              onChange={(e) => {
+                setPhotoUrl(e.target.value);
+                setPhotoFile(null);
+              }}
+              placeholder="Paste image URL"
+              className={inputCls}
+              disabled={!!photoFile}
+            />
+          </div>
+          {(photoFile || photoUrl.trim()) && (
+            <img
+              src={photoFile ? URL.createObjectURL(photoFile) : photoUrl.trim()}
+              alt="Preview"
+              className="mt-2 w-full h-[120px] object-cover border border-brd"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          )}
+        </div>
+
+        {/* Notes */}
+        <div className="mb-4">
+          <label className={labelCls}>Notes / review</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="How was it? What stood out?"
+            rows={3}
+            className={`${inputCls} resize-y leading-relaxed`}
+          />
+        </div>
+
+        {error && <p className="text-accent text-[13px] mb-2">{error}</p>}
+
+        <div className="flex gap-2 mt-6">
+          <button
+            onClick={handleSave}
+            disabled={saving || success || !menuSearch.trim()}
+            className={`flex-1 p-2.5 bg-accent text-white border-none text-sm font-medium font-body rounded-none ${
+              saving || success || !menuSearch.trim()
+                ? "cursor-default opacity-60"
+                : "cursor-pointer opacity-100"
+            }`}
+          >
+            {uploading
+              ? "Uploading photo..."
+              : saving
+                ? "Saving..."
+                : success
+                  ? "Saved!"
+                  : isEditing
+                    ? "Update order"
+                    : "Save order"}
+          </button>
+          <button
+            onClick={onClose}
+            className="py-2.5 px-[18px] bg-transparent text-txt2 border-[1.5px] border-brd text-sm cursor-pointer font-body rounded-none"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
