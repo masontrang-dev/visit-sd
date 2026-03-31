@@ -323,6 +323,8 @@ export default function AddModal({
       lng,
       photo_url: finalPhotoUrl.trim() || null,
       must_try: mustTry,
+      date_added: editData?.date_added ?? null,
+      last_visited: editData?.last_visited ?? null,
     });
     setSaving(false);
     if (ok) {

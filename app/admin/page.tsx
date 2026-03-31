@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase, type Restaurant, type PageView } from "@/lib/supabase";
+import {
+  supabase,
+  type Restaurant,
+  type PageView,
+  type RestaurantVisit,
+} from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar from "@/components/FilterBar";
 import AddModal from "@/components/AddModal";
@@ -31,6 +36,8 @@ export default function AdminPage() {
   const [topReferrers, setTopReferrers] = useState<
     { referrer: string; count: number }[]
   >([]);
+  const [visits, setVisits] = useState<Record<number, RestaurantVisit[]>>({});
+  const [visitingId, setVisitingId] = useState<number | null>(null);
 
   async function loadStats() {
     setStatsLoading(true);
@@ -113,7 +120,52 @@ export default function AdminPage() {
       .order("cuisine")
       .order("name");
     setRestaurants(data ?? []);
+    await loadVisits();
     setLoading(false);
+  }
+
+  async function loadVisits() {
+    const { data } = await supabase
+      .from("restaurant_visits")
+      .select("*")
+      .order("visited_at", { ascending: false });
+    if (data) {
+      const grouped: Record<number, RestaurantVisit[]> = {};
+      data.forEach((visit: RestaurantVisit) => {
+        if (!grouped[visit.restaurant_id]) grouped[visit.restaurant_id] = [];
+        grouped[visit.restaurant_id].push(visit);
+      });
+      setVisits(grouped);
+    }
+  }
+
+  async function handleMarkVisited(restaurantId: number, visitedBy: string) {
+    setVisitingId(restaurantId);
+    setOpError("");
+
+    const now = new Date().toISOString();
+
+    const { error: visitError } = await supabase
+      .from("restaurant_visits")
+      .insert([{ restaurant_id: restaurantId, visited_by: visitedBy }]);
+
+    if (visitError) {
+      setOpError("Failed to log visit.");
+      setVisitingId(null);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from("restaurants")
+      .update({ last_visited: now })
+      .eq("id", restaurantId);
+
+    if (updateError) {
+      setOpError("Failed to update last visited timestamp.");
+    }
+
+    setVisitingId(null);
+    loadData();
   }
 
   async function handleAdd(
@@ -280,6 +332,9 @@ export default function AdminPage() {
             setEditingRestaurant(r);
             setShowModal(true);
           }}
+          onMarkVisited={handleMarkVisited}
+          visitingId={visitingId}
+          visits={visits}
         />
       )}
 

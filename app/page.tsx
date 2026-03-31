@@ -26,7 +26,13 @@ function HomeContent() {
   const [neighborhoodFilter, setNeighborhoodFilter] = useState(
     searchParams.get("neighborhood") || "all",
   );
-  const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [viewMode, setViewMode] = useState<"list" | "map">(() => {
+    if (typeof window !== "undefined") {
+      const isMobile = window.innerWidth < 768;
+      return isMobile ? "list" : "list";
+    }
+    return "list";
+  });
   const [mustTryFilter, setMustTryFilter] = useState(
     searchParams.get("must_try") === "true",
   );
@@ -79,7 +85,17 @@ function HomeContent() {
         },
       ])
       .then(() => {});
-  }, []);
+
+    // Optimize for mobile on initial load
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      if (isMobile && viewMode === "map") {
+        setViewMode("list");
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [viewMode]);
 
   const cuisines = Array.from(
     new Set(restaurants.map((r) => r.cuisine).filter(Boolean)),

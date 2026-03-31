@@ -16,6 +16,15 @@ export type Restaurant = {
   lng: number | null;
   photo_url: string | null;
   must_try: boolean;
+  date_added: string | null;
+  last_visited: string | null;
+};
+
+export type RestaurantVisit = {
+  id: number;
+  restaurant_id: number;
+  visited_by: string;
+  visited_at: string;
 };
 
 const supabaseUrl =

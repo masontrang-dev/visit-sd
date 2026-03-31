@@ -234,9 +234,182 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 
 ---
 
+## Step 18 — Visit Tracking System _(~2 hr)_
+
+Track when restaurants are visited by admins, with full visit history.
+
+**Database migration:**
+
+```sql
+CREATE TABLE restaurant_visits (
+  id bigint generated always as identity primary key,
+  restaurant_id bigint references restaurants(id) on delete cascade,
+  visited_by text not null,
+  visited_at timestamptz default now()
+);
+
+ALTER TABLE restaurant_visits ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anon insert" ON restaurant_visits FOR INSERT WITH CHECK (true);
+CREATE POLICY "Anon read" ON restaurant_visits FOR SELECT USING (true);
+
+ALTER TABLE restaurants
+  ADD COLUMN date_added timestamptz default now(),
+  ADD COLUMN last_visited timestamptz;
+```
+
+- [x] Run migration in Supabase SQL Editor
+- [x] Add "Mark as Visited" button on restaurant cards (admin view only)
+- [x] Log visit to `restaurant_visits` table with current user
+- [x] Update `last_visited` timestamp on `restaurants` table
+- [x] Display visit stats on cards: "Visited X times, last visited [date]"
+- [x] Add expandable visit history section showing all visit dates
+- [x] Show "Date Added" on restaurant cards
+
+---
+
+## Step 19 — Mobile-First View _(~1 hr)_
+
+Default to mobile-optimized view for better phone experience.
+
+- [x] Update `FilterBar.tsx` to default to List view on mobile devices
+- [x] Add responsive detection (viewport width or user agent)
+- [x] Optimize card layout for mobile screens (single column, larger touch targets)
+- [x] Test map view on mobile devices
+- [x] Ensure all admin controls are accessible on mobile
+
+---
+
+## Step 20 — Restaurant Detail Page _(~1.5 hr)_
+
+Dedicated page for each restaurant with full details and visit history.
+
+- [ ] Create `app/restaurant/[id]/page.tsx` route
+- [ ] Display full restaurant info: photo, name, cuisine, price, address, description
+- [ ] Show complete visit history timeline
+- [ ] Add "View on Google Maps" button
+- [ ] Add "Mark as Visited" action (admin only)
+- [ ] Add "Edit" and "Delete" buttons (admin only)
+- [ ] Link restaurant cards to detail page
+- [ ] Add breadcrumb navigation back to main list
+
+---
+
+## Step 21 — User Authentication System _(~1 hr)_
+
+Replace single admin password with user-specific authentication.
+
+**Database migration:**
+
+```sql
+CREATE TABLE users (
+  id bigint generated always as identity primary key,
+  username text unique not null,
+  password_hash text not null,
+  created_at timestamptz default now()
+);
+
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anon read" ON users FOR SELECT USING (true);
+```
+
+- [ ] Run migration in Supabase SQL Editor
+- [ ] Add password hashing utility (bcrypt or similar)
+- [ ] Seed users table with Mason and Linli accounts
+- [ ] Update `app/api/auth/route.ts` to check username + password
+- [ ] Store username in session cookie
+- [ ] Auto-populate "Added by" field based on logged-in user
+- [ ] Fix "Added by" dropdown display bug (ensure clean option rendering)
+- [ ] Update environment variables:
+  ```bash
+  # Remove NEXT_PUBLIC_ADMIN_NAMES
+  # Add user credentials (or manage in Supabase directly)
+  MASON_PASSWORD_HASH=
+  LINLI_PASSWORD_HASH=
+  ```
+
+---
+
+## Step 22 — User Analytics & Demographics _(~1 hr)_ ⚠️
+
+Track user location and demographics for insights.
+
+**Privacy considerations:**
+
+- IP address logging (can identify general location)
+- City/region detection via IP geolocation
+- User agent tracking (device/browser info)
+- No PII (personally identifiable information) stored
+- Consider adding privacy policy page
+
+**Database migration:**
+
+```sql
+ALTER TABLE page_views
+  ADD COLUMN ip_address inet,
+  ADD COLUMN country text,
+  ADD COLUMN region text,
+  ADD COLUMN device_type text;
+```
+
+- [ ] Evaluate privacy implications with users
+- [ ] Add IP geolocation service (e.g., ipapi.co, MaxMind)
+- [ ] Update page view logging to capture IP and location
+- [ ] Parse user agent for device type (mobile/desktop/tablet)
+- [ ] Add analytics dashboard showing:
+  - Geographic distribution of visitors
+  - Device type breakdown
+  - Traffic sources
+- [ ] Create privacy policy page explaining data collection
+- [ ] Add opt-out mechanism or cookie consent banner
+
+**Note:** Consider if this level of tracking is necessary for a personal restaurant guide. May be overkill for the use case.
+
+---
+
+## Step 23 — AI-Powered Restaurant Summaries _(~3 hr)_ 🔬
+
+Feasibility study: Use AI to aggregate reviews and descriptions from Google Maps.
+
+**Research phase:**
+
+- [ ] Investigate Google Places API review access (requires Places API - Details)
+- [ ] Check API costs: $17/1000 requests for Place Details
+- [ ] Evaluate AI options:
+  - OpenAI GPT-4 API (~$0.03 per summary)
+  - Anthropic Claude API
+  - Local LLM (Ollama) for cost savings
+- [ ] Estimate total cost for 50-100 restaurants
+
+**Implementation (if feasible):**
+
+- [ ] Add `OPENAI_API_KEY` or similar to environment variables
+- [ ] Create server-side API route for AI summary generation
+- [ ] Fetch Google reviews via Places API (Place Details)
+- [ ] Send reviews to AI with prompt: "Summarize these reviews in 2-3 sentences, highlighting what makes this restaurant special"
+- [ ] Store generated summary in `restaurants.ai_summary` column
+- [ ] Add "Generate AI Summary" button in admin edit modal
+- [ ] Display AI summary on restaurant detail page
+- [ ] Add refresh button to regenerate summaries
+
+**Cost estimate:**
+
+- Google Places Details: $17/1000 = $0.017 per restaurant
+- OpenAI GPT-4: ~$0.03 per summary
+- **Total: ~$0.05 per restaurant** (one-time cost)
+- For 100 restaurants: ~$5 total
+
+**Alternative approach:**
+
+- Use free Google Places Basic Data (name, address, rating) + web scraping (check ToS)
+- Use free tier of AI APIs (limited requests)
+- Manual curation instead of AI
+
+---
+
 ## Notes
 
 - The "1 spot" / "2 spots" text next to cuisine headers is a count of restaurants in that group — not a bug.
 - All steps are additive — nothing breaks the existing public/admin flow.
 - Steps 1–3 have no external dependencies. Steps 4–7 require a Google Cloud API key. Steps 8–16 are independent of each other and can be done in any order.
 - No third-party analytics needed — a single Supabase table replaces Google Analytics for this use case.
+- **New features (Steps 18-23)** focus on visit tracking, mobile UX, user management, and AI enhancements.

@@ -1,6 +1,7 @@
 "use client";
 
-import { type Restaurant } from "@/lib/supabase";
+import { useState } from "react";
+import { type Restaurant, type RestaurantVisit } from "@/lib/supabase";
 
 type Props = {
   restaurants: Restaurant[];
@@ -9,6 +10,9 @@ type Props = {
   deletingId?: number | null;
   onEdit?: (r: Restaurant) => void;
   mustTryFilter?: boolean;
+  onMarkVisited?: (id: number, visitedBy: string) => Promise<void>;
+  visitingId?: number | null;
+  visits?: Record<number, RestaurantVisit[]>;
 };
 
 function Card({
@@ -16,12 +20,31 @@ function Card({
   onDelete,
   deletingId,
   onEdit,
+  onMarkVisited,
+  visitingId,
+  visits,
 }: {
   r: Restaurant;
   onDelete?: (id: number) => void;
   deletingId?: number | null;
   onEdit?: (r: Restaurant) => void;
+  onMarkVisited?: (id: number, visitedBy: string) => Promise<void>;
+  visitingId?: number | null;
+  visits?: Record<number, RestaurantVisit[]>;
 }) {
+  const [showHistory, setShowHistory] = useState(false);
+  const restaurantVisits = visits?.[r.id] || [];
+  const visitCount = restaurantVisits.length;
+
+  function formatDate(dateStr: string | null) {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
   return (
     <div className="bg-bg relative border-b border-brd transition-colors duration-100 hover:bg-bg2">
       {r.photo_url && (
@@ -76,10 +99,57 @@ function Card({
             Added by {r.added_by}
           </p>
         )}
+        {r.date_added && (
+          <p className="mt-1 text-[11px] text-txt2 tracking-[0.05em]">
+            Added {formatDate(r.date_added)}
+          </p>
+        )}
+        {visitCount > 0 && (
+          <div className="mt-2 pt-2 border-t border-brd">
+            <p className="text-[11px] text-txt2 tracking-[0.05em]">
+              Visited {visitCount} time{visitCount !== 1 ? "s" : ""}
+              {r.last_visited && (
+                <span>, last on {formatDate(r.last_visited)}</span>
+              )}
+            </p>
+            {visitCount > 0 && (
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="mt-1 text-[11px] text-accent2 font-medium bg-transparent border-none cursor-pointer p-0 tracking-[0.05em]"
+              >
+                {showHistory ? "Hide" : "Show"} history
+              </button>
+            )}
+            {showHistory && (
+              <div className="mt-2 space-y-1">
+                {restaurantVisits.map((visit) => (
+                  <p key={visit.id} className="text-[11px] text-txt2">
+                    • {formatDate(visit.visited_at)} by {visit.visited_by}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {onMarkVisited && (
+          <button
+            onClick={() => {
+              const adminNames = (process.env.NEXT_PUBLIC_ADMIN_NAMES ?? "")
+                .split(",")
+                .filter(Boolean);
+              const visitedBy = adminNames[0] || "Admin";
+              onMarkVisited(r.id, visitedBy);
+            }}
+            disabled={visitingId === r.id}
+            className={`mt-2 text-[13px] font-medium py-1.5 px-3 rounded-pill border-[1.5px] font-body ${visitingId === r.id ? "cursor-default opacity-30 bg-transparent border-brd text-txt2" : "cursor-pointer bg-accent2 text-white border-accent2"}`}
+          >
+            {visitingId === r.id ? "Marking..." : "✓ Mark as Visited"}
+          </button>
+        )}
         {onEdit && (
           <button
             onClick={() => onEdit(r)}
-            className={`absolute bottom-4 ${onDelete ? "right-20" : "right-4"} bg-transparent border-none cursor-pointer text-sm text-txt2 font-body opacity-60 p-0`}
+            className={`absolute ${onMarkVisited ? "bottom-[72px]" : "bottom-4"} ${onDelete ? "right-20" : "right-4"} bg-transparent border-none cursor-pointer text-sm text-txt2 font-body opacity-60 p-0`}
             title="Edit"
           >
             Edit
@@ -89,7 +159,7 @@ function Card({
           <button
             onClick={() => onDelete(r.id)}
             disabled={deletingId === r.id}
-            className={`absolute bottom-4 right-4 bg-transparent border-none text-sm text-accent font-body p-0 ${deletingId === r.id ? "cursor-default opacity-30" : "cursor-pointer opacity-60"}`}
+            className={`absolute ${onMarkVisited ? "bottom-[72px]" : "bottom-4"} right-4 bg-transparent border-none text-sm text-accent font-body p-0 ${deletingId === r.id ? "cursor-default opacity-30" : "cursor-pointer opacity-60"}`}
             title="Remove"
           >
             {deletingId === r.id ? "Removing..." : "Remove"}
@@ -101,7 +171,7 @@ function Card({
 }
 
 const gridClass =
-  "grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-0 bg-brd border-l border-brd";
+  "grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-0 bg-brd border-l border-brd";
 
 export default function RestaurantGrid({
   restaurants,
@@ -110,6 +180,9 @@ export default function RestaurantGrid({
   deletingId,
   onEdit,
   mustTryFilter,
+  onMarkVisited,
+  visitingId,
+  visits,
 }: Props) {
   if (restaurants.length === 0) {
     return (
@@ -134,6 +207,9 @@ export default function RestaurantGrid({
             onDelete={onDelete}
             deletingId={deletingId}
             onEdit={onEdit}
+            onMarkVisited={onMarkVisited}
+            visitingId={visitingId}
+            visits={visits}
           />
         ))}
       </div>
@@ -172,6 +248,9 @@ export default function RestaurantGrid({
                   onDelete={onDelete}
                   deletingId={deletingId}
                   onEdit={onEdit}
+                  onMarkVisited={onMarkVisited}
+                  visitingId={visitingId}
+                  visits={visits}
                 />
               ))}
             </div>
