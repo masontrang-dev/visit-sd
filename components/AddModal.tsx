@@ -268,6 +268,33 @@ export default function AddModal({
     if (photoFile) {
       setUploading(true);
 
+      // Delete old photo if it exists (when editing)
+      if (editData?.photo_url) {
+        try {
+          // Extract filename from the old photo URL
+          const oldUrl = editData.photo_url;
+          const urlParts = oldUrl.split("/restaurant-photos/");
+          if (urlParts.length > 1) {
+            const oldFileName = urlParts[1];
+            console.log("Deleting old photo:", oldFileName);
+
+            const { error: deleteError } = await supabase.storage
+              .from("restaurant-photos")
+              .remove([oldFileName]);
+
+            if (deleteError) {
+              console.warn("Failed to delete old photo:", deleteError);
+              // Continue anyway - don't block the upload
+            } else {
+              console.log("Old photo deleted successfully");
+            }
+          }
+        } catch (deleteErr) {
+          console.warn("Error deleting old photo:", deleteErr);
+          // Continue anyway - don't block the upload
+        }
+      }
+
       // Compress image before upload
       let fileToUpload = photoFile;
       try {

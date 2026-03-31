@@ -12,7 +12,7 @@ import AddModal from "@/components/AddModal";
 import Link from "next/link";
 
 type Props = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export default function RestaurantDetailPage({ params }: Props) {
@@ -31,7 +31,8 @@ export default function RestaurantDetailPage({ params }: Props) {
 
   useEffect(() => {
     async function load() {
-      const restaurantId = parseInt(params.id);
+      const resolvedParams = await params;
+      const restaurantId = parseInt(resolvedParams.id);
       if (isNaN(restaurantId)) {
         setError("Invalid restaurant ID");
         setLoading(false);
@@ -73,7 +74,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       }
     }
     load();
-  }, [params.id]);
+  }, [params]);
 
   async function handleMarkVisited() {
     if (!restaurant) return;
@@ -156,15 +157,23 @@ export default function RestaurantDetailPage({ params }: Props) {
     );
     console.log("Photo URL being updated:", entry.photo_url);
 
-    const { error } = await supabase
+    const { data: updateData, error } = await supabase
       .from("restaurants")
       .update(entry)
-      .eq("id", restaurant.id);
+      .eq("id", restaurant.id)
+      .select();
+
+    console.log("Update response:", { data: updateData, error });
 
     if (error) {
       console.error("Update error:", error);
       setSaveError("Failed to update restaurant.");
       return false;
+    }
+
+    if (updateData && Array.isArray(updateData) && updateData.length > 0) {
+      console.log("Updated restaurant from response:", updateData[0]);
+      console.log("Photo URL in update response:", updateData[0]?.photo_url);
     }
 
     // Reload restaurant data
@@ -177,6 +186,10 @@ export default function RestaurantDetailPage({ params }: Props) {
     if (restaurantData) {
       console.log("Reloaded restaurant data:", restaurantData);
       console.log("Photo URL in reloaded data:", restaurantData.photo_url);
+      console.log(
+        "FULL Photo URL (no truncation):",
+        JSON.stringify(restaurantData.photo_url),
+      );
       setRestaurant(restaurantData);
     }
 

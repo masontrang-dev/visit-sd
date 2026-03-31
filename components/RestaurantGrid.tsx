@@ -89,15 +89,18 @@ function Card({
         )}
         {r.address && <p className="mt-2 text-xs text-txt2">{r.address}</p>}
         {r.google_maps_url && (
-          <a
-            href={r.google_maps_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-block mt-2.5 text-[13px] font-medium py-1.5 px-3 rounded-pill border-[1.5px] border-accent2 bg-transparent text-accent2 no-underline hover:bg-accent2 hover:text-white transition-colors duration-150"
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (r.google_maps_url) {
+                window.open(r.google_maps_url, "_blank", "noopener,noreferrer");
+              }
+            }}
+            className="inline-block mt-2.5 text-[13px] font-medium py-1.5 px-3 rounded-pill border-[1.5px] border-accent2 bg-transparent text-accent2 cursor-pointer hover:bg-accent2 hover:text-white transition-colors duration-150"
           >
             View on Maps ↗
-          </a>
+          </button>
         )}
         {r.added_by && (
           <p className="mt-2 text-[11px] text-txt2 tracking-[0.05em]">
