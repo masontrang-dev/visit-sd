@@ -248,7 +248,7 @@ function Card({
               <div className="flex items-center gap-1">
                 <span className="text-accent">★</span>
                 <span className="font-medium text-txt">{r.my_rating}/5</span>
-                <span className="text-txt2">My pick</span>
+                <span className="text-txt2">My rating</span>
               </div>
             )}
           </div>

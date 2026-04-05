@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   supabase,
@@ -78,6 +78,7 @@ export default function RestaurantDetailPage({ params }: Props) {
     null,
   );
   const [isScrolled, setIsScrolled] = useState(false);
+  const hasScrolled = useRef(false);
 
   function handleBackClick(e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
@@ -92,10 +93,17 @@ export default function RestaurantDetailPage({ params }: Props) {
 
   useEffect(() => {
     const handleScroll = () => {
+      hasScrolled.current = true;
       setIsScrolled(window.scrollY > 100);
     };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    // Delay listener to skip the browser's initial scroll-to-top on navigation
+    const timer = setTimeout(() => {
+      window.addEventListener("scroll", handleScroll);
+    }, 100);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
   useEffect(() => {
@@ -471,6 +479,7 @@ export default function RestaurantDetailPage({ params }: Props) {
         className={`fixed top-0 left-0 right-0 z-50 bg-bg border-b-2 border-txt transition-transform duration-300 ${
           isScrolled ? "translate-y-0" : "-translate-y-full"
         }`}
+        style={{ visibility: hasScrolled.current ? "visible" : "hidden" }}
       >
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">

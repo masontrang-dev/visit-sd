@@ -112,52 +112,16 @@ export default function FilterBar({
       ref={barRef}
       className={`sticky top-0 z-10 bg-bg isolate transition-[border-color] duration-200 ${isScrolled ? "border-b-2 border-txt" : "border-b-2 border-transparent"}`}
     >
-      {/* Row 1: Search + View toggle + Add */}
+      {/* Row 1: Search + Add */}
       <div className="flex gap-2 pt-3 pb-2 px-6 items-center flex-wrap">
         {onSearchChange != null && (
           <input
             type="text"
             value={searchQuery ?? ""}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search..."
-            className="input-base !py-1.5 !px-3.5 !rounded-none !text-sm flex-1 min-w-0 placeholder:text-txt2 placeholder:opacity-50"
+            placeholder="Search restaurants, dishes, areas..."
+            className="input-base !py-2 !px-3.5 !rounded-none !text-sm flex-1 min-w-0 !bg-bg2 !border-brd placeholder:text-txt2 placeholder:opacity-60"
           />
-        )}
-
-        {onViewModeChange && (
-          <div className="flex gap-1">
-            <button
-              className={viewMode === "list" ? "chip-active" : "chip"}
-              onClick={() => onViewModeChange("list")}
-            >
-              List
-            </button>
-            <button
-              className={viewMode === "map" ? "chip-active" : "chip"}
-              onClick={() => onViewModeChange("map")}
-            >
-              Map
-            </button>
-          </div>
-        )}
-
-        {onImageDisplayModeChange && viewMode === "list" && (
-          <button
-            className="chip"
-            onClick={() => {
-              const modes: ImageDisplayMode[] = ["full", "compact", "none"];
-              const currentIndex = modes.indexOf(imageDisplayMode || "full");
-              const nextIndex = (currentIndex + 1) % modes.length;
-              onImageDisplayModeChange(modes[nextIndex]);
-            }}
-            title={`Images: ${imageDisplayMode === "full" ? "Full" : imageDisplayMode === "compact" ? "Compact" : "None"} (click to cycle)`}
-          >
-            {imageDisplayMode === "full"
-              ? "🖼️"
-              : imageDisplayMode === "compact"
-                ? "▢"
-                : "☰"}
-          </button>
         )}
 
         {onAdd && (
@@ -170,8 +134,66 @@ export default function FilterBar({
         )}
       </div>
 
-      {/* Row 2: Filter buttons and active filter pills */}
+      {/* Row 2: View toggle */}
+      <div className="flex gap-2 pb-2 px-6 items-center flex-wrap">
+        {/* View mode toggle */}
+        {onViewModeChange && (
+          <>
+            <span className="text-2xs font-medium text-txt2 uppercase tracking-wide">
+              View:
+            </span>
+            <div className="flex gap-1">
+              <button
+                className={viewMode === "list" ? "chip-active" : "chip"}
+                onClick={() => {
+                  if (viewMode === "list" && onImageDisplayModeChange) {
+                    // Cycle through image display modes when already in list view
+                    const modes: ImageDisplayMode[] = [
+                      "full",
+                      "compact",
+                      "none",
+                    ];
+                    const currentIndex = modes.indexOf(
+                      imageDisplayMode || "full",
+                    );
+                    const nextIndex = (currentIndex + 1) % modes.length;
+                    onImageDisplayModeChange(modes[nextIndex]);
+                  } else {
+                    // Switch to list view
+                    onViewModeChange("list");
+                  }
+                }}
+                title={
+                  viewMode === "list"
+                    ? `List view: ${imageDisplayMode === "full" ? "Full images" : imageDisplayMode === "compact" ? "Compact images" : "No images"} (click to cycle)`
+                    : "Switch to list view"
+                }
+              >
+                {viewMode === "list"
+                  ? imageDisplayMode === "full"
+                    ? "Full 🖼️"
+                    : imageDisplayMode === "compact"
+                      ? "Compact ▢"
+                      : "List ☰"
+                  : "List ☰"}
+              </button>
+              <button
+                className={viewMode === "map" ? "chip-active" : "chip"}
+                onClick={() => onViewModeChange("map")}
+                title="Switch to map view"
+              >
+                Map
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Row 3: Filter buttons and active filter pills */}
       <div className="flex gap-2 pb-3 px-6 items-center flex-wrap">
+        <span className="text-2xs font-medium text-txt2 uppercase tracking-wide">
+          Filters:
+        </span>
         {/* Active filter pills */}
         {activeCuisines.map((cuisine) => (
           <button
