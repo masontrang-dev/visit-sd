@@ -23,10 +23,31 @@ export default function AdminButton() {
     }
   }, [showMenu]);
 
-  if (!isAdmin) return null;
+  if (!isAdmin) {
+    if (isAdminPage) {
+      return (
+        <a
+          href="/"
+          aria-label="Back to home"
+          className="w-9 h-9 flex items-center justify-center rounded-full border border-brd bg-bg text-txt2 opacity-50 hover:opacity-80 transition-opacity duration-150 text-lg no-underline"
+        >
+          ←
+        </a>
+      );
+    }
+    return (
+      <a
+        href="/admin"
+        aria-label="Admin login"
+        className="w-9 h-9 flex items-center justify-center rounded-full border border-brd bg-bg text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 text-lg no-underline"
+      >
+        ⚙
+      </a>
+    );
+  }
 
   return (
-    <div className="fixed top-4 right-16 z-50" ref={menuRef}>
+    <div className="relative" ref={menuRef}>
       <button
         onClick={() => setShowMenu(!showMenu)}
         aria-label="Admin menu"

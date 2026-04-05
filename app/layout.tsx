@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import ThemeToggle from "@/components/ThemeToggle";
-import AdminButton from "@/components/AdminButton";
 import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
@@ -25,8 +23,6 @@ export default function RootLayout({
       </head>
       <body>
         <AuthProvider>
-          <ThemeToggle />
-          <AdminButton />
           {children}
         </AuthProvider>
       </body>

@@ -194,8 +194,9 @@ export default function AddModal({
       if (place.formatted_address) setAddress(place.formatted_address);
       if (place.place_id) {
         setPlaceId(place.place_id);
+        const name = encodeURIComponent(place.name || "");
         setGoogleMapsUrl(
-          `https://www.google.com/maps/place/?q=place_id:${place.place_id}`,
+          `https://www.google.com/maps/search/?api=1&query=${name}&query_place_id=${place.place_id}`,
         );
       }
       if (place.geometry?.location) {

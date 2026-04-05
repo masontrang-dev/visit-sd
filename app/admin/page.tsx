@@ -21,7 +21,7 @@ export default function AdminPage() {
   const [pwError, setPwError] = useState(false);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState("all");
+  const [activeCuisines, setActiveCuisines] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [editingRestaurant, setEditingRestaurant] = useState<Restaurant | null>(
@@ -31,7 +31,7 @@ export default function AdminPage() {
     useState<Restaurant | null>(null);
   const [opError, setOpError] = useState("");
   const [mustTryFilter, setMustTryFilter] = useState(false);
-  const [neighborhoodFilter, setNeighborhoodFilter] = useState("all");
+  const [activeNeighborhoods, setActiveNeighborhoods] = useState<string[]>([]);
   const [showStats, setShowStats] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
   const [totalViews, setTotalViews] = useState(0);
@@ -247,8 +247,12 @@ export default function AdminPage() {
     new Set(restaurants.map((r) => r.neighborhood).filter(Boolean)),
   ).sort();
   const filtered = restaurants.filter((r) => {
-    if (activeFilter !== "all" && r.cuisine !== activeFilter) return false;
-    if (neighborhoodFilter !== "all" && r.neighborhood !== neighborhoodFilter)
+    if (activeCuisines.length > 0 && !activeCuisines.includes(r.cuisine || ""))
+      return false;
+    if (
+      activeNeighborhoods.length > 0 &&
+      !activeNeighborhoods.includes(r.neighborhood || "")
+    )
       return false;
     if (mustTryFilter && !r.must_try) return false;
     return true;
@@ -332,11 +336,11 @@ export default function AdminPage() {
 
       <FilterBar
         cuisines={cuisines}
-        active={activeFilter}
-        onChange={setActiveFilter}
+        activeCuisines={activeCuisines}
+        onCuisineChange={setActiveCuisines}
         neighborhoods={neighborhoods}
-        activeNeighborhood={neighborhoodFilter}
-        onNeighborhoodChange={setNeighborhoodFilter}
+        activeNeighborhoods={activeNeighborhoods}
+        onNeighborhoodChange={setActiveNeighborhoods}
         onAdd={() => {
           setEditingRestaurant(null);
           setShowModal(true);
@@ -356,8 +360,8 @@ export default function AdminPage() {
         <RestaurantGrid
           restaurants={filtered}
           grouped={
-            activeFilter === "all" &&
-            neighborhoodFilter === "all" &&
+            activeCuisines.length === 0 &&
+            activeNeighborhoods.length === 0 &&
             !mustTryFilter
           }
           onEdit={(r) => {

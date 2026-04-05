@@ -15,6 +15,18 @@
     --brd: rgba(26, 26, 24, 0.12);
     --font-display: "Bebas Neue", sans-serif;
     --font-body: "DM Sans", sans-serif;
+
+    /* Cuisine palette */
+    --cuisine-1: #d85a30;
+    --cuisine-2: #1d9e75;
+    --cuisine-3: #2d7dd2;
+    --cuisine-4: #9b5de5;
+    --cuisine-5: #c4663a;
+    --cuisine-6: #00856a;
+    --cuisine-7: #d4584a;
+    --cuisine-8: #5a7d4f;
+    --cuisine-9: #b07c3b;
+    --cuisine-10: #7c6992;
   }
 
   .dark {
@@ -25,6 +37,18 @@
     --txt: #fafaf8;
     --txt2: #a8a7a3;
     --brd: rgba(250, 250, 248, 0.12);
+
+    /* Cuisine palette (dark) */
+    --cuisine-1: #e8734f;
+    --cuisine-2: #2bbf8e;
+    --cuisine-3: #4a9ae8;
+    --cuisine-4: #b07ce8;
+    --cuisine-5: #d98060;
+    --cuisine-6: #1aab88;
+    --cuisine-7: #e87068;
+    --cuisine-8: #7a9e6e;
+    --cuisine-9: #cfa05a;
+    --cuisine-10: #9a88ad;
   }
 
   body {

@@ -7,10 +7,35 @@ import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar from "@/components/FilterBar";
 import MapView from "@/components/MapView";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
+import AdminButton from "@/components/AdminButton";
+
+function SkeletonCard() {
+  return (
+    <div className="bg-bg border-b border-brd">
+      <div className="w-full h-[140px] bg-bg2 animate-pulse" />
+      <div className="p-5">
+        <div className="h-3 w-16 bg-bg2 rounded-pill animate-pulse mb-2" />
+        <div className="h-7 w-3/4 bg-bg2 animate-pulse mb-2" />
+        <div className="h-4 w-1/3 bg-bg2 animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
+function SkeletonGrid() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-0 bg-brd border-l border-brd">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <SkeletonCard key={i} />
+      ))}
+    </div>
+  );
+}
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<p className="py-12 px-6 text-txt2">Loading...</p>}>
+    <Suspense fallback={<SkeletonGrid />}>
       <HomeContent />
     </Suspense>
   );
@@ -21,11 +46,15 @@ function HomeContent() {
   const router = useRouter();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState(
-    searchParams.get("cuisine") || "all",
-  );
-  const [neighborhoodFilter, setNeighborhoodFilter] = useState(
-    searchParams.get("neighborhood") || "all",
+  const [activeCuisines, setActiveCuisines] = useState<string[]>(() => {
+    const param = searchParams.get("cuisine");
+    return param ? param.split(",") : [];
+  });
+  const [activeNeighborhoods, setActiveNeighborhoods] = useState<string[]>(
+    () => {
+      const param = searchParams.get("neighborhood");
+      return param ? param.split(",") : [];
+    },
   );
   const [viewMode, setViewMode] = useState<"list" | "map">(() => {
     if (typeof window !== "undefined") {
@@ -37,12 +66,15 @@ function HomeContent() {
   const [mustTryFilter, setMustTryFilter] = useState(
     searchParams.get("must_try") === "true",
   );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [mounted, setMounted] = useState(false);
 
   const syncParams = useCallback(
-    (cuisine: string, neighborhood: string, mustTry: boolean) => {
+    (cuisines: string[], neighborhoods: string[], mustTry: boolean) => {
       const params = new URLSearchParams();
-      if (cuisine !== "all") params.set("cuisine", cuisine);
-      if (neighborhood !== "all") params.set("neighborhood", neighborhood);
+      if (cuisines.length > 0) params.set("cuisine", cuisines.join(","));
+      if (neighborhoods.length > 0)
+        params.set("neighborhood", neighborhoods.join(","));
       if (mustTry) params.set("must_try", "true");
       const qs = params.toString();
       router.replace(qs ? `/?${qs}` : "/", { scroll: false });
@@ -50,17 +82,17 @@ function HomeContent() {
     [router],
   );
 
-  function handleCuisineChange(v: string) {
-    setActiveFilter(v);
-    syncParams(v, neighborhoodFilter, mustTryFilter);
+  function handleCuisineChange(v: string[]) {
+    setActiveCuisines(v);
+    syncParams(v, activeNeighborhoods, mustTryFilter);
   }
-  function handleNeighborhoodChange(v: string) {
-    setNeighborhoodFilter(v);
-    syncParams(activeFilter, v, mustTryFilter);
+  function handleNeighborhoodChange(v: string[]) {
+    setActiveNeighborhoods(v);
+    syncParams(activeCuisines, v, mustTryFilter);
   }
   function handleMustTryChange(v: boolean) {
     setMustTryFilter(v);
-    syncParams(activeFilter, neighborhoodFilter, v);
+    syncParams(activeCuisines, activeNeighborhoods, v);
   }
 
   useEffect(() => {
@@ -74,6 +106,7 @@ function HomeContent() {
       setLoading(false);
     }
     load();
+    setMounted(true);
 
     // Fire-and-forget page view log with geolocation
     fetch("/api/log-view", {
@@ -104,20 +137,48 @@ function HomeContent() {
     new Set(restaurants.map((r) => r.neighborhood).filter(Boolean)),
   ).sort();
   const filtered = restaurants.filter((r) => {
-    if (activeFilter !== "all" && r.cuisine !== activeFilter) return false;
-    if (neighborhoodFilter !== "all" && r.neighborhood !== neighborhoodFilter)
+    if (activeCuisines.length > 0 && !activeCuisines.includes(r.cuisine || ""))
+      return false;
+    if (
+      activeNeighborhoods.length > 0 &&
+      !activeNeighborhoods.includes(r.neighborhood || "")
+    )
       return false;
     if (mustTryFilter && !r.must_try) return false;
+    if (
+      searchQuery.trim() &&
+      !r.name.toLowerCase().includes(searchQuery.trim().toLowerCase())
+    )
+      return false;
     return true;
   });
 
   const totalCount = restaurants.length;
   const cuisineCount = cuisines.length;
+  const isFiltered =
+    activeCuisines.length > 0 ||
+    activeNeighborhoods.length > 0 ||
+    mustTryFilter ||
+    searchQuery.trim() !== "";
+
+  function handleClearAll() {
+    setActiveCuisines([]);
+    setActiveNeighborhoods([]);
+    setMustTryFilter(false);
+    setSearchQuery("");
+    syncParams([], [], false);
+  }
 
   return (
     <main className="min-h-screen">
       {/* Hero */}
-      <header className="pt-10 px-6 pb-6 border-b-2 border-txt">
+      <header
+        className={`relative pt-10 px-6 pb-6 border-b-2 border-txt transition-opacity duration-500 ${mounted ? "opacity-100" : "opacity-0"}`}
+      >
+        <div className="absolute top-4 right-4 flex gap-2">
+          <AdminButton />
+          <ThemeToggle />
+        </div>
         <p className="text-[11px] tracking-[0.15em] uppercase text-accent font-medium mb-1.5">
           Local Picks · San Diego
         </p>
@@ -126,11 +187,15 @@ function HomeContent() {
           <br />
           <span className="text-accent">SD</span>
         </h1>
-        <p className="text-sm text-txt2 mt-3">
+        <p className="text-[15px] text-txt2 mt-3 max-w-[280px]">
           Our go-to spots for visitors &amp; friends
         </p>
         <div className="flex gap-2.5 mt-4">
-          {[`${totalCount} spots`, `${cuisineCount} cuisines`].map((label) => (
+          {[
+            `${totalCount} spots`,
+            `${cuisineCount} cuisines`,
+            `${neighborhoods.length} areas`,
+          ].map((label) => (
             <span
               key={label}
               className="text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt text-txt"
@@ -143,30 +208,43 @@ function HomeContent() {
 
       <FilterBar
         cuisines={cuisines}
-        active={activeFilter}
-        onChange={handleCuisineChange}
+        activeCuisines={activeCuisines}
+        onCuisineChange={handleCuisineChange}
         neighborhoods={neighborhoods}
-        activeNeighborhood={neighborhoodFilter}
+        activeNeighborhoods={activeNeighborhoods}
         onNeighborhoodChange={handleNeighborhoodChange}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         mustTryFilter={mustTryFilter}
         onMustTryFilterChange={handleMustTryChange}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
 
+      <div className="relative z-0">
+      {isFiltered && !loading && (
+        <div className="flex items-center justify-between py-2.5 px-6 border-b-2 border-txt">
+          <p className="text-[13px] text-txt2 font-body">
+            Showing{" "}
+            <span className="font-medium text-txt">{filtered.length}</span> of{" "}
+            <span className="font-medium text-txt">{restaurants.length}</span>{" "}
+            spots
+          </p>
+          <button
+            onClick={handleClearAll}
+            className="font-body text-[12px] font-medium text-accent bg-transparent border-none cursor-pointer p-0 transition-opacity duration-[0.12s] hover:opacity-70"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
       {loading ? (
-        <p className="py-12 px-6 text-txt2">Loading...</p>
+        <SkeletonGrid />
       ) : viewMode === "map" ? (
         <MapView restaurants={filtered} />
       ) : (
-        <RestaurantGrid
-          restaurants={filtered}
-          grouped={
-            activeFilter === "all" &&
-            neighborhoodFilter === "all" &&
-            !mustTryFilter
-          }
-        />
+        <RestaurantGrid restaurants={filtered} grouped={false} />
       )}
 
       <footer className="p-6 flex justify-end items-center gap-4">
@@ -186,6 +264,7 @@ function HomeContent() {
           Admin <span className="text-[8px]">→</span>
         </Link>
       </footer>
+      </div>
     </main>
   );
 }
