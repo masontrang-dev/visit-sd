@@ -11,10 +11,25 @@ import {
   type DrinkDetails,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/components/Toast";
 import AddModal from "@/components/AddModal";
 import OrderModal from "@/components/OrderModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import Link from "next/link";
+
+function Chevron({ open, className = "" }: { open: boolean; className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      className={`transition-transform duration-200 ${open ? "rotate-90" : ""} ${className}`}
+    >
+      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -23,6 +38,7 @@ type Props = {
 export default function RestaurantDetailPage({ params }: Props) {
   const router = useRouter();
   const { isAdmin, username } = useAuth();
+  const { toast } = useToast();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [visits, setVisits] = useState<RestaurantVisit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,7 +135,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       .insert([{ restaurant_id: restaurant.id, visited_by: visitedBy }]);
 
     if (insertError) {
-      alert("Failed to mark as visited");
+      toast("Failed to mark as visited", "error");
       setVisitingId(null);
       return;
     }
@@ -130,7 +146,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       .eq("id", restaurant.id);
 
     if (updateError) {
-      alert("Failed to update last visited date");
+      toast("Failed to update last visited date", "error");
     }
 
     const { data: visitsData } = await supabase
@@ -160,7 +176,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       .eq("id", restaurant.id);
 
     if (error) {
-      alert("Failed to delete restaurant");
+      toast("Failed to delete restaurant", "error");
       setDeletingId(null);
       return;
     }
@@ -353,8 +369,26 @@ export default function RestaurantDetailPage({ params }: Props) {
 
   if (loading) {
     return (
-      <main className="min-h-screen p-6">
-        <p className="text-txt2">Loading...</p>
+      <main className="min-h-screen">
+        <div className="p-6 pb-4 border-b border-brd">
+          <div className="h-3 w-24 bg-bg2 rounded-pill animate-pulse" />
+        </div>
+        <div className="border-b-2 border-txt">
+          <div className="w-full h-[400px] bg-bg2 animate-pulse" />
+          <div className="p-6">
+            <div className="h-3 w-20 bg-bg2 rounded-pill animate-pulse mb-3" />
+            <div className="h-12 w-3/4 bg-bg2 animate-pulse mb-4" />
+            <div className="flex gap-3">
+              <div className="h-4 w-24 bg-bg2 rounded-pill animate-pulse" />
+              <div className="h-4 w-16 bg-bg2 rounded-pill animate-pulse" />
+            </div>
+          </div>
+        </div>
+        <div className="p-6 border-b border-brd">
+          <div className="h-5 w-16 bg-bg2 animate-pulse mb-3" />
+          <div className="h-4 w-full bg-bg2 animate-pulse mb-2" />
+          <div className="h-4 w-2/3 bg-bg2 animate-pulse" />
+        </div>
       </main>
     );
   }
@@ -388,15 +422,18 @@ export default function RestaurantDetailPage({ params }: Props) {
       {/* Restaurant Header */}
       <div className="border-b-2 border-txt">
         {restaurant.photo_url && (
-          <img
-            key={restaurant.photo_url}
-            src={restaurant.photo_url}
-            alt={restaurant.name}
-            className="w-full h-[300px] object-cover block"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
+          <div className="relative overflow-hidden">
+            <img
+              key={restaurant.photo_url}
+              src={restaurant.photo_url}
+              alt={restaurant.name}
+              className="w-full h-[400px] object-cover block"
+              onError={(e) => {
+                (e.target as HTMLImageElement).parentElement!.style.display = "none";
+              }}
+            />
+            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-bg to-transparent pointer-events-none" />
+          </div>
         )}
         <div className="p-6">
           <div className="flex items-center gap-2 mb-2">
@@ -412,23 +449,25 @@ export default function RestaurantDetailPage({ params }: Props) {
           <h1 className="font-display text-[clamp(48px,8vw,72px)] leading-[0.9] tracking-tight mb-3">
             {restaurant.name}
           </h1>
-          <p className="text-base text-txt2 flex items-center gap-2 mb-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-accent2 shrink-0" />
-            {restaurant.neighborhood}
-          </p>
-          <p className="text-base font-medium text-txt2 mb-4">
-            {restaurant.price}
-          </p>
-          <div className="flex gap-2 flex-wrap items-center">
+          <div className="flex items-center gap-3 flex-wrap text-base text-txt2 mb-4">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-accent2 shrink-0" />
+              {restaurant.neighborhood}
+            </span>
+            <span className="text-brd">·</span>
+            <span className="font-medium">{restaurant.price}</span>
             {restaurant.google_maps_url && (
-              <a
-                href={restaurant.google_maps_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block text-sm font-medium py-2 px-4 rounded-pill border-[1.5px] border-accent2 text-accent2 no-underline transition-all duration-100 hover:bg-accent2 hover:text-white"
-              >
-                View on Google Maps ↗
-              </a>
+              <>
+                <span className="text-brd">·</span>
+                <a
+                  href={restaurant.google_maps_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-accent2 no-underline transition-opacity duration-100 hover:opacity-70"
+                >
+                  Maps ↗
+                </a>
+              </>
             )}
           </div>
         </div>
@@ -486,9 +525,7 @@ export default function RestaurantDetailPage({ params }: Props) {
           <h2 className="font-display text-xl tracking-tight">
             Visit History
           </h2>
-          <span className="text-xl text-txt2">
-            {showVisitHistory ? "▾" : "▸"}
-          </span>
+          <Chevron open={showVisitHistory} className="text-txt2" />
         </button>
 
         {!showVisitHistory && (
@@ -520,7 +557,10 @@ export default function RestaurantDetailPage({ params }: Props) {
               )}
             </div>
             {visits.length === 0 ? (
-              <p className="text-txt2 text-sm">No visits recorded yet</p>
+              <div className="py-4 text-center">
+                <p className="text-2xl text-brd select-none mb-1" aria-hidden>📍</p>
+                <p className="text-sm text-txt2">No visits recorded yet</p>
+              </div>
             ) : (
               <div className="space-y-3 mt-4">
                 {visits.map((visit) => (
@@ -637,9 +677,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                         )}
                       </div>
                     </div>
-                    <span className="text-base text-txt2 shrink-0 mt-1">
-                      {expandedItem === item.menuItem.id ? "▾" : "▸"}
-                    </span>
+                    <Chevron open={expandedItem === item.menuItem.id} className="text-txt2 shrink-0 mt-1" />
                   </div>
                 </button>
 

@@ -40,6 +40,29 @@ module.exports = {
       borderRadius: {
         pill: "20px",
       },
+      keyframes: {
+        "fade-up": {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        shimmer: {
+          to: { backgroundPosition: "-200% 0" },
+        },
+        "toast-in": {
+          from: { opacity: "0", transform: "translateY(16px) scale(0.96)" },
+          to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        "toast-out": {
+          from: { opacity: "1", transform: "translateY(0)" },
+          to: { opacity: "0", transform: "translateY(8px)" },
+        },
+      },
+      animation: {
+        "fade-up": "fade-up 0.4s ease-out both",
+        shimmer: "shimmer 1.5s ease-in-out infinite",
+        "toast-in": "toast-in 0.25s ease-out both",
+        "toast-out": "toast-out 0.2s ease-in both",
+      },
     },
   },
   plugins: [],

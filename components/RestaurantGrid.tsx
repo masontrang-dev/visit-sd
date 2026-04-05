@@ -102,16 +102,16 @@ function Card({
   return (
     <Link
       href={`/restaurant/${r.id}`}
-      className="bg-bg relative border-b border-brd block no-underline cursor-pointer transition-all duration-150 hover:bg-bg2 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
+      className="group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-all duration-150 hover:bg-bg2 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.98]"
       style={{ borderLeft: `3px solid ${cuisineColor}` }}
     >
       {r.photo_url && (
-        <div className="relative">
+        <div className="relative overflow-hidden">
           <img
             src={r.photo_url}
             alt={r.name}
             loading="lazy"
-            className="w-full h-[100px] object-cover block"
+            className="w-full h-[100px] object-cover block transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
               (e.target as HTMLImageElement).parentElement!.style.display =
                 "none";
@@ -272,6 +272,35 @@ function Card({
   );
 }
 
+function useFadeUp() {
+  const ref = useRef<HTMLDivElement>(null!);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.classList.add("animate-fade-up");
+          observer.unobserve(el);
+        }
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return ref;
+}
+
+function FadeUpCard({ children, delay }: { children: React.ReactNode; delay: number }) {
+  const ref = useFadeUp();
+  return (
+    <div ref={ref} className="opacity-0" style={{ animationDelay: `${delay}ms` }}>
+      {children}
+    </div>
+  );
+}
+
 const gridClass =
   "grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-0 bg-brd border-l border-brd";
 
@@ -326,17 +355,18 @@ function InfiniteCardGrid({
   return (
     <>
       <div className={gridClass}>
-        {visible.map((r) => (
-          <Card
-            key={r.id}
-            r={r}
-            cuisineColor={cuisineColorMap[r.cuisine || ""] || CUISINE_COLORS[0]}
-            onEdit={onEdit}
-            onOrder={onOrder}
-            onMarkVisited={onMarkVisited}
-            visitingId={visitingId}
-            visits={visits}
-          />
+        {visible.map((r, i) => (
+          <FadeUpCard key={r.id} delay={(i % BATCH_SIZE) * 50}>
+            <Card
+              r={r}
+              cuisineColor={cuisineColorMap[r.cuisine || ""] || CUISINE_COLORS[0]}
+              onEdit={onEdit}
+              onOrder={onOrder}
+              onMarkVisited={onMarkVisited}
+              visitingId={visitingId}
+              visits={visits}
+            />
+          </FadeUpCard>
         ))}
       </div>
       {hasMore && (
@@ -370,12 +400,15 @@ export default function RestaurantGrid({
 
   if (restaurants.length === 0) {
     return (
-      <div className="py-12 px-6 text-center">
-        <p className="font-display text-5xl text-brd mb-3">NO SPOTS YET</p>
-        <p className="text-txt2 text-base">
+      <div className="py-16 px-6 text-center animate-fade-up">
+        <div className="text-[72px] leading-none text-brd mb-4 select-none" aria-hidden>
+          🍽
+        </div>
+        <p className="font-display text-2xl text-txt mb-2">NO SPOTS FOUND</p>
+        <p className="text-txt2 text-base max-w-[280px] mx-auto">
           {grouped
-            ? "Add your first recommendation"
-            : "No spots in this category"}
+            ? "Add your first recommendation to get started"
+            : "Try adjusting your filters or search to find what you're looking for"}
         </p>
       </div>
     );

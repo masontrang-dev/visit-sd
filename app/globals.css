@@ -96,16 +96,51 @@
   .chip {
     @apply font-body text-sm font-medium py-1.5 px-3.5 rounded-pill border-[1.5px]
            border-brd bg-transparent cursor-pointer text-txt2
-           transition-all duration-[0.12s] whitespace-nowrap;
+           transition-all duration-[0.12s] whitespace-nowrap active:scale-95;
   }
   .chip-active {
     @apply font-body text-sm font-medium py-1.5 px-3.5 rounded-pill border-[1.5px]
            border-txt bg-txt cursor-pointer text-bg
-           transition-all duration-[0.12s] whitespace-nowrap;
+           transition-all duration-[0.12s] whitespace-nowrap active:scale-95;
   }
 
   /* ── Badge ── */
   .badge {
     @apply text-2xs font-medium px-2 py-0.5 rounded-pill tracking-wide uppercase;
   }
+}
+
+/* ── Keyframes ── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(8px); }
+}
+
+/* ── Grain texture (used as pseudo-element bg) ── */
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+}
+.dark .grain::after {
+  opacity: 0.06;
 }

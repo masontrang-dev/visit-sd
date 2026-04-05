@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase, type Restaurant } from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
@@ -39,6 +39,31 @@ export default function HomePage() {
       <HomeContent />
     </Suspense>
   );
+}
+
+function AnimatedCounter({ value, duration = 800 }: { value: number; duration?: number }) {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef<number>(0);
+
+  useEffect(() => {
+    if (value === 0) return;
+    const start = performance.now();
+    const from = ref.current;
+
+    function tick(now: number) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(from + (value - from) * eased);
+      setDisplay(current);
+      if (progress < 1) requestAnimationFrame(tick);
+      else ref.current = value;
+    }
+    requestAnimationFrame(tick);
+  }, [value, duration]);
+
+  return <>{display}</>;
 }
 
 function HomeContent() {
@@ -173,9 +198,9 @@ function HomeContent() {
     <main className="min-h-screen">
       {/* Hero */}
       <header
-        className={`relative pt-10 px-6 pb-6 border-b-2 border-txt transition-opacity duration-500 ${mounted ? "opacity-100" : "opacity-0"}`}
+        className={`grain relative pt-10 px-6 pb-6 border-b-2 border-txt transition-opacity duration-500 overflow-hidden ${mounted ? "opacity-100" : "opacity-0"}`}
       >
-        <div className="absolute top-4 right-4 flex gap-2">
+        <div className="absolute top-4 right-4 flex gap-2 z-10">
           <AdminButton />
           <ThemeToggle />
         </div>
@@ -191,16 +216,19 @@ function HomeContent() {
           Our go-to spots for visitors &amp; friends
         </p>
         <div className="flex gap-2.5 mt-4">
-          {[
-            `${totalCount} spots`,
-            `${cuisineCount} cuisines`,
-            `${neighborhoods.length} areas`,
-          ].map((label) => (
+          {(
+            [
+              [totalCount, "spots"],
+              [cuisineCount, "cuisines"],
+              [neighborhoods.length, "areas"],
+            ] as const
+          ).map(([count, label], i) => (
             <span
               key={label}
-              className="text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt text-txt"
+              className="text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt text-txt animate-fade-up"
+              style={{ animationDelay: `${300 + i * 100}ms` }}
             >
-              {label}
+              <AnimatedCounter value={count} /> {label}
             </span>
           ))}
         </div>
@@ -222,48 +250,50 @@ function HomeContent() {
       />
 
       <div className="relative z-0">
-      {isFiltered && !loading && (
-        <div className="flex items-center justify-between py-2.5 px-6 border-b-2 border-txt">
-          <p className="text-sm text-txt2 font-body">
-            Showing{" "}
-            <span className="font-medium text-txt">{filtered.length}</span> of{" "}
-            <span className="font-medium text-txt">{restaurants.length}</span>{" "}
-            spots
-          </p>
-          <button
-            onClick={handleClearAll}
-            className="font-body text-xs font-medium text-accent bg-transparent border-none cursor-pointer p-0 transition-opacity duration-[0.12s] hover:opacity-70"
+        {isFiltered && !loading && (
+          <div className="flex items-center justify-between py-2.5 px-6 border-b-2 border-txt">
+            <p className="text-sm text-txt2 font-body">
+              Showing{" "}
+              <span className="font-medium text-txt">{filtered.length}</span> of{" "}
+              <span className="font-medium text-txt">{restaurants.length}</span>{" "}
+              spots
+            </p>
+            <button
+              onClick={handleClearAll}
+              className="font-body text-xs font-medium text-accent bg-transparent border-none cursor-pointer p-0 transition-opacity duration-[0.12s] hover:opacity-70"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
+
+        {loading ? (
+          <SkeletonGrid />
+        ) : viewMode === "map" ? (
+          <div className="animate-fade-up">
+            <MapView restaurants={filtered} />
+          </div>
+        ) : (
+          <RestaurantGrid restaurants={filtered} grouped={false} />
+        )}
+
+        <footer className="p-6 flex justify-end items-center gap-4">
+          <span className="text-xs font-medium text-txt2 opacity-50 tracking-tight font-body">
+            v{process.env.NEXT_PUBLIC_APP_VERSION}
+          </span>
+          <Link
+            href="/privacy"
+            className="text-2xs tracking-wide uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline"
           >
-            Clear all
-          </button>
-        </div>
-      )}
-
-      {loading ? (
-        <SkeletonGrid />
-      ) : viewMode === "map" ? (
-        <MapView restaurants={filtered} />
-      ) : (
-        <RestaurantGrid restaurants={filtered} grouped={false} />
-      )}
-
-      <footer className="p-6 flex justify-end items-center gap-4">
-        <span className="text-xs font-medium text-txt2 opacity-50 tracking-tight font-body">
-          v{process.env.NEXT_PUBLIC_APP_VERSION}
-        </span>
-        <Link
-          href="/privacy"
-          className="text-2xs tracking-wide uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline"
-        >
-          Privacy
-        </Link>
-        <Link
-          href="/admin"
-          className="text-2xs tracking-wide uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline flex items-center gap-1"
-        >
-          Admin <span className="text-[8px]">→</span>
-        </Link>
-      </footer>
+            Privacy
+          </Link>
+          <Link
+            href="/admin"
+            className="text-2xs tracking-wide uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline flex items-center gap-1"
+          >
+            Admin <span className="text-[8px]">→</span>
+          </Link>
+        </footer>
       </div>
     </main>
   );
