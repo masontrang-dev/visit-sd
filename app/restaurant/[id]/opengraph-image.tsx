@@ -69,7 +69,7 @@ export default async function OGImage({ params }: { params: Promise<{ id: string
         }}
       >
         {/* Photo (left half) */}
-        {restaurant.photo_url && (
+        {(restaurant.photo_url || restaurant.storefront_photo_url) && (
           <div
             style={{
               position: "absolute",
@@ -81,7 +81,7 @@ export default async function OGImage({ params }: { params: Promise<{ id: string
             }}
           >
             <img
-              src={restaurant.photo_url}
+              src={(restaurant.photo_url || restaurant.storefront_photo_url)!}
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
             <div
@@ -102,8 +102,8 @@ export default async function OGImage({ params }: { params: Promise<{ id: string
             flexDirection: "column",
             justifyContent: "center",
             padding: 60,
-            marginLeft: restaurant.photo_url ? "50%" : "0",
-            width: restaurant.photo_url ? "50%" : "100%",
+            marginLeft: (restaurant.photo_url || restaurant.storefront_photo_url) ? "50%" : "0",
+            width: (restaurant.photo_url || restaurant.storefront_photo_url) ? "50%" : "100%",
           }}
         >
           {/* Cuisine badge */}

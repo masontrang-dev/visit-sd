@@ -3,9 +3,14 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { type Restaurant, type RestaurantVisit } from "@/lib/supabase";
+import {
+  type Restaurant,
+  type RestaurantVisit,
+  type MenuItem,
+} from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import IllustrationEmpty from "@/components/IllustrationEmpty";
+import { formatRecencyTag } from "@/lib/utils";
 
 type Props = {
   restaurants: Restaurant[];
@@ -17,6 +22,7 @@ type Props = {
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   baseDelay?: number;
+  recommendedItems?: Record<number, MenuItem[]>;
 };
 
 const CUISINE_COLORS = [
@@ -32,7 +38,9 @@ const CUISINE_COLORS = [
   "var(--cuisine-10)",
 ];
 
-function buildCuisineColorMap(restaurants: Restaurant[]): Record<string, string> {
+function buildCuisineColorMap(
+  restaurants: Restaurant[],
+): Record<string, string> {
   const cuisines = Array.from(
     new Set(restaurants.map((r) => r.cuisine).filter(Boolean)),
   ).sort();
@@ -79,6 +87,7 @@ function Card({
   onMarkVisited,
   visitingId,
   visits,
+  recommendedItems,
 }: {
   r: Restaurant;
   cuisineColor: string;
@@ -87,11 +96,14 @@ function Card({
   onMarkVisited?: (id: number, visitedBy: string) => Promise<void>;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
+  recommendedItems?: MenuItem[];
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const isAdmin = !!(onEdit || onMarkVisited || onOrder);
   const restaurantVisits = visits?.[r.id] || [];
   const visitCount = restaurantVisits.length;
+  const recencyTag = formatRecencyTag(r.last_visited);
+  const topDishes = recommendedItems?.slice(0, 3) || [];
 
   function formatDate(dateStr: string | null) {
     if (!dateStr) return "";
@@ -106,19 +118,24 @@ function Card({
     <Link
       href={`/restaurant/${r.id}`}
       className="group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-all duration-150 hover:bg-bg2 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.98]"
-      style={{ borderLeft: `3px solid ${cuisineColor}` }}
+      style={{
+        borderLeft: r.must_try
+          ? `3px solid ${cuisineColor}`
+          : "3px solid transparent",
+      }}
     >
-      {r.photo_url && (
+      {(r.photo_url || r.storefront_photo_url) && (
         <div className="relative overflow-hidden aspect-[3/2]">
           <Image
-            src={r.photo_url}
+            src={(r.photo_url || r.storefront_photo_url)!}
             alt={r.name}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
             className="object-cover transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
-              (e.target as HTMLImageElement).parentElement!.parentElement!.style.display =
-                "none";
+              (
+                e.target as HTMLImageElement
+              ).parentElement!.parentElement!.style.display = "none";
             }}
             unoptimized
           />
@@ -156,7 +173,7 @@ function Card({
             </span>
           )}
           {r.neighborhood && (
-            <span className="text-2xs font-medium px-2 py-0.5 rounded-pill border-[1.5px] border-brd text-txt2 tracking-tight uppercase flex items-center gap-1">
+            <span className="text-2xs font-medium px-2 py-0.5 rounded-pill text-txt2 tracking-tight flex items-center gap-1">
               <span
                 className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
                 style={{ backgroundColor: cuisineColor }}
@@ -166,29 +183,98 @@ function Card({
           )}
           {r.must_try && (
             <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase">
-              ★ Must-Try
+              Must-try
+            </span>
+          )}
+          {r.is_open_now !== null && (
+            <span
+              className="text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight uppercase"
+              style={{
+                backgroundColor: r.is_open_now ? "#EAF3DE" : "#F1EFE8",
+                color: r.is_open_now ? "#27500A" : "#5F5E5A",
+              }}
+            >
+              {r.is_open_now ? "Open now" : r.hours_text || "Closed"}
             </span>
           )}
         </div>
 
+        {/* Ratings row */}
+        {(r.google_rating || r.my_rating) && (
+          <div className="flex items-center gap-2.5 mt-2 flex-wrap text-xs">
+            {r.google_rating && (
+              <div className="flex items-center gap-1">
+                <span className="text-accent">★</span>
+                <span className="font-medium text-txt">
+                  {r.google_rating.toFixed(1)}
+                </span>
+                <span className="text-txt2">Google</span>
+              </div>
+            )}
+            {r.google_rating && r.my_rating && (
+              <div className="w-px h-3 bg-brd" />
+            )}
+            {r.my_rating && (
+              <div className="flex items-center gap-1">
+                <span className="text-accent">★</span>
+                <span className="font-medium text-txt">{r.my_rating}/5</span>
+                <span className="text-txt2">My pick</span>
+              </div>
+            )}
+            {recencyTag && (
+              <>
+                <div className="w-px h-3 bg-brd" />
+                <span
+                  className="text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight uppercase"
+                  style={{
+                    backgroundColor:
+                      recencyTag.style === "week" ? "#FAEEDA" : "#FAEEDA",
+                    color: recencyTag.style === "week" ? "#633806" : "#633806",
+                  }}
+                >
+                  {recencyTag.text}
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Note (truncated) */}
         {r.note && (
-          <p className="mt-2 text-sm text-txt2 leading-relaxed border-t border-brd pt-2 italic line-clamp-2">
+          <p
+            className="mt-2 text-xs text-txt2 leading-relaxed italic line-clamp-2 border-l-2 pl-2"
+            style={{ borderColor: cuisineColor }}
+          >
             {r.note}
           </p>
         )}
 
-        {/* Address + added by (smaller) */}
-        {r.address && (
-          <p className="mt-1.5 text-xs text-txt2 opacity-70">{r.address}</p>
+        {/* Recommended dishes */}
+        {topDishes.length > 0 && (
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            {topDishes.map((item) => (
+              <span
+                key={item.id}
+                className="text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight"
+                style={{
+                  backgroundColor: "#E1F5EE",
+                  color: "#085041",
+                }}
+              >
+                {item.name}
+              </span>
+            ))}
+          </div>
         )}
-        {r.added_by && (
-          <p className="mt-1 text-2xs text-txt2 opacity-50 tracking-tight">
+
+        {/* Added by (admin only) */}
+        {isAdmin && r.added_by && (
+          <p className="mt-2 text-2xs text-txt2 opacity-50 tracking-tight">
             Added by {r.added_by}
           </p>
         )}
 
-        {/* Google Maps link */}
+        {/* Google Maps link (demoted)
         {r.google_maps_url && (
           <button
             onClick={(e) => {
@@ -198,11 +284,11 @@ function Card({
                 window.open(r.google_maps_url, "_blank", "noopener,noreferrer");
               }
             }}
-            className="inline-block mt-2 text-xs font-medium py-1 px-2.5 rounded-pill border-[1.5px] border-accent2 bg-transparent text-accent2 cursor-pointer hover:bg-accent2 hover:text-white transition-colors duration-150"
+            className="inline-block mt-2 text-2xs font-medium text-accent2 cursor-pointer hover:opacity-70 transition-opacity duration-150 bg-transparent border-none p-0"
           >
             View on Maps ↗
           </button>
-        )}
+        )} */}
 
         {/* Admin: visit history */}
         {isAdmin && visitCount > 0 && (
@@ -297,10 +383,20 @@ function useFadeUp() {
   return ref;
 }
 
-function FadeUpCard({ children, delay }: { children: React.ReactNode; delay: number }) {
+function FadeUpCard({
+  children,
+  delay,
+}: {
+  children: React.ReactNode;
+  delay: number;
+}) {
   const ref = useFadeUp();
   return (
-    <div ref={ref} className="opacity-0" style={{ animationDelay: `${delay}ms` }}>
+    <div
+      ref={ref}
+      className="opacity-0"
+      style={{ animationDelay: `${delay}ms` }}
+    >
       {children}
     </div>
   );
@@ -320,6 +416,7 @@ function InfiniteCardGrid({
   visitingId,
   visits,
   baseDelay = 0,
+  recommendedItems,
 }: {
   restaurants: Restaurant[];
   cuisineColorMap: Record<string, string>;
@@ -329,6 +426,7 @@ function InfiniteCardGrid({
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   baseDelay?: number;
+  recommendedItems?: Record<number, MenuItem[]>;
 }) {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -366,22 +464,22 @@ function InfiniteCardGrid({
           <FadeUpCard key={r.id} delay={(i % BATCH_SIZE) * 50 + baseDelay}>
             <Card
               r={r}
-              cuisineColor={cuisineColorMap[r.cuisine || ""] || CUISINE_COLORS[0]}
+              cuisineColor={
+                cuisineColorMap[r.cuisine || ""] || CUISINE_COLORS[0]
+              }
               onEdit={onEdit}
               onOrder={onOrder}
               onMarkVisited={onMarkVisited}
               visitingId={visitingId}
               visits={visits}
+              recommendedItems={recommendedItems?.[r.id]}
             />
           </FadeUpCard>
         ))}
       </div>
       {hasMore && (
         <div ref={sentinelRef} className="py-6 text-center">
-          <button
-            onClick={loadMore}
-            className="btn-outline btn-pill"
-          >
+          <button onClick={loadMore} className="btn-outline btn-pill">
             Show more ({restaurants.length - visibleCount} remaining)
           </button>
         </div>
@@ -400,6 +498,7 @@ export default function RestaurantGrid({
   visitingId,
   visits,
   baseDelay,
+  recommendedItems,
 }: Props) {
   const cuisineColorMap = useMemo(
     () => buildCuisineColorMap(restaurants),
@@ -438,6 +537,7 @@ export default function RestaurantGrid({
         visitingId={visitingId}
         visits={visits}
         baseDelay={baseDelay}
+        recommendedItems={recommendedItems}
       />
     );
   }
@@ -479,6 +579,7 @@ export default function RestaurantGrid({
                   onMarkVisited={onMarkVisited}
                   visitingId={visitingId}
                   visits={visits}
+                  recommendedItems={recommendedItems?.[r.id]}
                 />
               ))}
             </div>

@@ -1,11 +1,20 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback, useRef, useMemo } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { supabase, type Restaurant } from "@/lib/supabase";
+import { supabase, type Restaurant, type MenuItem } from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar from "@/components/FilterBar";
 import MapView from "@/components/MapView";
+import ContextHeader from "@/components/ContextHeader";
+import SurpriseBar from "@/components/SurpriseBar";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import AdminButton from "@/components/AdminButton";
@@ -41,7 +50,17 @@ export default function HomePage() {
   );
 }
 
-function StatPill({ value, label, duration = 800, countFromZero = false }: { value: number; label: string; duration?: number; countFromZero?: boolean }) {
+function StatPill({
+  value,
+  label,
+  duration = 800,
+  countFromZero = false,
+}: {
+  value: number;
+  label: string;
+  duration?: number;
+  countFromZero?: boolean;
+}) {
   const [display, setDisplay] = useState(countFromZero ? 0 : value);
   const prevRef = useRef(countFromZero ? 0 : value);
   const initialRef = useRef(true);
@@ -85,7 +104,9 @@ function StatPill({ value, label, duration = 800, countFromZero = false }: { val
     }
     requestAnimationFrame(tick);
 
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [value, duration, countFromZero]);
 
   return <>{`${display} ${label}`}</>;
@@ -124,6 +145,10 @@ function HomeContent() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [mounted, setMounted] = useState(false);
   const [isFirstVisit, setIsFirstVisit] = useState(false);
+  const [recommendedItems, setRecommendedItems] = useState<
+    Record<number, MenuItem[]>
+  >({});
+  const surpriseBtnRef = useRef<HTMLButtonElement>(null);
 
   // Debounce search input
   useEffect(() => {
@@ -132,7 +157,12 @@ function HomeContent() {
   }, [searchQuery]);
 
   const syncParams = useCallback(
-    (cuisines: string[], neighborhoods: string[], mustTry: boolean, prices: string[]) => {
+    (
+      cuisines: string[],
+      neighborhoods: string[],
+      mustTry: boolean,
+      prices: string[],
+    ) => {
       const params = new URLSearchParams();
       if (cuisines.length > 0) params.set("cuisine", cuisines.join(","));
       if (neighborhoods.length > 0)
@@ -170,6 +200,27 @@ function HomeContent() {
         .order("cuisine")
         .order("name");
       setRestaurants(data ?? []);
+
+      // Fetch recommended menu items for all restaurants
+      if (data && data.length > 0) {
+        const { data: menuData } = await supabase
+          .from("menu_items")
+          .select("*")
+          .eq("is_recommended", true)
+          .order("name");
+
+        if (menuData) {
+          const itemsByRestaurant: Record<number, MenuItem[]> = {};
+          menuData.forEach((item) => {
+            if (!itemsByRestaurant[item.restaurant_id]) {
+              itemsByRestaurant[item.restaurant_id] = [];
+            }
+            itemsByRestaurant[item.restaurant_id].push(item);
+          });
+          setRecommendedItems(itemsByRestaurant);
+        }
+      }
+
       setLoading(false);
     }
     load();
@@ -200,7 +251,27 @@ function HomeContent() {
       }
     };
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+
+    // Handle scroll detection for fade effect on surprise button (via DOM, no re-render)
+    let scrollTimeout: ReturnType<typeof setTimeout>;
+    const handleScroll = () => {
+      if (surpriseBtnRef.current) {
+        surpriseBtnRef.current.style.opacity = "0.3";
+      }
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        if (surpriseBtnRef.current) {
+          surpriseBtnRef.current.style.opacity = "1";
+        }
+      }, 150);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(scrollTimeout);
+    };
   }, [viewMode]);
 
   const cuisines = Array.from(
@@ -209,27 +280,41 @@ function HomeContent() {
   const neighborhoods = Array.from(
     new Set(restaurants.map((r) => r.neighborhood).filter(Boolean)),
   ).sort();
-  const filtered = useMemo(() => restaurants.filter((r) => {
-    if (activeCuisines.length > 0 && !activeCuisines.includes(r.cuisine || ""))
-      return false;
-    if (
-      activeNeighborhoods.length > 0 &&
-      !activeNeighborhoods.includes(r.neighborhood || "")
-    )
-      return false;
-    if (mustTryFilter && !r.must_try) return false;
-    if (activePrices.length > 0 && !activePrices.includes(r.price || ""))
-      return false;
-    if (debouncedSearch.trim()) {
-      const q = debouncedSearch.trim().toLowerCase();
-      const searchable = [r.name, r.cuisine, r.neighborhood, r.note]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      if (!searchable.includes(q)) return false;
-    }
-    return true;
-  }), [restaurants, activeCuisines, activeNeighborhoods, mustTryFilter, activePrices, debouncedSearch]);
+  const filtered = useMemo(
+    () =>
+      restaurants.filter((r) => {
+        if (
+          activeCuisines.length > 0 &&
+          !activeCuisines.includes(r.cuisine || "")
+        )
+          return false;
+        if (
+          activeNeighborhoods.length > 0 &&
+          !activeNeighborhoods.includes(r.neighborhood || "")
+        )
+          return false;
+        if (mustTryFilter && !r.must_try) return false;
+        if (activePrices.length > 0 && !activePrices.includes(r.price || ""))
+          return false;
+        if (debouncedSearch.trim()) {
+          const q = debouncedSearch.trim().toLowerCase();
+          const searchable = [r.name, r.cuisine, r.neighborhood, r.note]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          if (!searchable.includes(q)) return false;
+        }
+        return true;
+      }),
+    [
+      restaurants,
+      activeCuisines,
+      activeNeighborhoods,
+      mustTryFilter,
+      activePrices,
+      debouncedSearch,
+    ],
+  );
 
   const totalCount = restaurants.length;
   const cuisineCount = cuisines.length;
@@ -251,49 +336,82 @@ function HomeContent() {
 
   return (
     <main className="min-h-screen">
-      {/* Hero */}
-      <header
-        className={`relative pt-10 px-6 pb-6 border-b-2 border-txt transition-opacity duration-500 overflow-hidden ${mounted ? "grain opacity-100" : "opacity-0"}`}
-      >
-        <div className={`absolute top-4 right-4 flex gap-2 ${mounted ? "z-10" : ""}`}>
-          <AdminButton />
-          <ThemeToggle />
+      {/* Hero or Context Header */}
+      {!isFiltered ? (
+        <header
+          className={`relative pt-6 md:pt-10 px-6 pb-4 md:pb-6 border-b-2 border-txt transition-opacity duration-500 overflow-hidden ${mounted ? "grain opacity-100" : "opacity-0"}`}
+        >
+          <div
+            className={`absolute top-4 right-4 flex gap-2 ${mounted ? "z-10" : ""}`}
+          >
+            <AdminButton />
+            <ThemeToggle />
+          </div>
+          <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
+            Local Picks · San Diego
+          </p>
+          <h1 className="font-display text-[clamp(48px,12vw,96px)] leading-[0.88] tracking-tight scroll-parallax">
+            {isFirstVisit ? (
+              <span className="word-reveal">
+                <span style={{ animationDelay: "200ms" }}>VISIT</span>
+                <br />
+                <span
+                  className="text-accent"
+                  style={{ animationDelay: "500ms" }}
+                >
+                  SD
+                </span>
+              </span>
+            ) : (
+              <>
+                VISIT
+                <br />
+                <span className="text-accent">SD</span>
+              </>
+            )}
+          </h1>
+          <p className="text-base text-txt2 mt-2 md:mt-3 max-w-[280px]">
+            Our go-to spots for visitors &amp; friends
+          </p>
+          <div className="flex gap-2.5 mt-3 md:mt-4">
+            {(
+              [
+                [totalCount, "spots"],
+                [cuisineCount, "cuisines"],
+                [neighborhoods.length, "areas"],
+              ] as const
+            ).map(([count, label], i) => (
+              <span
+                key={label}
+                className={`text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt text-txt ${mounted ? "animate-fade-up" : "opacity-0"}`}
+                style={
+                  mounted ? { animationDelay: `${300 + i * 100}ms` } : undefined
+                }
+              >
+                <StatPill
+                  value={count}
+                  label={label}
+                  countFromZero={isFirstVisit}
+                />
+              </span>
+            ))}
+          </div>
+        </header>
+      ) : (
+        <div className="relative">
+          <div className="absolute top-4 right-4 flex gap-2 z-10">
+            <AdminButton />
+            <ThemeToggle />
+          </div>
+          <ContextHeader
+            activeCuisines={activeCuisines}
+            activeNeighborhoods={activeNeighborhoods}
+            searchQuery={debouncedSearch}
+            matchCount={filtered.length}
+            totalCount={totalCount}
+          />
         </div>
-        <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
-          Local Picks · San Diego
-        </p>
-        <h1 className="font-display text-[clamp(56px,12vw,96px)] leading-[0.88] tracking-tight scroll-parallax">
-          {isFirstVisit ? (
-            <span className="word-reveal">
-              <span style={{ animationDelay: "200ms" }}>VISIT</span>
-              <br />
-              <span className="text-accent" style={{ animationDelay: "500ms" }}>SD</span>
-            </span>
-          ) : (
-            <>VISIT<br /><span className="text-accent">SD</span></>
-          )}
-        </h1>
-        <p className="text-base text-txt2 mt-3 max-w-[280px]">
-          Our go-to spots for visitors &amp; friends
-        </p>
-        <div className="flex gap-2.5 mt-4">
-          {(
-            [
-              [totalCount, "spots"],
-              [cuisineCount, "cuisines"],
-              [neighborhoods.length, "areas"],
-            ] as const
-          ).map(([count, label], i) => (
-            <span
-              key={label}
-              className={`text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt text-txt ${mounted ? "animate-fade-up" : "opacity-0"}`}
-              style={mounted ? { animationDelay: `${300 + i * 100}ms` } : undefined}
-            >
-              <StatPill value={count} label={label} countFromZero={isFirstVisit} />
-            </span>
-          ))}
-        </div>
-      </header>
+      )}
 
       <FilterBar
         cuisines={cuisines}
@@ -313,29 +431,6 @@ function HomeContent() {
       />
 
       <div className="relative z-0">
-        {isFiltered && !loading && (
-          <div className="flex items-center justify-between py-2.5 px-6 border-b-2 border-txt">
-            <p className="text-sm text-txt2 font-body">
-              {searchQuery !== debouncedSearch ? (
-                <span className="text-txt2 opacity-60">Searching...</span>
-              ) : (
-                <>
-                  Showing{" "}
-                  <span className="font-medium text-txt">{filtered.length}</span> of{" "}
-                  <span className="font-medium text-txt">{restaurants.length}</span>{" "}
-                  spots
-                </>
-              )}
-            </p>
-            <button
-              onClick={handleClearAll}
-              className="font-body text-xs font-medium text-accent bg-transparent border-none cursor-pointer p-0 transition-opacity duration-[0.12s] hover:opacity-70"
-            >
-              Clear filters
-            </button>
-          </div>
-        )}
-
         {loading ? (
           <SkeletonGrid />
         ) : viewMode === "map" ? (
@@ -343,7 +438,31 @@ function HomeContent() {
             <MapView restaurants={filtered} allRestaurants={restaurants} />
           </div>
         ) : (
-          <RestaurantGrid restaurants={filtered} grouped={false} baseDelay={isFirstVisit ? 400 : 0} />
+          <>
+            <RestaurantGrid
+              restaurants={filtered}
+              grouped={false}
+              baseDelay={isFirstVisit ? 400 : 0}
+              recommendedItems={recommendedItems}
+            />
+            {!loading && isFiltered && <SurpriseBar restaurants={filtered} />}
+            {!loading && !isFiltered && (
+              <button
+                ref={surpriseBtnRef}
+                onClick={() => {
+                  if (filtered.length === 0) return;
+                  const randomIndex = Math.floor(
+                    Math.random() * filtered.length,
+                  );
+                  const randomRestaurant = filtered[randomIndex];
+                  router.push(`/restaurant/${randomRestaurant.id}`);
+                }}
+                className="fixed bottom-6 left-1/2 -translate-x-1/2 text-xs font-medium px-3 py-1.5 rounded-pill bg-txt text-bg border-[1.5px] border-txt shadow-lg z-20 transition-opacity duration-200 hover:opacity-90 active:scale-95"
+              >
+                Surprise me ✦
+              </button>
+            )}
+          </>
         )}
 
         <footer className="p-6 flex justify-end items-center gap-4">

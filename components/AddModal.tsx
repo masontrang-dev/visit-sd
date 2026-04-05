@@ -18,6 +18,19 @@ type Props = {
 
 const PRICES = ["$", "$$", "$$$", "$$$$"];
 
+const OCCASION_SUGGESTIONS = [
+  "casual",
+  "date-friendly",
+  "family-friendly",
+  "quick-bite",
+  "special-occasion",
+  "group-dining",
+  "late-night",
+  "brunch-spot",
+  "romantic",
+  "business-lunch",
+];
+
 const GOOGLE_TYPE_TO_CUISINE: Record<string, string> = {
   mexican_restaurant: "Mexican",
   italian_restaurant: "Italian",
@@ -138,6 +151,16 @@ export default function AddModal({
   const [note, setNote] = useState(editData?.note ?? "");
   const [addedBy, setAddedBy] = useState(editData?.added_by ?? username ?? "");
   const [mustTry, setMustTry] = useState(editData?.must_try ?? false);
+  const [myRating, setMyRating] = useState<number | null>(
+    editData?.my_rating ?? null,
+  );
+  const [ratingNotes, setRatingNotes] = useState("");
+  const [googleRating, setGoogleRating] = useState<number | null>(
+    editData?.google_rating ?? null,
+  );
+  const [googleReviewCount, setGoogleReviewCount] = useState<number | null>(
+    editData?.google_review_count ?? null,
+  );
   const [photoUrl, setPhotoUrl] = useState(editData?.photo_url ?? "");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -155,6 +178,10 @@ export default function AddModal({
   const [cuisineOpen, setCuisineOpen] = useState(false);
   const [cuisineHighlight, setCuisineHighlight] = useState(-1);
   const cuisineWrapperRef = useRef<HTMLDivElement>(null);
+  const [occasions, setOccasions] = useState<string[]>(
+    editData?.occasions ?? [],
+  );
+  const [occasionInput, setOccasionInput] = useState("");
 
   const cuisineOptions = Array.from(
     new Set([...(existingCuisines ?? []), ...DEFAULT_CUISINE_OPTIONS]),
@@ -215,6 +242,13 @@ export default function AddModal({
       if (place.price_level != null && PRICE_LEVEL_MAP[place.price_level]) {
         setPrice(PRICE_LEVEL_MAP[place.price_level]);
       }
+      // Auto-populate Google rating
+      if (place.rating != null) {
+        setGoogleRating(place.rating);
+      }
+      if (place.user_ratings_total != null) {
+        setGoogleReviewCount(place.user_ratings_total);
+      }
     },
     [],
   );
@@ -241,6 +275,8 @@ export default function AddModal({
             "address_components",
             "price_level",
             "types",
+            "rating",
+            "user_ratings_total",
           ],
         },
       );
@@ -336,6 +372,11 @@ export default function AddModal({
     }
 
     console.log("Saving restaurant with photo_url:", finalPhotoUrl);
+
+    // Track rating change for history
+    const ratingChanged =
+      editData && myRating !== null && myRating !== editData.my_rating;
+
     const ok = await onSave({
       name: name.trim(),
       neighborhood: neighborhood.trim(),
@@ -349,10 +390,28 @@ export default function AddModal({
       lat,
       lng,
       photo_url: finalPhotoUrl.trim() || null,
+      storefront_photo_url: editData?.storefront_photo_url ?? null,
       must_try: mustTry,
       date_added: editData?.date_added ?? null,
       last_visited: editData?.last_visited ?? null,
+      google_rating: googleRating,
+      google_review_count: googleReviewCount,
+      my_rating: myRating,
+      occasions: occasions.length > 0 ? occasions : null,
+      is_open_now: editData?.is_open_now ?? null,
+      hours_text: editData?.hours_text ?? null,
+      opening_hours: editData?.opening_hours ?? null,
     });
+
+    // Save rating history if rating changed
+    if (ok && ratingChanged && editData && myRating !== null) {
+      await supabase.from("rating_history").insert({
+        restaurant_id: editData.id,
+        rating: myRating,
+        changed_by: username || "Unknown",
+        notes: ratingNotes.trim() || null,
+      });
+    }
     setSaving(false);
     if (ok) {
       setSuccess(true);
@@ -548,19 +607,149 @@ export default function AddModal({
         </div>
 
         <div className="mb-4">
+          <label className={labelCls}>Occasion Tags</label>
+          <div className="mb-2">
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={occasionInput}
+                onChange={(e) => setOccasionInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && occasionInput.trim()) {
+                    e.preventDefault();
+                    const tag = occasionInput.trim().toLowerCase();
+                    if (!occasions.includes(tag)) {
+                      setOccasions([...occasions, tag]);
+                    }
+                    setOccasionInput("");
+                  }
+                }}
+                placeholder="Add occasion tag..."
+                className="input-base flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (occasionInput.trim()) {
+                    const tag = occasionInput.trim().toLowerCase();
+                    if (!occasions.includes(tag)) {
+                      setOccasions([...occasions, tag]);
+                    }
+                    setOccasionInput("");
+                  }
+                }}
+                className="btn-outline !py-2 !px-4 !border-txt !text-txt"
+              >
+                Add
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {OCCASION_SUGGESTIONS.filter((s) => !occasions.includes(s)).map(
+                (suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => setOccasions([...occasions, suggestion])}
+                    className="text-2xs px-2 py-1 border border-brd text-txt2 hover:border-txt hover:text-txt transition-colors capitalize"
+                  >
+                    + {suggestion}
+                  </button>
+                ),
+              )}
+            </div>
+            {occasions.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {occasions.map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-2xs font-medium px-2.5 py-1 rounded-pill border border-txt text-txt capitalize flex items-center gap-1.5"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOccasions(occasions.filter((t) => t !== tag))
+                      }
+                      className="text-txt hover:text-accent transition-colors"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mb-4">
           <label className={labelCls}>Must-Try</label>
           <button
             type="button"
             onClick={() => setMustTry(!mustTry)}
             className={`chip ${
-              mustTry
-                ? "!bg-accent !text-white !border-accent"
-                : ""
+              mustTry ? "!bg-accent !text-white !border-accent" : ""
             }`}
           >
             {mustTry ? "★ Must-Try" : "☆ Mark as Must-Try"}
           </button>
         </div>
+
+        <div className="mb-4">
+          <label className={labelCls}>My Rating</label>
+          <div className="flex gap-2 mb-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setMyRating(myRating === star ? null : star)}
+                className="text-3xl cursor-pointer bg-transparent border-none p-0 transition-all duration-100 hover:scale-110"
+                style={{
+                  color: myRating && star <= myRating ? "#D85A30" : "#D3D1C7",
+                }}
+              >
+                ★
+              </button>
+            ))}
+            {myRating !== null && (
+              <button
+                type="button"
+                onClick={() => setMyRating(null)}
+                className="text-xs text-txt2 ml-2 bg-transparent border-none cursor-pointer hover:text-accent"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {editData && myRating !== null && myRating !== editData.my_rating && (
+            <div>
+              <input
+                value={ratingNotes}
+                onChange={(e) => setRatingNotes(e.target.value)}
+                placeholder="Why did your rating change? (optional)"
+                className="input-base text-xs"
+              />
+            </div>
+          )}
+        </div>
+
+        {googleRating !== null && (
+          <div className="mb-4 p-3 bg-bg2 border border-brd">
+            <label className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1 block">
+              Google Rating (auto-populated)
+            </label>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-accent">★</span>
+              <span className="font-medium text-txt">
+                {googleRating.toFixed(1)}
+              </span>
+              {googleReviewCount && (
+                <span className="text-txt2">
+                  ({googleReviewCount.toLocaleString()} reviews)
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="mb-4">
           <label className={labelCls}>Photo</label>

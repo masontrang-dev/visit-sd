@@ -1,0 +1,428 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;1,400&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+.stage{display:flex;gap:24px;padding:24px;background:var(--color-background-secondary);border-radius:var(--border-radius-lg);flex-wrap:wrap;justify-content:center;}
+.phone{width:375px;background:#FAFAF8;border-radius:40px;border:8px solid #1a1a18;overflow:hidden;font-family:'DM Sans',sans-serif;}
+.phone-label{text-align:center;font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:10px;letter-spacing:0.06em;text-transform:uppercase;}
+.statusbar{background:#FAFAF8;padding:12px 20px 4px;display:flex;justify-content:space-between;align-items:center;}
+.statusbar-time{font-size:13px;font-weight:500;color:#1a1a18;}
+.statusbar-icons{display:flex;gap:5px;align-items:center;}
+.sb-icon{width:16px;height:10px;background:#1a1a18;border-radius:2px;opacity:0.7;}
+.hero{padding:16px 20px 12px;background:#FAFAF8;border-bottom:1.5px solid #1a1a18;}
+.hero-eye{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#D85A30;font-weight:500;margin-bottom:3px;}
+.hero-title{font-family:'Bebas Neue',sans-serif;font-size:52px;line-height:0.88;color:#1a1a18;}
+.hero-title span{color:#D85A30;}
+.hero-sub{font-size:13px;color:#5F5E5A;margin-top:6px;}
+.hero-pills{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+.hero-pill{font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;border:1.5px solid #1a1a18;color:#1a1a18;}
+.search-bar{padding:10px 16px;background:#FAFAF8;border-bottom:0.5px solid rgba(26,26,24,0.12);}
+.search-input{width:100%;background:#F1EFE8;border:none;border-radius:8px;padding:8px 12px;font-size:14px;color:#5F5E5A;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:8px;}
+.search-row{display:flex;gap:8px;align-items:center;}
+.search-field{flex:1;background:#F1EFE8;border-radius:8px;padding:8px 12px;font-size:13px;color:#888780;}
+.view-toggle{display:flex;background:#F1EFE8;border-radius:8px;overflow:hidden;flex-shrink:0;}
+.vt-btn{padding:7px 12px;font-size:12px;font-weight:500;color:#888780;background:transparent;border:none;font-family:'DM Sans',sans-serif;}
+.vt-btn.active{background:#1a1a18;color:#FAFAF8;border-radius:6px;}
+.filters{padding:8px 16px;display:flex;gap:6px;overflow-x:auto;border-bottom:0.5px solid rgba(26,26,24,0.12);}
+.filters::-webkit-scrollbar{display:none;}
+.filter-pill{flex-shrink:0;font-size:12px;font-weight:500;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(26,26,24,0.18);color:#5F5E5A;background:transparent;white-space:nowrap;display:flex;align-items:center;gap:4px;}
+.filter-pill.active{background:#1a1a18;color:#FAFAF8;border-color:#1a1a18;}
+.filter-pill.accent{background:#FAECE7;color:#712B13;border-color:#F0997B;}
+.chevron{font-size:9px;opacity:0.6;}
+.cards{padding:0;}
+.card{padding:14px 16px;border-bottom:0.5px solid rgba(26,26,24,0.1);background:#FAFAF8;position:relative;}
+.card.must-try{border-left:3px solid #D85A30;}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.card-name{font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1;color:#1a1a18;flex:1;}
+.card-price{font-size:13px;font-weight:500;color:#888780;flex-shrink:0;margin-top:2px;}
+.card-meta{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;align-items:center;}
+.tag{font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px;letter-spacing:0.05em;text-transform:uppercase;}
+.tag-cuisine{background:#F1EFE8;color:#444441;}
+.tag-hood{display:flex;align-items:center;gap:4px;font-size:12px;color:#5F5E5A;}
+.tag-hood-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;flex-shrink:0;}
+.tag-must{background:#FAECE7;color:#712B13;}
+.tag-open{background:#EAF3DE;color:#27500A;}
+.tag-recent{background:#FAEEDA;color:#633806;}
+.card-ratings{display:flex;gap:10px;margin-top:7px;align-items:center;}
+.rating-item{display:flex;align-items:center;gap:4px;font-size:12px;}
+.rating-star{color:#D85A30;font-size:12px;}
+.rating-val{font-weight:500;color:#1a1a18;}
+.rating-src{color:#888780;}
+.rating-divider{width:1px;height:12px;background:rgba(26,26,24,0.15);}
+.card-note{margin-top:7px;font-size:12px;color:#5F5E5A;line-height:1.45;font-style:italic;border-left:2px solid #F0997B;padding-left:8px;}
+.card-dishes{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.dish-tag{font-size:11px;padding:3px 9px;border-radius:20px;background:#E1F5EE;color:#085041;font-weight:500;}
+.card-footer{display:flex;gap:8px;margin-top:10px;align-items:center;justify-content:space-between;}
+.maps-btn{font-size:11px;font-weight:500;color:#185FA5;display:flex;align-items:center;gap:3px;padding:4px 0;}
+.surprise-btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:20px;background:#1a1a18;color:#FAFAF8;}
+
+.detail-hero{background:#1a1a18;padding:0;overflow:hidden;position:relative;}
+.detail-photo{width:100%;height:160px;background:#2C2C2A;display:flex;align-items:center;justify-content:center;}
+.photo-placeholder{width:100%;height:100%;background:linear-gradient(135deg,#2C2C2A 0%,#444441 100%);display:flex;align-items:flex-end;padding:12px 16px;}
+.detail-back{position:absolute;top:16px;left:16px;width:32px;height:32px;border-radius:50%;background:rgba(26,26,24,0.6);display:flex;align-items:center;justify-content:center;}
+.back-arrow{color:#FAFAF8;font-size:14px;font-weight:500;}
+.detail-info{padding:14px 16px;background:#FAFAF8;border-bottom:0.5px solid rgba(26,26,24,0.12);}
+.detail-cuisine-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.detail-name{font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:0.95;color:#1a1a18;margin-bottom:8px;}
+.detail-meta-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+.detail-ratings{display:flex;gap:12px;padding:12px 16px;border-bottom:0.5px solid rgba(26,26,24,0.12);background:#FAFAF8;}
+.detail-rating-block{flex:1;text-align:center;}
+.detail-rating-val{font-family:'Bebas Neue',sans-serif;font-size:32px;color:#1a1a18;}
+.detail-rating-label{font-size:11px;color:#888780;margin-top:1px;}
+.detail-rating-sub{font-size:10px;color:#B4B2A9;margin-top:1px;}
+.rating-sep{width:0.5px;background:rgba(26,26,24,0.12);}
+.section{padding:12px 16px;border-bottom:0.5px solid rgba(26,26,24,0.1);}
+.section-title{font-size:10px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;color:#888780;margin-bottom:8px;}
+.note-block{font-size:13px;color:#444441;line-height:1.55;font-style:italic;border-left:2px solid #D85A30;padding-left:10px;}
+.dishes-grid{display:flex;gap:8px;flex-direction:column;}
+.dish-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:0.5px solid rgba(26,26,24,0.06);}
+.dish-photo{width:44px;height:44px;border-radius:8px;background:#F1EFE8;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.dish-photo-inner{width:100%;height:100%;border-radius:8px;background:#D3D1C7;}
+.dish-info{flex:1;}
+.dish-name{font-size:13px;font-weight:500;color:#1a1a18;}
+.dish-meta{font-size:11px;color:#888780;margin-top:2px;}
+.dish-stars{display:flex;gap:2px;margin-top:3px;}
+.star-filled{width:10px;height:10px;background:#D85A30;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);}
+.star-empty{width:10px;height:10px;background:#D3D1C7;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);}
+.occasions-row{display:flex;gap:6px;flex-wrap:wrap;}
+.occ-tag{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid rgba(26,26,24,0.2);color:#5F5E5A;}
+.action-row{display:flex;gap:8px;padding:12px 16px;}
+.action-btn{flex:1;padding:10px;border-radius:8px;font-size:13px;font-weight:500;text-align:center;font-family:'DM Sans',sans-serif;}
+.action-primary{background:#D85A30;color:#fff;}
+.action-secondary{background:#F1EFE8;color:#1a1a18;}
+.checkin-list{display:flex;flex-direction:column;gap:0;}
+.checkin-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid rgba(26,26,24,0.06);}
+.checkin-date{font-size:12px;color:#5F5E5A;}
+.checkin-rating{display:flex;gap:2px;}
+</style>
+
+<div class="stage">
+
+  <div>
+    <div class="phone-label">Screen 1 — List view</div>
+    <div class="phone">
+      <div class="statusbar">
+        <span class="statusbar-time">9:41</span>
+        <div class="statusbar-icons">
+          <div class="sb-icon" style="width:14px;height:8px;border-radius:1px;opacity:0.5;"></div>
+          <div class="sb-icon" style="width:10px;height:8px;border-radius:50%;"></div>
+          <div class="sb-icon" style="width:20px;height:8px;border-radius:2px;"></div>
+        </div>
+      </div>
+
+      <div class="hero">
+        <div class="hero-eye">Local picks · San Diego</div>
+        <div class="hero-title">VISIT<br><span>SD</span></div>
+        <div class="hero-sub">Our go-to spots for visitors &amp; friends</div>
+        <div class="hero-pills">
+          <span class="hero-pill">58 spots</span>
+          <span class="hero-pill">15 cuisines</span>
+          <span class="hero-pill">16 areas</span>
+        </div>
+      </div>
+
+      <div class="search-bar">
+        <div class="search-row">
+          <div class="search-field">Search restaurants, dishes, areas...</div>
+          <div class="view-toggle">
+            <div class="vt-btn active">List</div>
+            <div class="vt-btn">Map</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <div class="filter-pill active">All</div>
+        <div class="filter-pill">Cuisine <span class="chevron">▾</span></div>
+        <div class="filter-pill">Area <span class="chevron">▾</span></div>
+        <div class="filter-pill">Price <span class="chevron">▾</span></div>
+        <div class="filter-pill">Occasion <span class="chevron">▾</span></div>
+        <div class="filter-pill accent">Must-try</div>
+      </div>
+
+      <div class="cards">
+
+        <div class="card must-try">
+          <div class="card-top">
+            <div class="card-name">Omomo Tea Shoppe</div>
+            <div class="card-price">$</div>
+          </div>
+          <div class="card-meta">
+            <span class="tag tag-cuisine">Boba</span>
+            <span class="tag-hood"><span class="tag-hood-dot"></span>Carmel Valley</span>
+            <span class="tag tag-must">Must-try</span>
+            <span class="tag tag-open">Open now</span>
+          </div>
+          <div class="card-ratings">
+            <div class="rating-item">
+              <span class="rating-star">★</span>
+              <span class="rating-val">4.7</span>
+              <span class="rating-src">Google</span>
+            </div>
+            <div class="rating-divider"></div>
+            <div class="rating-item">
+              <span class="rating-star">★</span>
+              <span class="rating-val">5/5</span>
+              <span class="rating-src">My pick</span>
+            </div>
+            <div class="rating-divider"></div>
+            <span class="tag tag-recent" style="font-size:10px;padding:2px 7px;">This week</span>
+          </div>
+          <div class="card-note">"Best taro in SD. Always get less sweet, light ice."</div>
+          <div class="card-dishes">
+            <span class="dish-tag">Taro milk tea</span>
+            <span class="dish-tag">Brown sugar boba</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <div class="card-name">3Cat Handcrafted Beverage</div>
+            <div class="card-price">$</div>
+          </div>
+          <div class="card-meta">
+            <span class="tag tag-cuisine">Boba</span>
+            <span class="tag-hood"><span class="tag-hood-dot"></span>Kearny Mesa</span>
+          </div>
+          <div class="card-ratings">
+            <div class="rating-item">
+              <span class="rating-star">★</span>
+              <span class="rating-val">4.5</span>
+              <span class="rating-src">Google</span>
+            </div>
+            <div class="rating-divider"></div>
+            <div class="rating-item">
+              <span class="rating-star">★</span>
+              <span class="rating-val">4/5</span>
+              <span class="rating-src">My pick</span>
+            </div>
+            <div class="rating-divider"></div>
+            <span class="tag tag-recent" style="font-size:10px;padding:2px 7px;background:#FAEEDA;color:#633806;">This month</span>
+          </div>
+          <div class="card-dishes">
+            <span class="dish-tag">Matcha latte</span>
+          </div>
+        </div>
+
+        <div class="card must-try">
+          <div class="card-top">
+            <div class="card-name">Amardeen Lebanese &amp; Mediterranean</div>
+            <div class="card-price">$$</div>
+          </div>
+          <div class="card-meta">
+            <span class="tag tag-cuisine">Mediterranean</span>
+            <span class="tag-hood"><span class="tag-hood-dot"></span>University City</span>
+            <span class="tag tag-must">Must-try</span>
+          </div>
+          <div class="card-ratings">
+            <div class="rating-item">
+              <span class="rating-star">★</span>
+              <span class="rating-val">4.8</span>
+              <span class="rating-src">Google</span>
+            </div>
+            <div class="rating-divider"></div>
+            <div class="rating-item">
+              <span class="rating-star">★</span>
+              <span class="rating-val">5/5</span>
+              <span class="rating-src">My pick</span>
+            </div>
+          </div>
+          <div class="card-note">"Get the shawarma plate. Always fresh, huge portions."</div>
+          <div class="card-dishes">
+            <span class="dish-tag">Shawarma plate</span>
+            <span class="dish-tag">Hummus</span>
+          </div>
+        </div>
+
+        <div style="padding:10px 16px;display:flex;justify-content:center;">
+          <div class="surprise-btn">Surprise me ✦</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="phone-label">Screen 2 — Restaurant detail</div>
+    <div class="phone">
+      <div class="statusbar">
+        <span class="statusbar-time">9:41</span>
+        <div class="statusbar-icons">
+          <div class="sb-icon" style="width:14px;height:8px;border-radius:1px;opacity:0.5;"></div>
+          <div class="sb-icon" style="width:20px;height:8px;border-radius:2px;"></div>
+        </div>
+      </div>
+
+      <div class="detail-hero">
+        <div class="detail-photo">
+          <div class="photo-placeholder">
+            <span style="font-size:11px;color:rgba(250,250,248,0.4);font-weight:500;">Restaurant photo</span>
+          </div>
+        </div>
+        <div class="detail-back"><span class="back-arrow">←</span></div>
+      </div>
+
+      <div class="detail-info">
+        <div class="detail-cuisine-row">
+          <span class="tag tag-cuisine">Boba</span>
+          <div style="display:flex;gap:6px;">
+            <span class="tag tag-open">Open · closes 10pm</span>
+          </div>
+        </div>
+        <div class="detail-name">Omomo Tea<br>Shoppe</div>
+        <div class="detail-meta-row">
+          <span class="tag-hood"><span class="tag-hood-dot"></span>Carmel Valley</span>
+          <span style="font-size:12px;color:#888780;">·</span>
+          <span style="font-size:12px;color:#888780;">$</span>
+          <span style="font-size:12px;color:#888780;">·</span>
+          <span class="tag tag-recent" style="font-size:10px;padding:2px 7px;">Visited this week</span>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <span class="tag tag-must">Must-try</span>
+          <span class="occ-tag">Casual</span>
+          <span class="occ-tag">Date-friendly</span>
+        </div>
+      </div>
+
+      <div class="detail-ratings">
+        <div class="detail-rating-block">
+          <div class="detail-rating-val">4.7</div>
+          <div class="detail-rating-label">Google rating</div>
+          <div class="detail-rating-sub">1,240 reviews</div>
+        </div>
+        <div class="rating-sep"></div>
+        <div class="detail-rating-block">
+          <div class="detail-rating-val" style="color:#D85A30;">5/5</div>
+          <div class="detail-rating-label">My rating</div>
+          <div class="detail-rating-sub">12 visits</div>
+        </div>
+        <div class="rating-sep"></div>
+        <div class="detail-rating-block">
+          <div class="detail-rating-val">12</div>
+          <div class="detail-rating-label">Check-ins</div>
+          <div class="detail-rating-sub">Last: 3 days ago</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">My take</div>
+        <div class="note-block">"Best taro in SD, no contest. Always get less sweet, light ice. The brown sugar boba is a must on your first visit."</div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Dishes &amp; drinks I've tried</div>
+        <div class="dishes-grid">
+          <div class="dish-row">
+            <div class="dish-photo"><div class="dish-photo-inner"></div></div>
+            <div class="dish-info">
+              <div class="dish-name">Taro milk tea</div>
+              <div class="dish-meta">Ordered 8 times · Less sweet · Light ice</div>
+              <div class="dish-stars">
+                <div class="star-filled"></div><div class="star-filled"></div><div class="star-filled"></div><div class="star-filled"></div><div class="star-filled"></div>
+              </div>
+            </div>
+          </div>
+          <div class="dish-row">
+            <div class="dish-photo"><div class="dish-photo-inner"></div></div>
+            <div class="dish-info">
+              <div class="dish-name">Brown sugar boba</div>
+              <div class="dish-meta">Ordered 4 times · Regular sweet</div>
+              <div class="dish-stars">
+                <div class="star-filled"></div><div class="star-filled"></div><div class="star-filled"></div><div class="star-filled"></div><div class="star-empty"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <div class="action-btn action-primary">View on Maps</div>
+        <div class="action-btn action-secondary">Share this spot</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div>
+    <div class="phone-label">Screen 3 — Filtered + search active</div>
+    <div class="phone">
+      <div class="statusbar">
+        <span class="statusbar-time">9:41</span>
+        <div class="statusbar-icons">
+          <div class="sb-icon" style="width:20px;height:8px;border-radius:2px;"></div>
+        </div>
+      </div>
+
+      <div style="padding:12px 16px 8px;background:#FAFAF8;border-bottom:1.5px solid #1a1a18;">
+        <div style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#D85A30;font-weight:500;margin-bottom:2px;">Showing results for</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;line-height:1;color:#1a1a18;">Boba · Date night</div>
+        <div style="font-size:12px;color:#888780;margin-top:4px;">4 spots match · sorted by my rating</div>
+      </div>
+
+      <div style="padding:8px 16px;background:#FAFAF8;border-bottom:0.5px solid rgba(26,26,24,0.12);">
+        <div class="search-field" style="background:#F1EFE8;border-radius:8px;padding:8px 12px;font-size:13px;color:#D85A30;font-weight:500;">boba</div>
+      </div>
+
+      <div class="filters" style="border-bottom:0.5px solid rgba(26,26,24,0.12);">
+        <div class="filter-pill active">Boba ✕</div>
+        <div class="filter-pill active">Date night ✕</div>
+        <div class="filter-pill">Price <span class="chevron">▾</span></div>
+        <div class="filter-pill">Area <span class="chevron">▾</span></div>
+        <div style="flex-shrink:0;font-size:11px;font-weight:500;color:#D85A30;padding:5px 4px;white-space:nowrap;">Clear all</div>
+      </div>
+
+      <div class="cards">
+
+        <div class="card must-try">
+          <div class="card-top">
+            <div class="card-name">Omomo Tea Shoppe</div>
+            <div class="card-price">$</div>
+          </div>
+          <div class="card-meta">
+            <span class="tag-hood"><span class="tag-hood-dot"></span>Carmel Valley</span>
+            <span class="tag tag-open">Open now</span>
+            <span class="tag tag-recent" style="font-size:10px;padding:2px 7px;">This week</span>
+          </div>
+          <div class="card-ratings">
+            <div class="rating-item"><span class="rating-star">★</span><span class="rating-val">5/5</span><span class="rating-src">My pick</span></div>
+            <div class="rating-divider"></div>
+            <div class="rating-item"><span class="rating-star">★</span><span class="rating-val">4.7</span><span class="rating-src">Google</span></div>
+          </div>
+          <div class="card-dishes">
+            <span class="dish-tag">Taro milk tea</span>
+            <span class="dish-tag">Brown sugar boba</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <div class="card-name">Boba Bear</div>
+            <div class="card-price">$</div>
+          </div>
+          <div class="card-meta">
+            <span class="tag-hood"><span class="tag-hood-dot"></span>North Park</span>
+            <span class="tag tag-open">Open now</span>
+          </div>
+          <div class="card-ratings">
+            <div class="rating-item"><span class="rating-star">★</span><span class="rating-val">4/5</span><span class="rating-src">My pick</span></div>
+            <div class="rating-divider"></div>
+            <div class="rating-item"><span class="rating-star">★</span><span class="rating-val">4.4</span><span class="rating-src">Google</span></div>
+          </div>
+          <div class="card-dishes">
+            <span class="dish-tag">Honey milk tea</span>
+          </div>
+        </div>
+
+        <div style="padding:14px 16px;background:#F1EFE8;border-bottom:0.5px solid rgba(26,26,24,0.1);">
+          <div style="font-size:11px;font-weight:500;color:#888780;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.08em;">Feeling lucky?</div>
+          <div style="display:flex;gap:8px;">
+            <div class="surprise-btn" style="font-size:12px;">Surprise me from these 4 ✦</div>
+            <div style="font-size:12px;font-weight:500;padding:5px 12px;border-radius:20px;border:1.5px solid rgba(26,26,24,0.2);color:#5F5E5A;">Share list</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>

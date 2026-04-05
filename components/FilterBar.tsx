@@ -49,9 +49,9 @@ export default function FilterBar({
   searchQuery,
   onSearchChange,
 }: Props) {
-  const [activePanel, setActivePanel] = useState<"cuisine" | "area" | "price" | null>(
-    null,
-  );
+  const [activePanel, setActivePanel] = useState<
+    "cuisine" | "area" | "price" | null
+  >(null);
 
   const [isScrolled, setIsScrolled] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
@@ -79,74 +79,136 @@ export default function FilterBar({
   const hasAreaFilter = (activeNeighborhoods ?? []).length > 0;
   const hasPriceFilter = (activePrices ?? []).length > 0;
   const panelOpen = activePanel !== null;
+  const hasAnyFilter =
+    hasCuisineFilter || hasAreaFilter || hasPriceFilter || mustTryFilter;
+
+  function handleClearAll() {
+    onCuisineChange([]);
+    if (onNeighborhoodChange) onNeighborhoodChange([]);
+    if (onPriceChange) onPriceChange([]);
+    if (onMustTryFilterChange) onMustTryFilterChange(false);
+  }
+
+  function removeFilter(type: "cuisine" | "area" | "price", value: string) {
+    if (type === "cuisine") {
+      onCuisineChange(activeCuisines.filter((c) => c !== value));
+    } else if (type === "area" && onNeighborhoodChange) {
+      onNeighborhoodChange(
+        (activeNeighborhoods ?? []).filter((n) => n !== value),
+      );
+    } else if (type === "price" && onPriceChange) {
+      onPriceChange((activePrices ?? []).filter((p) => p !== value));
+    }
+  }
 
   return (
-      <div ref={barRef} className={`sticky top-0 z-10 bg-bg isolate transition-[border-color] duration-200 ${isScrolled ? "border-b-2 border-txt" : "border-b-2 border-transparent"}`}>
-        {/* Row 1: Search + View toggle + Add */}
-        <div className="flex gap-2 pt-3 pb-2 px-6 items-center flex-wrap">
-          {onSearchChange != null && (
-            <input
-              type="text"
-              value={searchQuery ?? ""}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search..."
-              className="input-base !py-1.5 !px-3.5 !rounded-none !text-sm flex-1 min-w-0 placeholder:text-txt2 placeholder:opacity-50"
-            />
-          )}
+    <div
+      ref={barRef}
+      className={`sticky top-0 z-10 bg-bg isolate transition-[border-color] duration-200 ${isScrolled ? "border-b-2 border-txt" : "border-b-2 border-transparent"}`}
+    >
+      {/* Row 1: Search + View toggle + Add */}
+      <div className="flex gap-2 pt-3 pb-2 px-6 items-center flex-wrap">
+        {onSearchChange != null && (
+          <input
+            type="text"
+            value={searchQuery ?? ""}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search..."
+            className="input-base !py-1.5 !px-3.5 !rounded-none !text-sm flex-1 min-w-0 placeholder:text-txt2 placeholder:opacity-50"
+          />
+        )}
 
-          {onViewModeChange && (
-            <div className="flex gap-1">
-              <button
-                className={viewMode === "list" ? "chip-active" : "chip"}
-                onClick={() => onViewModeChange("list")}
-              >
-                List
-              </button>
-              <button
-                className={viewMode === "map" ? "chip-active" : "chip"}
-                onClick={() => onViewModeChange("map")}
-              >
-                Map
-              </button>
-            </div>
-          )}
-
-          {onAdd && (
+        {onViewModeChange && (
+          <div className="flex gap-1">
             <button
-              onClick={onAdd}
-              className="btn-primary btn-pill !py-1.5 !px-[18px]"
+              className={viewMode === "list" ? "chip-active" : "chip"}
+              onClick={() => onViewModeChange("list")}
             >
-              + Add
+              List
             </button>
-          )}
-        </div>
+            <button
+              className={viewMode === "map" ? "chip-active" : "chip"}
+              onClick={() => onViewModeChange("map")}
+            >
+              Map
+            </button>
+          </div>
+        )}
 
-        {/* Row 2: Filter buttons */}
-        <div className="flex gap-2 pb-3 px-6 items-center flex-wrap">
-          {/* Cuisine toggle */}
+        {onAdd && (
           <button
-            className={`chip flex items-center gap-1.5 ${hasCuisineFilter || activePanel === "cuisine" ? "!border-txt !bg-txt !text-bg" : ""}`}
+            onClick={onAdd}
+            className="btn-primary btn-pill !py-1.5 !px-[18px]"
+          >
+            + Add
+          </button>
+        )}
+      </div>
+
+      {/* Row 2: Filter buttons and active filter pills */}
+      <div className="flex gap-2 pb-3 px-6 items-center flex-wrap">
+        {/* Active filter pills */}
+        {activeCuisines.map((cuisine) => (
+          <button
+            key={`active-cuisine-${cuisine}`}
+            onClick={() => removeFilter("cuisine", cuisine)}
+            className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
+          >
+            {cuisine}
+            <span className="text-xs">✕</span>
+          </button>
+        ))}
+        {(activeNeighborhoods ?? []).map((area) => (
+          <button
+            key={`active-area-${area}`}
+            onClick={() => removeFilter("area", area)}
+            className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
+          >
+            {area}
+            <span className="text-xs">✕</span>
+          </button>
+        ))}
+        {(activePrices ?? []).map((price) => (
+          <button
+            key={`active-price-${price}`}
+            onClick={() => removeFilter("price", price)}
+            className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
+          >
+            {price}
+            <span className="text-xs">✕</span>
+          </button>
+        ))}
+
+        {/* Filter dropdown buttons (only show if not active) */}
+        {/* Cuisine toggle - only show if no active cuisines */}
+        {!hasCuisineFilter && (
+          <button
+            className={`chip flex items-center gap-1.5 ${activePanel === "cuisine" ? "!border-txt !bg-txt !text-bg" : ""}`}
             onClick={() =>
               setActivePanel(activePanel === "cuisine" ? null : "cuisine")
             }
           >
-            {filterLabel(activeCuisines, "Cuisine")}
+            Cuisine
             <span
               className={`text-2xs transition-transform duration-[0.12s] ${activePanel === "cuisine" ? "rotate-180" : ""}`}
             >
               ▾
             </span>
           </button>
+        )}
 
-          {/* Area toggle */}
-          {neighborhoods && neighborhoods.length > 0 && onNeighborhoodChange && (
+        {/* Area toggle - only show if no active areas */}
+        {neighborhoods &&
+          neighborhoods.length > 0 &&
+          onNeighborhoodChange &&
+          !hasAreaFilter && (
             <button
-              className={`chip flex items-center gap-1.5 ${hasAreaFilter || activePanel === "area" ? "!border-txt !bg-txt !text-bg" : ""}`}
+              className={`chip flex items-center gap-1.5 ${activePanel === "area" ? "!border-txt !bg-txt !text-bg" : ""}`}
               onClick={() =>
                 setActivePanel(activePanel === "area" ? null : "area")
               }
             >
-              {filterLabel(activeNeighborhoods ?? [], "Area")}
+              Area
               <span
                 className={`text-2xs transition-transform duration-[0.12s] ${activePanel === "area" ? "rotate-180" : ""}`}
               >
@@ -155,149 +217,165 @@ export default function FilterBar({
             </button>
           )}
 
-          {/* Price toggle */}
-          {onPriceChange && (
-            <button
-              className={`chip flex items-center gap-1.5 ${hasPriceFilter || activePanel === "price" ? "!border-txt !bg-txt !text-bg" : ""}`}
-              onClick={() =>
-                setActivePanel(activePanel === "price" ? null : "price")
-              }
+        {/* Price toggle - only show if no active prices */}
+        {onPriceChange && !hasPriceFilter && (
+          <button
+            className={`chip flex items-center gap-1.5 ${activePanel === "price" ? "!border-txt !bg-txt !text-bg" : ""}`}
+            onClick={() =>
+              setActivePanel(activePanel === "price" ? null : "price")
+            }
+          >
+            Price
+            <span
+              className={`text-2xs transition-transform duration-[0.12s] ${activePanel === "price" ? "rotate-180" : ""}`}
             >
-              {filterLabel(activePrices ?? [], "Price")}
-              <span
-                className={`text-2xs transition-transform duration-[0.12s] ${activePanel === "price" ? "rotate-180" : ""}`}
-              >
-                ▾
-              </span>
-            </button>
-          )}
-
-          {/* Must-Try */}
-          {onMustTryFilterChange && (
-            <button
-              className={
-                mustTryFilter
-                  ? "chip !border-accent !bg-accent !text-white"
-                  : "chip"
-              }
-              onClick={() => onMustTryFilterChange(!mustTryFilter)}
-            >
-              ★ Must-Try
-            </button>
-          )}
-        </div>
-
-        {/* Slide-down panel */}
-        <div
-          className="grid transition-[grid-template-rows] duration-200 ease-in-out bg-bg"
-          style={{ gridTemplateRows: panelOpen ? "1fr" : "0fr" }}
-        >
-        <div className="overflow-hidden">
-        <div className="py-3 px-6 max-h-[60vh] overflow-y-auto border-b-2 border-brd">
-          {/* Panel header */}
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="font-body text-xs font-medium text-txt2 uppercase tracking-wide">
-              {activePanel === "cuisine" ? "Cuisine" : activePanel === "area" ? "Area" : "Price"}
+              ▾
             </span>
-            <button
-              onClick={() => setActivePanel(null)}
-              className="btn-ghost !text-base text-txt2 hover:text-txt leading-none"
-            >
-              ✕
-            </button>
-          </div>
+          </button>
+        )}
 
-          {/* Cuisine chips */}
-          {activePanel === "cuisine" && (
-            <div className="flex gap-1.5 flex-wrap items-center">
+        {/* Must-Try */}
+        {onMustTryFilterChange && (
+          <button
+            className={
+              mustTryFilter
+                ? "chip !border-accent !bg-accent !text-white"
+                : "chip"
+            }
+            onClick={() => onMustTryFilterChange(!mustTryFilter)}
+          >
+            ★ Must-Try
+          </button>
+        )}
+
+        {/* Clear all link */}
+        {hasAnyFilter && (
+          <button
+            onClick={handleClearAll}
+            className="text-2xs font-medium text-accent bg-transparent border-none cursor-pointer px-1 py-0.5 transition-opacity duration-150 hover:opacity-70"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      {/* Slide-down panel */}
+      <div
+        className="grid transition-[grid-template-rows] duration-200 ease-in-out bg-bg"
+        style={{ gridTemplateRows: panelOpen ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden">
+          <div className="py-3 px-6 max-h-[60vh] overflow-y-auto border-b-2 border-brd">
+            {/* Panel header */}
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="font-body text-xs font-medium text-txt2 uppercase tracking-wide">
+                {activePanel === "cuisine"
+                  ? "Cuisine"
+                  : activePanel === "area"
+                    ? "Area"
+                    : "Price"}
+              </span>
               <button
-                className={!hasCuisineFilter ? "chip-active" : "chip"}
-                onClick={() => onCuisineChange([])}
+                onClick={() => setActivePanel(null)}
+                className="btn-ghost !text-base text-txt2 hover:text-txt leading-none"
               >
-                All
+                ✕
               </button>
-              {cuisines.map((c) => (
-                <button
-                  key={c}
-                  className={
-                    activeCuisines.includes(c) ? "chip-active" : "chip"
-                  }
-                  onClick={() =>
-                    onCuisineChange(toggleItem(activeCuisines, c))
-                  }
-                >
-                  {c}
-                </button>
-              ))}
             </div>
-          )}
 
-          {/* Area chips */}
-          {activePanel === "area" &&
-            neighborhoods &&
-            onNeighborhoodChange && (
+            {/* Cuisine chips */}
+            {activePanel === "cuisine" && (
               <div className="flex gap-1.5 flex-wrap items-center">
                 <button
-                  className={!hasAreaFilter ? "chip-active" : "chip"}
-                  onClick={() => onNeighborhoodChange([])}
+                  className={!hasCuisineFilter ? "chip-active" : "chip"}
+                  onClick={() => onCuisineChange([])}
                 >
                   All
                 </button>
-                {neighborhoods.map((n) => (
+                {cuisines.map((c) => (
                   <button
-                    key={n}
+                    key={c}
                     className={
-                      (activeNeighborhoods ?? []).includes(n)
-                        ? "chip-active"
-                        : "chip"
+                      activeCuisines.includes(c) ? "chip-active" : "chip"
                     }
                     onClick={() =>
-                      onNeighborhoodChange(
-                        toggleItem(activeNeighborhoods ?? [], n),
-                      )
+                      onCuisineChange(toggleItem(activeCuisines, c))
                     }
                   >
-                    {n}
+                    {c}
                   </button>
                 ))}
               </div>
             )}
 
-          {/* Price chips */}
-          {activePanel === "price" && onPriceChange && (
-            <div className="flex gap-1.5 flex-wrap items-center">
-              <button
-                className={!hasPriceFilter ? "chip-active" : "chip"}
-                onClick={() => onPriceChange([])}
-              >
-                All
-              </button>
-              {["$", "$$", "$$$", "$$$$"].map((p) => (
-                <button
-                  key={p}
-                  className={
-                    (activePrices ?? []).includes(p)
-                      ? "chip-active"
-                      : "chip"
-                  }
-                  onClick={() =>
-                    onPriceChange(toggleItem(activePrices ?? [], p))
-                  }
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        </div>
-        </div>
+            {/* Area chips */}
+            {activePanel === "area" &&
+              neighborhoods &&
+              onNeighborhoodChange && (
+                <div className="flex gap-1.5 flex-wrap items-center">
+                  <button
+                    className={!hasAreaFilter ? "chip-active" : "chip"}
+                    onClick={() => onNeighborhoodChange([])}
+                  >
+                    All
+                  </button>
+                  {neighborhoods.map((n) => (
+                    <button
+                      key={n}
+                      className={
+                        (activeNeighborhoods ?? []).includes(n)
+                          ? "chip-active"
+                          : "chip"
+                      }
+                      onClick={() =>
+                        onNeighborhoodChange(
+                          toggleItem(activeNeighborhoods ?? [], n),
+                        )
+                      }
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-        {/* Shadow — absolutely positioned so it's not clipped */}
-        <div
-          className="absolute left-0 right-0 bottom-0 h-6 pointer-events-none translate-y-full transition-opacity duration-200"
-          style={{ opacity: panelOpen ? 1 : 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.06), transparent)" }}
-        />
+            {/* Price chips */}
+            {activePanel === "price" && onPriceChange && (
+              <div className="flex gap-1.5 flex-wrap items-center">
+                <button
+                  className={!hasPriceFilter ? "chip-active" : "chip"}
+                  onClick={() => onPriceChange([])}
+                >
+                  All
+                </button>
+                {["$", "$$", "$$$", "$$$$"].map((p) => (
+                  <button
+                    key={p}
+                    className={
+                      (activePrices ?? []).includes(p) ? "chip-active" : "chip"
+                    }
+                    onClick={() =>
+                      onPriceChange(toggleItem(activePrices ?? [], p))
+                    }
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Shadow — absolutely positioned so it's not clipped */}
+      <div
+        className="absolute left-0 right-0 bottom-0 h-6 pointer-events-none translate-y-full transition-opacity duration-200"
+        style={{
+          opacity: panelOpen ? 1 : 0,
+          background:
+            "linear-gradient(to bottom, rgba(0,0,0,0.06), transparent)",
+        }}
+      />
+    </div>
   );
 }

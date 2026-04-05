@@ -15,9 +15,17 @@ export type Restaurant = {
   lat: number | null;
   lng: number | null;
   photo_url: string | null;
+  storefront_photo_url: string | null;
   must_try: boolean;
   date_added: string | null;
   last_visited: string | null;
+  google_rating: number | null;
+  google_review_count: number | null;
+  my_rating: number | null;
+  occasions: string[] | null;
+  is_open_now: boolean | null;
+  hours_text: string | null;
+  opening_hours: any | null;
 };
 
 export type RestaurantVisit = {
@@ -25,6 +33,15 @@ export type RestaurantVisit = {
   restaurant_id: number;
   visited_by: string;
   visited_at: string;
+};
+
+export type RatingHistory = {
+  id: number;
+  restaurant_id: number;
+  rating: number;
+  changed_by: string;
+  notes: string | null;
+  created_at: string;
 };
 
 export type MenuItem = {
