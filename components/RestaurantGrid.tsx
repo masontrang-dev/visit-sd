@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { type Restaurant, type RestaurantVisit } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import IllustrationEmpty from "@/components/IllustrationEmpty";
 
 type Props = {
   restaurants: Restaurant[];
@@ -15,6 +16,7 @@ type Props = {
   onMarkVisited?: (id: number, visitedBy: string) => Promise<void>;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
+  baseDelay?: number;
 };
 
 const CUISINE_COLORS = [
@@ -317,6 +319,7 @@ function InfiniteCardGrid({
   onMarkVisited,
   visitingId,
   visits,
+  baseDelay = 0,
 }: {
   restaurants: Restaurant[];
   cuisineColorMap: Record<string, string>;
@@ -325,6 +328,7 @@ function InfiniteCardGrid({
   onMarkVisited?: (id: number, visitedBy: string) => Promise<void>;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
+  baseDelay?: number;
 }) {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -359,7 +363,7 @@ function InfiniteCardGrid({
     <>
       <div className={gridClass}>
         {visible.map((r, i) => (
-          <FadeUpCard key={r.id} delay={(i % BATCH_SIZE) * 50}>
+          <FadeUpCard key={r.id} delay={(i % BATCH_SIZE) * 50 + baseDelay}>
             <Card
               r={r}
               cuisineColor={cuisineColorMap[r.cuisine || ""] || CUISINE_COLORS[0]}
@@ -395,6 +399,7 @@ export default function RestaurantGrid({
   onMarkVisited,
   visitingId,
   visits,
+  baseDelay,
 }: Props) {
   const cuisineColorMap = useMemo(
     () => buildCuisineColorMap(restaurants),
@@ -404,9 +409,7 @@ export default function RestaurantGrid({
   if (restaurants.length === 0) {
     return (
       <div className="py-16 px-6 text-center animate-fade-up">
-        <div className="text-[72px] leading-none text-brd mb-4 select-none" aria-hidden>
-          🍽
-        </div>
+        <IllustrationEmpty className="mx-auto mb-4" />
         <p className="font-display text-2xl text-txt mb-2">NO SPOTS FOUND</p>
         <p className="text-txt2 text-base max-w-[280px] mx-auto">
           {grouped
@@ -434,6 +437,7 @@ export default function RestaurantGrid({
         onMarkVisited={onMarkVisited}
         visitingId={visitingId}
         visits={visits}
+        baseDelay={baseDelay}
       />
     );
   }

@@ -41,14 +41,30 @@ export default function HomePage() {
   );
 }
 
-function StatPill({ value, label, duration = 800 }: { value: number; label: string; duration?: number }) {
-  const [display, setDisplay] = useState(value);
-  const prevRef = useRef(value);
+function StatPill({ value, label, duration = 800, countFromZero = false }: { value: number; label: string; duration?: number; countFromZero?: boolean }) {
+  const [display, setDisplay] = useState(countFromZero ? 0 : value);
+  const prevRef = useRef(countFromZero ? 0 : value);
   const initialRef = useRef(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (initialRef.current) {
       initialRef.current = false;
+      if (countFromZero && value > 0) {
+        timerRef.current = setTimeout(() => {
+          const start = performance.now();
+          function tick(now: number) {
+            const elapsed = now - start;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setDisplay(Math.round(value * eased));
+            if (progress < 1) requestAnimationFrame(tick);
+            else prevRef.current = value;
+          }
+          requestAnimationFrame(tick);
+        }, 600);
+        return;
+      }
       setDisplay(value);
       prevRef.current = value;
       return;
@@ -68,7 +84,9 @@ function StatPill({ value, label, duration = 800 }: { value: number; label: stri
       else prevRef.current = value;
     }
     requestAnimationFrame(tick);
-  }, [value, duration]);
+
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [value, duration, countFromZero]);
 
   return <>{`${display} ${label}`}</>;
 }
@@ -105,6 +123,7 @@ function HomeContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [isFirstVisit, setIsFirstVisit] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -155,6 +174,12 @@ function HomeContent() {
     }
     load();
     setMounted(true);
+
+    const visited = localStorage.getItem("visitsd-visited");
+    if (!visited) {
+      setIsFirstVisit(true);
+      localStorage.setItem("visitsd-visited", "1");
+    }
 
     // Fire-and-forget page view log with geolocation
     fetch("/api/log-view", {
@@ -237,10 +262,16 @@ function HomeContent() {
         <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
           Local Picks · San Diego
         </p>
-        <h1 className="font-display text-[clamp(56px,12vw,96px)] leading-[0.88] tracking-tight">
-          VISIT
-          <br />
-          <span className="text-accent">SD</span>
+        <h1 className="font-display text-[clamp(56px,12vw,96px)] leading-[0.88] tracking-tight scroll-parallax">
+          {isFirstVisit ? (
+            <span className="word-reveal">
+              <span style={{ animationDelay: "200ms" }}>VISIT</span>
+              <br />
+              <span className="text-accent" style={{ animationDelay: "500ms" }}>SD</span>
+            </span>
+          ) : (
+            <>VISIT<br /><span className="text-accent">SD</span></>
+          )}
         </h1>
         <p className="text-base text-txt2 mt-3 max-w-[280px]">
           Our go-to spots for visitors &amp; friends
@@ -258,7 +289,7 @@ function HomeContent() {
               className={`text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt text-txt ${mounted ? "animate-fade-up" : "opacity-0"}`}
               style={mounted ? { animationDelay: `${300 + i * 100}ms` } : undefined}
             >
-              <StatPill value={count} label={label} />
+              <StatPill value={count} label={label} countFromZero={isFirstVisit} />
             </span>
           ))}
         </div>
@@ -312,7 +343,7 @@ function HomeContent() {
             <MapView restaurants={filtered} allRestaurants={restaurants} />
           </div>
         ) : (
-          <RestaurantGrid restaurants={filtered} grouped={false} />
+          <RestaurantGrid restaurants={filtered} grouped={false} baseDelay={isFirstVisit ? 400 : 0} />
         )}
 
         <footer className="p-6 flex justify-end items-center gap-4">

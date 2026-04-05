@@ -10,6 +10,7 @@ import {
   type ItemOrder,
   type DrinkDetails,
 } from "@/lib/supabase";
+import IllustrationNoVisits from "@/components/IllustrationNoVisits";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/Toast";
 import AddModal from "@/components/AddModal";
@@ -480,7 +481,7 @@ export default function RestaurantDetailPage({ params }: Props) {
 
       {/* Notes Section */}
       {restaurant.note && (
-        <div className="p-6 border-b border-brd bg-bg2">
+        <div className="p-6 border-b border-brd bg-bg2 scroll-fade-in">
           <h2 className="font-display text-xl mb-3 tracking-tight">
             Notes
           </h2>
@@ -492,7 +493,7 @@ export default function RestaurantDetailPage({ params }: Props) {
 
       {/* Address */}
       {restaurant.address && (
-        <div className="p-6 border-b border-brd">
+        <div className="p-6 border-b border-brd scroll-fade-in">
           <h2 className="font-display text-xl mb-3 tracking-tight">
             Address
           </h2>
@@ -501,7 +502,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       )}
 
       {/* Metadata */}
-      <div className="p-6 border-b border-brd">
+      <div className="p-6 border-b border-brd scroll-fade-in">
         <h2 className="font-display text-xl mb-3 tracking-tight">
           Details
         </h2>
@@ -522,7 +523,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       </div>
 
       {/* Visit History */}
-      <div className="p-6 border-b border-brd">
+      <div className="p-6 border-b border-brd scroll-fade-in">
         <button
           onClick={() => setShowVisitHistory(!showVisitHistory)}
           className="w-full flex items-center justify-between bg-transparent border-none cursor-pointer p-0 mb-3 text-left"
@@ -563,7 +564,7 @@ export default function RestaurantDetailPage({ params }: Props) {
             </div>
             {visits.length === 0 ? (
               <div className="py-4 text-center">
-                <p className="text-2xl text-brd select-none mb-1" aria-hidden>📍</p>
+                <IllustrationNoVisits className="mx-auto mb-1" />
                 <p className="text-sm text-txt2">No visits recorded yet</p>
               </div>
             ) : (
@@ -593,7 +594,7 @@ export default function RestaurantDetailPage({ params }: Props) {
 
       {/* Usual Order — boba shops only */}
       {usualOrder && (
-        <div className="p-6 border-b border-brd bg-bg2">
+        <div className="p-6 border-b border-brd bg-bg2 scroll-fade-in">
           <h2 className="font-display text-xl mb-3 tracking-tight">
             Usual Order
           </h2>
@@ -626,7 +627,7 @@ export default function RestaurantDetailPage({ params }: Props) {
 
       {/* Menu Highlights */}
       {(highlightedItems.length > 0 || itemsWithOrders.length > 0) && (
-        <div className="p-6 border-b border-brd">
+        <div className="p-6 border-b border-brd scroll-fade-in">
           <h2 className="font-display text-xl mb-3 tracking-tight">
             Menu Highlights
           </h2>
@@ -713,7 +714,7 @@ export default function RestaurantDetailPage({ params }: Props) {
 
       {/* Order History */}
       {itemOrders.length > 0 && (
-        <div className="p-6 border-b border-brd">
+        <div className="p-6 border-b border-brd scroll-fade-in">
           <h2 className="font-display text-xl mb-3 tracking-tight">
             Order History
           </h2>

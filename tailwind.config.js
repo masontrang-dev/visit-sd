@@ -56,12 +56,22 @@ module.exports = {
           from: { opacity: "1", transform: "translateY(0)" },
           to: { opacity: "0", transform: "translateY(8px)" },
         },
+        "scroll-fade-in": {
+          from: { opacity: "0", transform: "translateY(20px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "word-reveal": {
+          from: { opacity: "0", transform: "translateY(0.3em)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.4s ease-out both",
         shimmer: "shimmer 1.5s ease-in-out infinite",
         "toast-in": "toast-in 0.25s ease-out both",
         "toast-out": "toast-out 0.2s ease-in both",
+        "scroll-fade-in": "scroll-fade-in 0.5s ease-out both",
+        "word-reveal": "word-reveal 0.4s cubic-bezier(0.22,1,0.36,1) both",
       },
     },
   },
