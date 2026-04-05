@@ -26,7 +26,7 @@ export default function MapView({ restaurants }: Props) {
   if (!apiKey) {
     return (
       <div className="py-12 px-6 text-center text-txt2">
-        <p className="text-[15px]">
+        <p className="text-base">
           Google Maps API key not configured. Add{" "}
           <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to your environment.
         </p>
@@ -70,7 +70,7 @@ export default function MapView({ restaurants }: Props) {
                   <p className="text-xs text-txt2">{selected.neighborhood}</p>
                 )}
                 {selected.must_try && (
-                  <span className="inline-block mt-1 text-[10px] font-medium px-2 py-0.5 rounded-pill bg-accent text-white">
+                  <span className="inline-block mt-1 text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white">
                     ★ Must-Try
                   </span>
                 )}

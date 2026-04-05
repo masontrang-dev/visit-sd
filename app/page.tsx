@@ -179,15 +179,15 @@ function HomeContent() {
           <AdminButton />
           <ThemeToggle />
         </div>
-        <p className="text-[11px] tracking-[0.15em] uppercase text-accent font-medium mb-1.5">
+        <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
           Local Picks · San Diego
         </p>
-        <h1 className="font-display text-[clamp(56px,12vw,96px)] leading-[0.88] tracking-[0.02em]">
+        <h1 className="font-display text-[clamp(56px,12vw,96px)] leading-[0.88] tracking-tight">
           VISIT
           <br />
           <span className="text-accent">SD</span>
         </h1>
-        <p className="text-[15px] text-txt2 mt-3 max-w-[280px]">
+        <p className="text-base text-txt2 mt-3 max-w-[280px]">
           Our go-to spots for visitors &amp; friends
         </p>
         <div className="flex gap-2.5 mt-4">
@@ -224,7 +224,7 @@ function HomeContent() {
       <div className="relative z-0">
       {isFiltered && !loading && (
         <div className="flex items-center justify-between py-2.5 px-6 border-b-2 border-txt">
-          <p className="text-[13px] text-txt2 font-body">
+          <p className="text-sm text-txt2 font-body">
             Showing{" "}
             <span className="font-medium text-txt">{filtered.length}</span> of{" "}
             <span className="font-medium text-txt">{restaurants.length}</span>{" "}
@@ -232,7 +232,7 @@ function HomeContent() {
           </p>
           <button
             onClick={handleClearAll}
-            className="font-body text-[12px] font-medium text-accent bg-transparent border-none cursor-pointer p-0 transition-opacity duration-[0.12s] hover:opacity-70"
+            className="font-body text-xs font-medium text-accent bg-transparent border-none cursor-pointer p-0 transition-opacity duration-[0.12s] hover:opacity-70"
           >
             Clear all
           </button>
@@ -248,18 +248,18 @@ function HomeContent() {
       )}
 
       <footer className="p-6 flex justify-end items-center gap-4">
-        <span className="text-[11px] font-medium text-txt2 opacity-50 tracking-[0.05em] font-body">
+        <span className="text-xs font-medium text-txt2 opacity-50 tracking-tight font-body">
           v{process.env.NEXT_PUBLIC_APP_VERSION}
         </span>
         <Link
           href="/privacy"
-          className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline"
+          className="text-2xs tracking-wide uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline"
         >
           Privacy
         </Link>
         <Link
           href="/admin"
-          className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline flex items-center gap-1"
+          className="text-2xs tracking-wide uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline flex items-center gap-1"
         >
           Admin <span className="text-[8px]">→</span>
         </Link>

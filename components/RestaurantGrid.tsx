@@ -61,7 +61,7 @@ function MarkVisitedButton({
         }
       }}
       disabled={visitingId === restaurantId}
-      className={`text-[13px] font-medium py-1.5 px-3 rounded-pill border-[1.5px] font-body h-[38px] flex items-center justify-center ${visitingId === restaurantId ? "cursor-default opacity-30 bg-transparent border-brd text-txt2" : "cursor-pointer bg-accent2 text-white border-accent2"}`}
+      className={`btn-base text-sm py-1.5 px-3 rounded-pill border-[1.5px] h-[38px] flex items-center justify-center ${visitingId === restaurantId ? "bg-transparent border-brd text-txt2" : "bg-accent2 text-white border-accent2"}`}
     >
       {visitingId === restaurantId ? "Marking..." : "✓ Mark as Visited"}
     </button>
@@ -123,11 +123,11 @@ function Card({
       <div className="p-4">
         {/* Name + price */}
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-display text-[24px] leading-none text-txt">
+          <h3 className="font-display text-xl leading-none text-txt">
             {r.name}
           </h3>
           <span
-            className="text-[11px] font-medium shrink-0 px-1.5 py-0.5 rounded-pill tracking-[0.03em]"
+            className="text-xs font-medium shrink-0 px-1.5 py-0.5 rounded-pill tracking-tight"
             style={{
               color: cuisineColor,
               backgroundColor: `color-mix(in srgb, ${cuisineColor} 10%, transparent)`,
@@ -141,7 +141,7 @@ function Card({
         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
           {r.cuisine && (
             <span
-              className="text-[10px] font-medium px-2 py-0.5 rounded-pill tracking-[0.05em] uppercase"
+              className="text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight uppercase"
               style={{
                 color: cuisineColor,
                 backgroundColor: `color-mix(in srgb, ${cuisineColor} 12%, transparent)`,
@@ -151,7 +151,7 @@ function Card({
             </span>
           )}
           {r.neighborhood && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-pill border-[1.5px] border-brd text-txt2 tracking-[0.05em] uppercase flex items-center gap-1">
+            <span className="text-2xs font-medium px-2 py-0.5 rounded-pill border-[1.5px] border-brd text-txt2 tracking-tight uppercase flex items-center gap-1">
               <span
                 className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
                 style={{ backgroundColor: cuisineColor }}
@@ -160,7 +160,7 @@ function Card({
             </span>
           )}
           {r.must_try && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-[0.05em] uppercase">
+            <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase">
               ★ Must-Try
             </span>
           )}
@@ -168,17 +168,17 @@ function Card({
 
         {/* Note (truncated) */}
         {r.note && (
-          <p className="mt-2 text-[13px] text-txt2 leading-relaxed border-t border-brd pt-2 italic line-clamp-2">
+          <p className="mt-2 text-sm text-txt2 leading-relaxed border-t border-brd pt-2 italic line-clamp-2">
             {r.note}
           </p>
         )}
 
         {/* Address + added by (smaller) */}
         {r.address && (
-          <p className="mt-1.5 text-[11px] text-txt2 opacity-70">{r.address}</p>
+          <p className="mt-1.5 text-xs text-txt2 opacity-70">{r.address}</p>
         )}
         {r.added_by && (
-          <p className="mt-1 text-[10px] text-txt2 opacity-50 tracking-[0.05em]">
+          <p className="mt-1 text-2xs text-txt2 opacity-50 tracking-tight">
             Added by {r.added_by}
           </p>
         )}
@@ -193,7 +193,7 @@ function Card({
                 window.open(r.google_maps_url, "_blank", "noopener,noreferrer");
               }
             }}
-            className="inline-block mt-2 text-[12px] font-medium py-1 px-2.5 rounded-pill border-[1.5px] border-accent2 bg-transparent text-accent2 cursor-pointer hover:bg-accent2 hover:text-white transition-colors duration-150"
+            className="inline-block mt-2 text-xs font-medium py-1 px-2.5 rounded-pill border-[1.5px] border-accent2 bg-transparent text-accent2 cursor-pointer hover:bg-accent2 hover:text-white transition-colors duration-150"
           >
             View on Maps ↗
           </button>
@@ -202,7 +202,7 @@ function Card({
         {/* Admin: visit history */}
         {isAdmin && visitCount > 0 && (
           <div className="mt-2 pt-2 border-t border-brd">
-            <p className="text-[11px] text-txt2 tracking-[0.05em]">
+            <p className="text-xs text-txt2 tracking-tight">
               Visited {visitCount} time{visitCount !== 1 ? "s" : ""}
               {r.last_visited && (
                 <span>, last on {formatDate(r.last_visited)}</span>
@@ -215,7 +215,7 @@ function Card({
                   e.stopPropagation();
                   setShowHistory(!showHistory);
                 }}
-                className="mt-1 text-[11px] text-accent2 font-medium bg-transparent border-none cursor-pointer p-0 tracking-[0.05em]"
+                className="mt-1 text-xs text-accent2 font-medium bg-transparent border-none cursor-pointer p-0 tracking-tight"
               >
                 {showHistory ? "Hide" : "Show"} history
               </button>
@@ -223,7 +223,7 @@ function Card({
             {showHistory && (
               <div className="mt-2 space-y-1">
                 {restaurantVisits.map((visit) => (
-                  <p key={visit.id} className="text-[11px] text-txt2">
+                  <p key={visit.id} className="text-xs text-txt2">
                     • {formatDate(visit.visited_at)} by {visit.visited_by}
                   </p>
                 ))}
@@ -247,7 +247,7 @@ function Card({
                   e.stopPropagation();
                   onOrder(r);
                 }}
-                className="text-[13px] font-medium py-1.5 px-3 rounded-pill border-[1.5px] bg-accent text-white border-accent font-body h-[38px] flex items-center justify-center"
+                className="text-sm font-medium py-1.5 px-3 rounded-pill border-[1.5px] bg-accent text-white border-accent font-body h-[38px] flex items-center justify-center"
               >
                 + Order
               </button>
@@ -343,7 +343,7 @@ function InfiniteCardGrid({
         <div ref={sentinelRef} className="py-6 text-center">
           <button
             onClick={loadMore}
-            className="font-body text-[13px] font-medium py-2 px-5 rounded-pill border-[1.5px] border-brd bg-transparent text-txt2 cursor-pointer hover:border-txt hover:text-txt transition-all duration-[0.12s]"
+            className="btn-outline btn-pill"
           >
             Show more ({restaurants.length - visibleCount} remaining)
           </button>
@@ -372,7 +372,7 @@ export default function RestaurantGrid({
     return (
       <div className="py-12 px-6 text-center">
         <p className="font-display text-5xl text-brd mb-3">NO SPOTS YET</p>
-        <p className="text-txt2 text-[15px]">
+        <p className="text-txt2 text-base">
           {grouped
             ? "Add your first recommendation"
             : "No spots in this category"}
@@ -418,10 +418,10 @@ export default function RestaurantGrid({
             <div
               className={`py-4 px-6 pb-2 ${i === 0 ? "" : "border-t-2 border-txt"}`}
             >
-              <span className="font-display text-[22px] tracking-[0.04em]">
+              <span className="font-display text-xl tracking-tight">
                 {cuisine}
               </span>
-              <span className="text-[13px] text-txt2 ml-2.5">
+              <span className="text-sm text-txt2 ml-2.5">
                 {byCuisine[cuisine].length} spot
                 {byCuisine[cuisine].length !== 1 ? "s" : ""}
               </span>

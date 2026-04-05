@@ -16,10 +16,26 @@ module.exports = {
         txt: "var(--txt)",
         txt2: "var(--txt2)",
         brd: "var(--brd)",
+        error: "var(--error)",
+        success: "var(--success)",
+        warning: "var(--warning)",
       },
       fontFamily: {
         display: ["var(--font-display)"],
         body: ["var(--font-body)"],
+      },
+      fontSize: {
+        "2xs": ["10px", { lineHeight: "1.4" }],
+        xs: ["11px", { lineHeight: "1.4" }],
+        sm: ["13px", { lineHeight: "1.5" }],
+        base: ["15px", { lineHeight: "1.5" }],
+        lg: ["18px", { lineHeight: "1.3" }],
+        xl: ["22px", { lineHeight: "1.2" }],
+        "2xl": ["32px", { lineHeight: "1.1" }],
+      },
+      letterSpacing: {
+        tight: "0.02em",
+        wide: "0.12em",
       },
       borderRadius: {
         pill: "20px",

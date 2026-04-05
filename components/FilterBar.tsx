@@ -19,14 +19,6 @@ type Props = {
   onSearchChange?: (q: string) => void;
 };
 
-const chipBase =
-  "font-body text-[13px] font-medium py-1.5 px-3.5 rounded-pill border-[1.5px] border-brd bg-transparent cursor-pointer text-txt2 transition-all duration-[0.12s] whitespace-nowrap";
-const chipActive =
-  "font-body text-[13px] font-medium py-1.5 px-3.5 rounded-pill border-[1.5px] border-txt bg-txt cursor-pointer text-bg transition-all duration-[0.12s] whitespace-nowrap";
-
-const toggleBtn =
-  "font-body text-[13px] font-medium py-1.5 px-3.5 rounded-pill border-[1.5px] cursor-pointer transition-all duration-[0.12s] whitespace-nowrap flex items-center gap-1.5";
-
 function toggleItem(arr: string[], item: string): string[] {
   return arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item];
 }
@@ -90,20 +82,20 @@ export default function FilterBar({
               value={searchQuery ?? ""}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search..."
-              className="font-body text-[13px] py-1.5 px-3.5 border-[1.5px] border-brd bg-transparent text-txt rounded-none placeholder:text-txt2 placeholder:opacity-50 focus:border-accent focus:outline-none transition-[border-color] duration-[0.12s] flex-1 min-w-0"
+              className="input-base !py-1.5 !px-3.5 !rounded-none !text-sm flex-1 min-w-0 placeholder:text-txt2 placeholder:opacity-50"
             />
           )}
 
           {onViewModeChange && (
             <div className="flex gap-1">
               <button
-                className={viewMode === "list" ? chipActive : chipBase}
+                className={viewMode === "list" ? "chip-active" : "chip"}
                 onClick={() => onViewModeChange("list")}
               >
                 List
               </button>
               <button
-                className={viewMode === "map" ? chipActive : chipBase}
+                className={viewMode === "map" ? "chip-active" : "chip"}
                 onClick={() => onViewModeChange("map")}
               >
                 Map
@@ -114,7 +106,7 @@ export default function FilterBar({
           {onAdd && (
             <button
               onClick={onAdd}
-              className="font-body text-[13px] font-medium py-1.5 px-[18px] rounded-pill border-none bg-accent text-white cursor-pointer"
+              className="btn-primary btn-pill !py-1.5 !px-[18px]"
             >
               + Add
             </button>
@@ -125,14 +117,14 @@ export default function FilterBar({
         <div className="flex gap-2 pb-3 px-6 items-center flex-wrap">
           {/* Cuisine toggle */}
           <button
-            className={`${toggleBtn} ${hasCuisineFilter || activePanel === "cuisine" ? "border-txt bg-txt text-bg" : "border-brd bg-transparent text-txt2"}`}
+            className={`chip flex items-center gap-1.5 ${hasCuisineFilter || activePanel === "cuisine" ? "!border-txt !bg-txt !text-bg" : ""}`}
             onClick={() =>
               setActivePanel(activePanel === "cuisine" ? null : "cuisine")
             }
           >
             {filterLabel(activeCuisines, "Cuisine")}
             <span
-              className={`text-[10px] transition-transform duration-[0.12s] ${activePanel === "cuisine" ? "rotate-180" : ""}`}
+              className={`text-2xs transition-transform duration-[0.12s] ${activePanel === "cuisine" ? "rotate-180" : ""}`}
             >
               ▾
             </span>
@@ -141,14 +133,14 @@ export default function FilterBar({
           {/* Area toggle */}
           {neighborhoods && neighborhoods.length > 0 && onNeighborhoodChange && (
             <button
-              className={`${toggleBtn} ${hasAreaFilter || activePanel === "area" ? "border-txt bg-txt text-bg" : "border-brd bg-transparent text-txt2"}`}
+              className={`chip flex items-center gap-1.5 ${hasAreaFilter || activePanel === "area" ? "!border-txt !bg-txt !text-bg" : ""}`}
               onClick={() =>
                 setActivePanel(activePanel === "area" ? null : "area")
               }
             >
               {filterLabel(activeNeighborhoods ?? [], "Area")}
               <span
-                className={`text-[10px] transition-transform duration-[0.12s] ${activePanel === "area" ? "rotate-180" : ""}`}
+                className={`text-2xs transition-transform duration-[0.12s] ${activePanel === "area" ? "rotate-180" : ""}`}
               >
                 ▾
               </span>
@@ -160,8 +152,8 @@ export default function FilterBar({
             <button
               className={
                 mustTryFilter
-                  ? "font-body text-[13px] font-medium py-1.5 px-3.5 rounded-pill border-[1.5px] border-accent bg-accent cursor-pointer text-white transition-all duration-[0.12s] whitespace-nowrap"
-                  : chipBase
+                  ? "chip !border-accent !bg-accent !text-white"
+                  : "chip"
               }
               onClick={() => onMustTryFilterChange(!mustTryFilter)}
             >
@@ -179,12 +171,12 @@ export default function FilterBar({
         <div className="py-3 px-6 max-h-[60vh] overflow-y-auto border-b-2 border-brd">
           {/* Panel header */}
           <div className="flex items-center justify-between mb-2.5">
-            <span className="font-body text-[12px] font-medium text-txt2 uppercase tracking-[0.08em]">
+            <span className="font-body text-xs font-medium text-txt2 uppercase tracking-wide">
               {activePanel === "cuisine" ? "Cuisine" : "Area"}
             </span>
             <button
               onClick={() => setActivePanel(null)}
-              className="font-body text-[16px] text-txt2 hover:text-txt bg-transparent border-none cursor-pointer p-0 leading-none transition-colors duration-[0.12s]"
+              className="btn-ghost !text-base text-txt2 hover:text-txt leading-none"
             >
               ✕
             </button>
@@ -194,7 +186,7 @@ export default function FilterBar({
           {activePanel === "cuisine" && (
             <div className="flex gap-1.5 flex-wrap items-center">
               <button
-                className={!hasCuisineFilter ? chipActive : chipBase}
+                className={!hasCuisineFilter ? "chip-active" : "chip"}
                 onClick={() => onCuisineChange([])}
               >
                 All
@@ -203,7 +195,7 @@ export default function FilterBar({
                 <button
                   key={c}
                   className={
-                    activeCuisines.includes(c) ? chipActive : chipBase
+                    activeCuisines.includes(c) ? "chip-active" : "chip"
                   }
                   onClick={() =>
                     onCuisineChange(toggleItem(activeCuisines, c))
@@ -221,7 +213,7 @@ export default function FilterBar({
             onNeighborhoodChange && (
               <div className="flex gap-1.5 flex-wrap items-center">
                 <button
-                  className={!hasAreaFilter ? chipActive : chipBase}
+                  className={!hasAreaFilter ? "chip-active" : "chip"}
                   onClick={() => onNeighborhoodChange([])}
                 >
                   All
@@ -231,8 +223,8 @@ export default function FilterBar({
                     key={n}
                     className={
                       (activeNeighborhoods ?? []).includes(n)
-                        ? chipActive
-                        : chipBase
+                        ? "chip-active"
+                        : "chip"
                     }
                     onClick={() =>
                       onNeighborhoodChange(

@@ -285,9 +285,9 @@ export default function AdminPage() {
               setPwError(false);
             }}
             onKeyDown={(e) => e.key === "Enter" && checkPassword()}
-            className={`w-full py-2.5 px-3.5 text-[15px] border-[1.5px] ${
-              pwError ? "border-accent" : "border-brd"
-            } bg-bg text-txt rounded-none outline-none font-body mb-2`}
+            className={`input-base mb-2 ${
+              pwError ? "!border-error" : ""
+            }`}
           />
           <input
             type="password"
@@ -298,18 +298,18 @@ export default function AdminPage() {
               setPwError(false);
             }}
             onKeyDown={(e) => e.key === "Enter" && checkPassword()}
-            className={`w-full py-2.5 px-3.5 text-[15px] border-[1.5px] ${
-              pwError ? "border-accent" : "border-brd"
-            } bg-bg text-txt rounded-none outline-none font-body mb-2`}
+            className={`input-base mb-2 ${
+              pwError ? "!border-error" : ""
+            }`}
           />
           {pwError && (
-            <p className="text-accent text-[13px] mb-3">
+            <p className="text-error text-sm mb-3">
               Invalid username or password
             </p>
           )}
           <button
             onClick={checkPassword}
-            className="w-full p-2.5 bg-txt text-bg border-none text-sm font-medium cursor-pointer font-body rounded-none"
+            className="btn-secondary w-full"
           >
             Sign in
           </button>
@@ -325,7 +325,7 @@ export default function AdminPage() {
           <AdminButton />
           <ThemeToggle />
         </div>
-        <p className="text-[11px] tracking-[0.15em] uppercase text-accent font-medium mb-1.5">
+        <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
           Admin · San Diego
         </p>
         <h1 className="font-display text-[clamp(48px,10vw,80px)] leading-[0.88]">
@@ -357,7 +357,7 @@ export default function AdminPage() {
       />
 
       {opError && (
-        <p className="py-3 px-6 text-accent text-[13px]">{opError}</p>
+        <p className="py-3 px-6 text-error text-sm">{opError}</p>
       )}
 
       {loading ? (
@@ -388,7 +388,7 @@ export default function AdminPage() {
             setShowStats(!showStats);
             if (!showStats) loadStats();
           }}
-          className="font-display text-[22px] bg-none border-none cursor-pointer text-txt p-0 tracking-[0.04em]"
+          className="font-display text-xl bg-none border-none cursor-pointer text-txt p-0 tracking-tight"
         >
           {showStats ? "▾ STATS" : "▸ STATS"}
         </button>
@@ -401,13 +401,13 @@ export default function AdminPage() {
               <>
                 <div className="flex gap-4 mb-6 flex-wrap">
                   <div className="p-4 pr-5 border-[1.5px] border-brd min-w-[140px]">
-                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1">
+                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1">
                       Total views
                     </p>
                     <p className="font-display text-4xl">{totalViews}</p>
                   </div>
                   <div className="p-4 pr-5 border-[1.5px] border-brd min-w-[140px]">
-                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1">
+                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1">
                       Today
                     </p>
                     <p className="font-display text-4xl">
@@ -420,10 +420,10 @@ export default function AdminPage() {
                     </p>
                   </div>
                   <div className="p-4 pr-5 border-[1.5px] border-brd min-w-[200px]">
-                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1">
+                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1">
                       Cleanup last run
                     </p>
-                    <p className="text-[13px] text-txt">
+                    <p className="text-sm text-txt">
                       {lastCleanup
                         ? new Date(lastCleanup).toLocaleString("en-US", {
                             month: "short",
@@ -439,7 +439,7 @@ export default function AdminPage() {
                     href="/admin/boba"
                     className="p-4 pr-5 border-[1.5px] border-brd min-w-[140px] no-underline block hover:bg-bg2 transition-colors duration-[0.12s]"
                   >
-                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1">
+                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1">
                       🧋 Boba Analytics
                     </p>
                     <p className="font-display text-2xl text-accent">View</p>
@@ -449,7 +449,7 @@ export default function AdminPage() {
                 {/* Views per day bar chart */}
                 {viewsByDay.length > 0 && (
                   <div className="mb-6">
-                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-2">
+                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-2">
                       Views per day (last 30 days)
                     </p>
                     <div className="flex items-end gap-0.5 h-20 border-b border-brd pb-1">
@@ -472,13 +472,13 @@ export default function AdminPage() {
                 {/* Top referrers */}
                 {topReferrers.length > 0 && (
                   <div className="mb-6">
-                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-2">
+                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-2">
                       Top referrers
                     </p>
                     {topReferrers.map((ref) => (
                       <div
                         key={ref.referrer}
-                        className="flex justify-between py-1.5 border-b border-brd text-[13px]"
+                        className="flex justify-between py-1.5 border-b border-brd text-sm"
                       >
                         <span className="text-txt2 overflow-hidden text-ellipsis whitespace-nowrap max-w-[80%]">
                           {ref.referrer}
@@ -492,13 +492,13 @@ export default function AdminPage() {
                 {/* Geographic distribution */}
                 {geoData.length > 0 && (
                   <div className="mb-6">
-                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-2">
+                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-2">
                       Geographic distribution
                     </p>
                     {geoData.map((geo) => (
                       <div
                         key={geo.location}
-                        className="flex justify-between py-1.5 border-b border-brd text-[13px]"
+                        className="flex justify-between py-1.5 border-b border-brd text-sm"
                       >
                         <span className="text-txt2 overflow-hidden text-ellipsis whitespace-nowrap max-w-[80%]">
                           {geo.location}
@@ -512,7 +512,7 @@ export default function AdminPage() {
                 {/* Device breakdown */}
                 {deviceData.length > 0 && (
                   <div className="mb-6">
-                    <p className="text-[10px] tracking-[0.1em] uppercase font-medium text-txt2 mb-2">
+                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-2">
                       Device type breakdown
                     </p>
                     <div className="flex gap-4 flex-wrap">
@@ -521,7 +521,7 @@ export default function AdminPage() {
                           key={device.device}
                           className="p-3 border-[1.5px] border-brd min-w-[100px]"
                         >
-                          <p className="text-[11px] text-txt2 mb-1 capitalize">
+                          <p className="text-xs text-txt2 mb-1 capitalize">
                             {device.device}
                           </p>
                           <p className="font-display text-2xl">
@@ -544,7 +544,7 @@ export default function AdminPage() {
       </section>
 
       <footer className="p-6 flex justify-end">
-        <span className="text-[11px] font-medium text-txt2 opacity-50 tracking-[0.05em] font-body">
+        <span className="text-xs font-medium text-txt2 opacity-50 tracking-tight font-body">
           v{process.env.NEXT_PUBLIC_APP_VERSION}
         </span>
       </footer>

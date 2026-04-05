@@ -52,11 +52,8 @@ const BOBA_TEMPS = ["Hot", "Warm", "Iced"];
 const CAFE_TEMPS = ["Hot", "Iced"];
 const MILK_TYPES = ["Whole", "Oat", "Almond", "Soy", "Coconut", "None"];
 
-const inputCls =
-  "w-full py-2 px-3 text-[15px] border-[1.5px] border-brd bg-bg text-txt rounded-none outline-none font-body transition-[border-color] duration-[0.12s] focus:border-accent";
-
 const labelCls =
-  "block text-[11px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1";
+  "block text-xs tracking-wide uppercase font-medium text-txt2 mb-1";
 
 export default function OrderModal({
   restaurantId,
@@ -366,8 +363,8 @@ export default function OrderModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
       className="fixed inset-0 bg-black/55 z-[100] flex items-center justify-center p-4"
     >
-      <div className="bg-bg border-2 border-txt p-7 w-full max-w-[480px] max-h-[90vh] overflow-y-auto">
-        <p className="font-display text-4xl mb-5">
+      <div className="bg-bg border-2 border-txt p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto">
+        <p className="font-display text-2xl mb-5">
           {success
             ? isEditing
               ? "Order updated!"
@@ -426,7 +423,7 @@ export default function OrderModal({
               }
             }}
             placeholder="Search or type a new item..."
-            className={inputCls}
+            className="input-base"
             autoComplete="off"
           />
           {showDropdown && (filteredItems.length > 0 || showCreateNew) && (
@@ -452,7 +449,7 @@ export default function OrderModal({
                   >
                     <span>{item.name}</span>
                     {item.category && (
-                      <span className="ml-2 text-[11px] text-txt2">
+                      <span className="ml-2 text-xs text-txt2">
                         {item.category}
                       </span>
                     )}
@@ -471,7 +468,7 @@ export default function OrderModal({
               <button
                 key={c}
                 onClick={() => setSelectedCategory(c)}
-                className={`flex-1 p-2 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] capitalize ${
+                className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] capitalize ${
                   selectedCategory === c
                     ? "bg-txt text-bg border-txt"
                     : "bg-transparent text-txt2 border-brd"
@@ -491,7 +488,7 @@ export default function OrderModal({
               <button
                 key={star}
                 onClick={() => setRating(rating === star ? null : star)}
-                className={`text-[24px] bg-transparent border-none cursor-pointer p-1 transition-colors duration-[0.12s] ${
+                className={`text-xl bg-transparent border-none cursor-pointer p-1 transition-colors duration-[0.12s] ${
                   rating !== null && star <= rating ? "text-accent" : "text-brd"
                 }`}
               >
@@ -499,7 +496,7 @@ export default function OrderModal({
               </button>
             ))}
             {rating && (
-              <span className="text-[13px] text-txt2 self-center ml-2">
+              <span className="text-sm text-txt2 self-center ml-2">
                 {rating}/5
               </span>
             )}
@@ -513,7 +510,7 @@ export default function OrderModal({
             type="date"
             value={orderedAt}
             onChange={(e) => setOrderedAt(e.target.value)}
-            className={inputCls}
+            className="input-base"
           />
         </div>
 
@@ -532,7 +529,7 @@ export default function OrderModal({
                         : "descriptive",
                     )
                   }
-                  className="text-[11px] text-accent2 bg-transparent border-none cursor-pointer font-body"
+                  className="text-xs text-accent2 bg-transparent border-none cursor-pointer font-body"
                 >
                   {sweetnessStyle === "descriptive"
                     ? "Switch to %"
@@ -545,7 +542,7 @@ export default function OrderModal({
                     <button
                       key={d.label}
                       onClick={() => setSweetnessValue(d.value)}
-                      className={`py-1.5 px-3 text-[12px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
+                      className={`py-1.5 px-3 text-xs font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
                         sweetnessValue === d.value
                           ? "bg-txt text-bg border-txt"
                           : "bg-transparent text-txt2 border-brd"
@@ -568,7 +565,7 @@ export default function OrderModal({
                     }
                     className="flex-1 accent-accent"
                   />
-                  <span className="text-[13px] font-medium text-txt min-w-[40px] text-right">
+                  <span className="text-sm font-medium text-txt min-w-[40px] text-right">
                     {sweetnessValue}%
                   </span>
                 </div>
@@ -585,7 +582,7 @@ export default function OrderModal({
                       iceStyle === "descriptive" ? "percentage" : "descriptive",
                     )
                   }
-                  className="text-[11px] text-accent2 bg-transparent border-none cursor-pointer font-body"
+                  className="text-xs text-accent2 bg-transparent border-none cursor-pointer font-body"
                 >
                   {iceStyle === "descriptive"
                     ? "Switch to %"
@@ -598,7 +595,7 @@ export default function OrderModal({
                     <button
                       key={d.label}
                       onClick={() => setIceValue(d.value)}
-                      className={`py-1.5 px-3 text-[12px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
+                      className={`py-1.5 px-3 text-xs font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
                         iceValue === d.value
                           ? "bg-txt text-bg border-txt"
                           : "bg-transparent text-txt2 border-brd"
@@ -621,7 +618,7 @@ export default function OrderModal({
                     }
                     className="flex-1 accent-accent"
                   />
-                  <span className="text-[13px] font-medium text-txt min-w-[40px] text-right">
+                  <span className="text-sm font-medium text-txt min-w-[40px] text-right">
                     {iceValue}%
                   </span>
                 </div>
@@ -636,7 +633,7 @@ export default function OrderModal({
                   <button
                     key={t}
                     onClick={() => toggleTopping(t)}
-                    className={`py-1.5 px-3 text-[12px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
+                    className={`py-1.5 px-3 text-xs font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
                       toppings.includes(t)
                         ? "bg-accent2 text-white border-accent2"
                         : "bg-transparent text-txt2 border-brd"
@@ -652,7 +649,7 @@ export default function OrderModal({
                     <button
                       key={t}
                       onClick={() => toggleTopping(t)}
-                      className="py-1.5 px-3 text-[12px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill bg-accent2 text-white border-accent2"
+                      className="py-1.5 px-3 text-xs font-medium border-[1.5px] cursor-pointer font-body rounded-pill bg-accent2 text-white border-accent2"
                     >
                       {t} ✕
                     </button>
@@ -669,12 +666,12 @@ export default function OrderModal({
                     }
                   }}
                   placeholder="Add custom topping..."
-                  className={inputCls + " flex-1"}
+                  className="input-base flex-1"
                 />
                 <button
                   onClick={addCustomTopping}
                   disabled={!customTopping.trim()}
-                  className="py-2 px-4 text-[13px] font-medium border-[1.5px] border-brd cursor-pointer font-body rounded-none bg-transparent text-txt2 disabled:opacity-30"
+                  className="btn-outline"
                 >
                   Add
                 </button>
@@ -692,7 +689,7 @@ export default function OrderModal({
                 <button
                   key={s}
                   onClick={() => setSize(size === s ? null : s)}
-                  className={`flex-1 p-2 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                  className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
                     size === s
                       ? "bg-txt text-bg border-txt"
                       : "bg-transparent text-txt2 border-brd"
@@ -714,7 +711,7 @@ export default function OrderModal({
                 <button
                   key={t}
                   onClick={() => setTemperature(temperature === t ? null : t)}
-                  className={`flex-1 p-2 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                  className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
                     temperature === t
                       ? "bg-txt text-bg border-txt"
                       : "bg-transparent text-txt2 border-brd"
@@ -736,7 +733,7 @@ export default function OrderModal({
                 <button
                   key={m}
                   onClick={() => setMilkType(milkType === m ? null : m)}
-                  className={`py-1.5 px-3 text-[12px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
+                  className={`py-1.5 px-3 text-xs font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
                     milkType === m
                       ? "bg-txt text-bg border-txt"
                       : "bg-transparent text-txt2 border-brd"
@@ -758,7 +755,7 @@ export default function OrderModal({
                 <button
                   key={s}
                   onClick={() => setShots(shots === s ? null : s)}
-                  className={`w-10 h-10 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                  className={`w-10 h-10 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
                     shots === s
                       ? "bg-txt text-bg border-txt"
                       : "bg-transparent text-txt2 border-brd"
@@ -789,7 +786,7 @@ export default function OrderModal({
             />
             <div className="flex items-center gap-2">
               <div className="flex-1 h-px bg-brd" />
-              <span className="text-xs text-txt2 uppercase tracking-wider">
+              <span className="text-xs text-txt2 uppercase tracking-wide">
                 or
               </span>
               <div className="flex-1 h-px bg-brd" />
@@ -801,7 +798,7 @@ export default function OrderModal({
                 setPhotoFile(null);
               }}
               placeholder="Paste image URL"
-              className={inputCls}
+              className="input-base"
               disabled={!!photoFile}
             />
           </div>
@@ -825,21 +822,17 @@ export default function OrderModal({
             onChange={(e) => setNotes(e.target.value)}
             placeholder="How was it? What stood out?"
             rows={3}
-            className={`${inputCls} resize-y leading-relaxed`}
+            className="input-base resize-y leading-relaxed"
           />
         </div>
 
-        {error && <p className="text-accent text-[13px] mb-2">{error}</p>}
+        {error && <p className="text-error text-sm mb-2">{error}</p>}
 
         <div className="flex gap-2 mt-6">
           <button
             onClick={handleSave}
             disabled={saving || success || !menuSearch.trim()}
-            className={`flex-1 p-2.5 bg-accent text-white border-none text-sm font-medium font-body rounded-none ${
-              saving || success || !menuSearch.trim()
-                ? "cursor-default opacity-60"
-                : "cursor-pointer opacity-100"
-            }`}
+            className="btn-primary flex-1"
           >
             {uploading
               ? "Uploading photo..."
@@ -853,7 +846,7 @@ export default function OrderModal({
           </button>
           <button
             onClick={onClose}
-            className="py-2.5 px-[18px] bg-transparent text-txt2 border-[1.5px] border-brd text-sm cursor-pointer font-body rounded-none"
+            className="btn-outline"
           >
             Cancel
           </button>

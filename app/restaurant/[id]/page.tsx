@@ -362,7 +362,7 @@ export default function RestaurantDetailPage({ params }: Props) {
   if (error || !restaurant) {
     return (
       <main className="min-h-screen p-6">
-        <p className="text-accent mb-4">{error || "Restaurant not found"}</p>
+        <p className="text-error mb-4">{error || "Restaurant not found"}</p>
         <Link
           href={isAdmin ? "/admin" : "/"}
           className="text-accent2 font-medium text-sm no-underline"
@@ -379,7 +379,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       <div className="p-6 pb-4 border-b border-brd">
         <Link
           href={isAdmin ? "/admin" : "/"}
-          className="text-[11px] tracking-[0.12em] uppercase font-medium text-accent2 no-underline"
+          className="text-xs tracking-wide uppercase font-medium text-accent2 no-underline"
         >
           ← Back to list
         </Link>
@@ -400,23 +400,23 @@ export default function RestaurantDetailPage({ params }: Props) {
         )}
         <div className="p-6">
           <div className="flex items-center gap-2 mb-2">
-            <p className="text-[11px] tracking-[0.12em] uppercase font-medium text-accent">
+            <p className="text-xs tracking-wide uppercase font-medium text-accent">
               {restaurant.cuisine}
             </p>
             {restaurant.must_try && (
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-[0.05em] uppercase">
+              <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase">
                 ★ Must-Try
               </span>
             )}
           </div>
-          <h1 className="font-display text-[clamp(48px,8vw,72px)] leading-[0.9] tracking-[0.02em] mb-3">
+          <h1 className="font-display text-[clamp(48px,8vw,72px)] leading-[0.9] tracking-tight mb-3">
             {restaurant.name}
           </h1>
-          <p className="text-[15px] text-txt2 flex items-center gap-2 mb-2">
+          <p className="text-base text-txt2 flex items-center gap-2 mb-2">
             <span className="inline-block w-2 h-2 rounded-full bg-accent2 shrink-0" />
             {restaurant.neighborhood}
           </p>
-          <p className="text-[15px] font-medium text-txt2 mb-4">
+          <p className="text-base font-medium text-txt2 mb-4">
             {restaurant.price}
           </p>
           <div className="flex gap-2 flex-wrap items-center">
@@ -425,7 +425,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                 href={restaurant.google_maps_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block text-[14px] font-medium py-2 px-4 rounded-pill border-[1.5px] border-accent2 text-accent2 no-underline transition-all duration-100 hover:bg-accent2 hover:text-white"
+                className="inline-block text-sm font-medium py-2 px-4 rounded-pill border-[1.5px] border-accent2 text-accent2 no-underline transition-all duration-100 hover:bg-accent2 hover:text-white"
               >
                 View on Google Maps ↗
               </a>
@@ -437,10 +437,10 @@ export default function RestaurantDetailPage({ params }: Props) {
       {/* Notes Section */}
       {restaurant.note && (
         <div className="p-6 border-b border-brd bg-bg2">
-          <h2 className="font-display text-[22px] mb-3 tracking-[0.04em]">
+          <h2 className="font-display text-xl mb-3 tracking-tight">
             Notes
           </h2>
-          <p className="text-[15px] text-txt leading-relaxed italic border-l-[3px] border-accent pl-4">
+          <p className="text-base text-txt leading-relaxed italic border-l-[3px] border-accent pl-4">
             {restaurant.note}
           </p>
         </div>
@@ -449,27 +449,27 @@ export default function RestaurantDetailPage({ params }: Props) {
       {/* Address */}
       {restaurant.address && (
         <div className="p-6 border-b border-brd">
-          <h2 className="font-display text-[22px] mb-3 tracking-[0.04em]">
+          <h2 className="font-display text-xl mb-3 tracking-tight">
             Address
           </h2>
-          <p className="text-[14px] text-txt2">{restaurant.address}</p>
+          <p className="text-sm text-txt2">{restaurant.address}</p>
         </div>
       )}
 
       {/* Metadata */}
       <div className="p-6 border-b border-brd">
-        <h2 className="font-display text-[22px] mb-3 tracking-[0.04em]">
+        <h2 className="font-display text-xl mb-3 tracking-tight">
           Details
         </h2>
         <div className="space-y-2">
           {restaurant.added_by && (
-            <p className="text-[13px] text-txt2">
+            <p className="text-sm text-txt2">
               <span className="font-medium">Added by:</span>{" "}
               {restaurant.added_by}
             </p>
           )}
           {restaurant.date_added && (
-            <p className="text-[13px] text-txt2">
+            <p className="text-sm text-txt2">
               <span className="font-medium">Date added:</span>{" "}
               {formatDate(restaurant.date_added)}
             </p>
@@ -483,21 +483,21 @@ export default function RestaurantDetailPage({ params }: Props) {
           onClick={() => setShowVisitHistory(!showVisitHistory)}
           className="w-full flex items-center justify-between bg-transparent border-none cursor-pointer p-0 mb-3 text-left"
         >
-          <h2 className="font-display text-[22px] tracking-[0.04em]">
+          <h2 className="font-display text-xl tracking-tight">
             Visit History
           </h2>
-          <span className="text-[20px] text-txt2">
+          <span className="text-xl text-txt2">
             {showVisitHistory ? "▾" : "▸"}
           </span>
         </button>
 
         {!showVisitHistory && (
           <div className="space-y-1.5">
-            <p className="text-[13px] text-txt2">
+            <p className="text-sm text-txt2">
               <span className="font-medium">Total visits:</span> {visits.length}
             </p>
             {restaurant.last_visited && (
-              <p className="text-[13px] text-txt2">
+              <p className="text-sm text-txt2">
                 <span className="font-medium">Last visited:</span>{" "}
                 {formatDate(restaurant.last_visited)}
               </p>
@@ -508,19 +508,19 @@ export default function RestaurantDetailPage({ params }: Props) {
         {showVisitHistory && (
           <div>
             <div className="mb-3 space-y-1.5">
-              <p className="text-[13px] text-txt2">
+              <p className="text-sm text-txt2">
                 <span className="font-medium">Total visits:</span>{" "}
                 {visits.length}
               </p>
               {restaurant.last_visited && (
-                <p className="text-[13px] text-txt2">
+                <p className="text-sm text-txt2">
                   <span className="font-medium">Last visited:</span>{" "}
                   {formatDate(restaurant.last_visited)}
                 </p>
               )}
             </div>
             {visits.length === 0 ? (
-              <p className="text-txt2 text-[14px]">No visits recorded yet</p>
+              <p className="text-txt2 text-sm">No visits recorded yet</p>
             ) : (
               <div className="space-y-3 mt-4">
                 {visits.map((visit) => (
@@ -530,11 +530,11 @@ export default function RestaurantDetailPage({ params }: Props) {
                   >
                     <div className="w-2 h-2 rounded-full bg-accent2 shrink-0" />
                     <div>
-                      <p className="text-[14px] text-txt font-medium">
+                      <p className="text-sm text-txt font-medium">
                         {formatDate(visit.visited_at)} at{" "}
                         {formatTime(visit.visited_at)}
                       </p>
-                      <p className="text-[12px] text-txt2">
+                      <p className="text-xs text-txt2">
                         by {visit.visited_by}
                       </p>
                     </div>
@@ -549,21 +549,21 @@ export default function RestaurantDetailPage({ params }: Props) {
       {/* Usual Order — boba shops only */}
       {usualOrder && (
         <div className="p-6 border-b border-brd bg-bg2">
-          <h2 className="font-display text-[22px] mb-3 tracking-[0.04em]">
+          <h2 className="font-display text-xl mb-3 tracking-tight">
             Usual Order
           </h2>
           <div className="border-[1.5px] border-txt p-4">
-            <p className="font-display text-[20px] leading-tight mb-1">
+            <p className="font-display text-xl leading-tight mb-1">
               {usualOrder.menuItem.name}
             </p>
             {usualOrder.latestOrder?.drink_details && (
-              <p className="text-[13px] text-txt2 mb-2">
+              <p className="text-sm text-txt2 mb-2">
                 {formatDrinkSummary(
                   usualOrder.latestOrder.drink_details as DrinkDetails,
                 )}
               </p>
             )}
-            <div className="flex items-center gap-3 text-[12px] text-txt2">
+            <div className="flex items-center gap-3 text-xs text-txt2">
               {usualOrder.avgRating !== null &&
                 !isNaN(usualOrder.avgRating) && (
                   <span className="text-accent font-medium">
@@ -582,7 +582,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       {/* Menu Highlights */}
       {(highlightedItems.length > 0 || itemsWithOrders.length > 0) && (
         <div className="p-6 border-b border-brd">
-          <h2 className="font-display text-[22px] mb-3 tracking-[0.04em]">
+          <h2 className="font-display text-xl mb-3 tracking-tight">
             Menu Highlights
           </h2>
           <div className="space-y-3">
@@ -611,16 +611,16 @@ export default function RestaurantDetailPage({ params }: Props) {
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-display text-[18px] leading-tight">
+                        <p className="font-display text-lg leading-tight">
                           {item.menuItem.name}
                         </p>
                         {item.menuItem.is_recommended && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-pill bg-accent text-white tracking-[0.05em] uppercase shrink-0">
+                          <span className="text-2xs font-medium px-1.5 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase shrink-0">
                             ★
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 mt-1 text-[12px] text-txt2">
+                      <div className="flex items-center gap-3 mt-1 text-xs text-txt2">
                         {item.avgRating !== null && !isNaN(item.avgRating) && (
                           <span className="text-accent font-medium">
                             ★ {item.avgRating.toFixed(1)}
@@ -637,7 +637,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                         )}
                       </div>
                     </div>
-                    <span className="text-[16px] text-txt2 shrink-0 mt-1">
+                    <span className="text-base text-txt2 shrink-0 mt-1">
                       {expandedItem === item.menuItem.id ? "▾" : "▸"}
                     </span>
                   </div>
@@ -646,18 +646,18 @@ export default function RestaurantDetailPage({ params }: Props) {
                 {expandedItem === item.menuItem.id && item.latestOrder && (
                   <div className="mt-2 ml-0 pl-4 border-l-[3px] border-accent">
                     {item.latestOrder.notes && (
-                      <p className="text-[14px] text-txt leading-relaxed italic mb-2">
+                      <p className="text-sm text-txt leading-relaxed italic mb-2">
                         {item.latestOrder.notes}
                       </p>
                     )}
                     {item.latestOrder.drink_details && (
-                      <p className="text-[12px] text-txt2 mb-1">
+                      <p className="text-xs text-txt2 mb-1">
                         {formatDrinkSummary(
                           item.latestOrder.drink_details as DrinkDetails,
                         )}
                       </p>
                     )}
-                    <p className="text-[11px] text-txt2">
+                    <p className="text-xs text-txt2">
                       Last ordered: {formatDate(item.latestOrder.ordered_at)}
                     </p>
                   </div>
@@ -671,7 +671,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       {/* Order History */}
       {itemOrders.length > 0 && (
         <div className="p-6 border-b border-brd">
-          <h2 className="font-display text-[22px] mb-3 tracking-[0.04em]">
+          <h2 className="font-display text-xl mb-3 tracking-tight">
             Order History
           </h2>
           <div className="space-y-3">
@@ -684,7 +684,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-display text-[18px] leading-tight">
+                        <p className="font-display text-lg leading-tight">
                           {menuItem?.name || "Unknown item"}
                         </p>
                         {order.rating && (
@@ -693,21 +693,21 @@ export default function RestaurantDetailPage({ params }: Props) {
                           </span>
                         )}
                         {menuItem?.category && (
-                          <span className="text-[11px] text-txt2 capitalize">
+                          <span className="text-xs text-txt2 capitalize">
                             {menuItem.category}
                           </span>
                         )}
                       </div>
-                      <p className="text-[12px] text-txt2 mb-2">
+                      <p className="text-xs text-txt2 mb-2">
                         {formatDate(order.ordered_at)}
                       </p>
                       {order.notes && (
-                        <p className="text-[14px] text-txt leading-relaxed italic mb-2">
+                        <p className="text-sm text-txt leading-relaxed italic mb-2">
                           {order.notes}
                         </p>
                       )}
                       {order.drink_details && (
-                        <p className="text-[12px] text-txt2">
+                        <p className="text-xs text-txt2">
                           {formatDrinkSummary(
                             order.drink_details as DrinkDetails,
                           )}
@@ -732,18 +732,14 @@ export default function RestaurantDetailPage({ params }: Props) {
                     <div className="flex gap-2 mt-3">
                       <button
                         onClick={() => handleEditOrder(order)}
-                        className="py-1 px-3 text-[12px] font-medium border-[1.5px] border-txt text-txt bg-transparent cursor-pointer font-body rounded-none hover:bg-bg2 transition-colors duration-[0.12s]"
+                        className="btn-outline !py-1 !px-3 !text-xs !border-txt !text-txt"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDeleteOrderClick(order.id)}
                         disabled={deletingOrderId === order.id}
-                        className={`py-1 px-3 text-[12px] font-medium border-[1.5px] border-accent text-accent bg-transparent font-body rounded-none transition-colors duration-[0.12s] ${
-                          deletingOrderId === order.id
-                            ? "cursor-default opacity-30"
-                            : "cursor-pointer hover:bg-accent hover:text-white"
-                        }`}
+                        className="btn-outline !py-1 !px-3 !text-xs !border-accent !text-accent hover:!bg-accent hover:!text-white"
                       >
                         {deletingOrderId === order.id
                           ? "Deleting..."
@@ -792,14 +788,14 @@ export default function RestaurantDetailPage({ params }: Props) {
         <div className="fixed bottom-0 left-0 right-0 bg-bg border-t-2 border-txt p-3 z-50">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-txt2 mr-3">Admin:</span>
+              <span className="text-xs text-txt2 mr-3">Admin:</span>
               <button
                 onClick={handleMarkVisited}
                 disabled={visitingId === restaurant.id}
-                className={`text-[13px] font-medium py-2 px-3 rounded-pill border-[1.5px] font-body ${
+                className={`btn-base text-sm py-2 px-3 rounded-pill border-[1.5px] ${
                   visitingId === restaurant.id
-                    ? "cursor-default opacity-30 bg-transparent border-brd text-txt2"
-                    : "cursor-pointer bg-accent2 text-white border-accent2"
+                    ? "bg-transparent border-brd text-txt2"
+                    : "bg-accent2 text-white border-accent2"
                 }`}
               >
                 {visitingId === restaurant.id ? "Marking..." : "✓ Visited"}
@@ -810,19 +806,19 @@ export default function RestaurantDetailPage({ params }: Props) {
                   setEditingMenuItem(null);
                   setShowOrderModal(true);
                 }}
-                className="text-[13px] font-medium py-2 px-3 rounded-pill border-[1.5px] border-accent text-white bg-accent cursor-pointer font-body"
+                className="btn-primary btn-pill !py-2 !px-3"
               >
                 + Order
               </button>
               <button
                 onClick={handleEdit}
-                className="text-[13px] font-medium py-2 px-3 rounded-pill border-[1.5px] border-txt text-txt bg-transparent cursor-pointer font-body"
+                className="btn-outline btn-pill !py-2 !px-3 !border-txt !text-txt"
               >
                 Edit
               </button>
             </div>
             {saveError && (
-              <p className="text-accent text-[12px]">{saveError}</p>
+              <p className="text-error text-xs">{saveError}</p>
             )}
           </div>
         </div>

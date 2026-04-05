@@ -60,7 +60,7 @@ export default function AdminButton() {
           {!isAdminPage && (
             <a
               href="/admin"
-              className="block px-4 py-2.5 text-[13px] text-txt hover:bg-brd/20 no-underline transition-colors"
+              className="block px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
               onClick={() => setShowMenu(false)}
             >
               Manage spots
@@ -69,7 +69,7 @@ export default function AdminButton() {
           {isAdminPage && (
             <a
               href="/"
-              className="block px-4 py-2.5 text-[13px] text-txt hover:bg-brd/20 no-underline transition-colors"
+              className="block px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
               onClick={() => setShowMenu(false)}
             >
               Public view
@@ -81,7 +81,7 @@ export default function AdminButton() {
               setShowMenu(false);
               window.location.href = "/";
             }}
-            className="w-full text-left px-4 py-2.5 text-[13px] text-accent hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
+            className="w-full text-left px-4 py-2.5 text-sm text-accent hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
           >
             Logout
           </button>

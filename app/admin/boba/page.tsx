@@ -352,14 +352,14 @@ export default function BobaDashboardPage() {
       <div className="p-6 pb-4 border-b border-brd">
         <Link
           href="/admin"
-          className="text-[11px] tracking-[0.12em] uppercase font-medium text-accent2 no-underline"
+          className="text-xs tracking-wide uppercase font-medium text-accent2 no-underline"
         >
           ← Back to admin
         </Link>
       </div>
 
       <header className="pt-10 px-6 pb-6 border-b-2 border-txt">
-        <p className="text-[11px] tracking-[0.15em] uppercase text-accent font-medium mb-1.5">
+        <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
           Admin · Boba Dashboard
         </p>
         <h1 className="font-display text-[clamp(48px,10vw,80px)] leading-[0.88]">
@@ -375,45 +375,45 @@ export default function BobaDashboardPage() {
         <>
           {/* Summary Stats */}
           <section className="p-6 border-b border-brd">
-            <h2 className="font-display text-[22px] mb-4 tracking-[0.04em]">
+            <h2 className="font-display text-xl mb-4 tracking-tight">
               Summary
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="border-[1.5px] border-brd p-4">
-                <p className="text-[32px] font-display leading-tight">
+                <p className="text-2xl font-display leading-tight">
                   {stats.totalCheckins}
                 </p>
-                <p className="text-[11px] text-txt2 uppercase tracking-[0.1em]">
+                <p className="text-xs text-txt2 uppercase tracking-wide">
                   Total checkins
                 </p>
               </div>
               <div className="border-[1.5px] border-brd p-4">
-                <p className="text-[32px] font-display leading-tight">
+                <p className="text-2xl font-display leading-tight">
                   {stats.totalThisMonth}
                 </p>
-                <p className="text-[11px] text-txt2 uppercase tracking-[0.1em]">
+                <p className="text-xs text-txt2 uppercase tracking-wide">
                   This month
                 </p>
               </div>
               <div className="border-[1.5px] border-brd p-4">
-                <p className="text-[32px] font-display leading-tight">
+                <p className="text-2xl font-display leading-tight">
                   {stats.uniqueShops}
                 </p>
-                <p className="text-[11px] text-txt2 uppercase tracking-[0.1em]">
+                <p className="text-xs text-txt2 uppercase tracking-wide">
                   Unique shops
                 </p>
               </div>
               <div className="border-[1.5px] border-brd p-4">
-                <p className="text-[32px] font-display leading-tight">
+                <p className="text-2xl font-display leading-tight">
                   {stats.uniqueDrinks}
                 </p>
-                <p className="text-[11px] text-txt2 uppercase tracking-[0.1em]">
+                <p className="text-xs text-txt2 uppercase tracking-wide">
                   Unique drinks
                 </p>
               </div>
             </div>
             {stats.favoriteShop && (
-              <p className="mt-4 text-[13px] text-txt">
+              <p className="mt-4 text-sm text-txt">
                 Favorite shop:{" "}
                 <span className="font-medium">{stats.favoriteShop}</span>
               </p>
@@ -422,7 +422,7 @@ export default function BobaDashboardPage() {
 
           {/* Per-shop breakdown */}
           <section className="p-6 border-b border-brd">
-            <h2 className="font-display text-[22px] mb-4 tracking-[0.04em]">
+            <h2 className="font-display text-xl mb-4 tracking-tight">
               Per-shop breakdown
             </h2>
             <div className="space-y-4">
@@ -432,19 +432,19 @@ export default function BobaDashboardPage() {
                   className="border-[1.5px] border-brd p-4"
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-display text-[18px] leading-tight">
+                    <h3 className="font-display text-lg leading-tight">
                       {shop.restaurant.name}
                     </h3>
-                    <span className="text-[11px] text-txt2">
+                    <span className="text-xs text-txt2">
                       {shop.totalVisits} visit
                       {shop.totalVisits !== 1 ? "s" : ""}
                     </span>
                   </div>
-                  <p className="text-[11px] text-txt2 mb-1">
+                  <p className="text-xs text-txt2 mb-1">
                     {shop.restaurant.neighborhood}
                   </p>
                   {shop.mostOrderedDrink && (
-                    <p className="text-[13px] text-txt mb-1">
+                    <p className="text-sm text-txt mb-1">
                       Most ordered:{" "}
                       <span className="font-medium">
                         {shop.mostOrderedDrink}
@@ -457,12 +457,12 @@ export default function BobaDashboardPage() {
                     </p>
                   )}
                   {shop.commonCustomization && (
-                    <p className="text-[12px] text-txt2 italic">
+                    <p className="text-xs text-txt2 italic">
                       Usually: {shop.commonCustomization}
                     </p>
                   )}
                   {shop.lastVisit && (
-                    <p className="text-[11px] text-txt2 mt-2">
+                    <p className="text-xs text-txt2 mt-2">
                       Last visit: {formatDate(shop.lastVisit)}
                     </p>
                   )}
@@ -473,15 +473,15 @@ export default function BobaDashboardPage() {
 
           {/* Preference analysis */}
           <section className="p-6 border-b border-brd">
-            <h2 className="font-display text-[22px] mb-4 tracking-[0.04em]">
+            <h2 className="font-display text-xl mb-4 tracking-tight">
               Preference analysis
             </h2>
             <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <h3 className="text-[14px] font-medium mb-2">Sweetness</h3>
+                <h3 className="text-sm font-medium mb-2">Sweetness</h3>
                 {avgSweetness !== null ? (
                   <div className="space-y-1">
-                    <div className="flex justify-between text-[13px]">
+                    <div className="flex justify-between text-sm">
                       <span>Average:</span>
                       <span>{avgSweetness}%</span>
                     </div>
@@ -491,7 +491,7 @@ export default function BobaDashboardPage() {
                         style={{ width: `${avgSweetness}%` }}
                       />
                     </div>
-                    <div className="text-[11px] text-txt2">
+                    <div className="text-xs text-txt2">
                       {avgSweetness < 50
                         ? "Less sweet preference"
                         : avgSweetness < 80
@@ -500,14 +500,14 @@ export default function BobaDashboardPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-[13px] text-txt2">No data yet</p>
+                  <p className="text-sm text-txt2">No data yet</p>
                 )}
               </div>
               <div>
-                <h3 className="text-[14px] font-medium mb-2">Ice level</h3>
+                <h3 className="text-sm font-medium mb-2">Ice level</h3>
                 {avgIce !== null ? (
                   <div className="space-y-1">
-                    <div className="flex justify-between text-[13px]">
+                    <div className="flex justify-between text-sm">
                       <span>Average:</span>
                       <span>{avgIce}%</span>
                     </div>
@@ -517,7 +517,7 @@ export default function BobaDashboardPage() {
                         style={{ width: `${avgIce}%` }}
                       />
                     </div>
-                    <div className="text-[11px] text-txt2">
+                    <div className="text-xs text-txt2">
                       {avgIce < 30
                         ? "Light ice preference"
                         : avgIce < 60
@@ -526,19 +526,19 @@ export default function BobaDashboardPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-[13px] text-txt2">No data yet</p>
+                  <p className="text-sm text-txt2">No data yet</p>
                 )}
               </div>
             </div>
 
             {topToppings.length > 0 && (
               <div className="mt-6">
-                <h3 className="text-[14px] font-medium mb-2">Top toppings</h3>
+                <h3 className="text-sm font-medium mb-2">Top toppings</h3>
                 <div className="flex flex-wrap gap-2">
                   {topToppings.map((topping) => (
                     <span
                       key={topping.name}
-                      className="px-2 py-1 bg-bg2 border border-brd text-[12px]"
+                      className="px-2 py-1 bg-bg2 border border-brd text-xs"
                     >
                       {topping.name} ({topping.count})
                     </span>
@@ -548,10 +548,10 @@ export default function BobaDashboardPage() {
             )}
 
             <div className="mt-6">
-              <h3 className="text-[14px] font-medium mb-2">
+              <h3 className="text-sm font-medium mb-2">
                 Temperature preference
               </h3>
-              <div className="flex gap-4 text-[13px]">
+              <div className="flex gap-4 text-sm">
                 <span>
                   Hot: <span className="font-medium">{hotVsIced.hot}</span>
                 </span>
@@ -564,20 +564,20 @@ export default function BobaDashboardPage() {
 
           {/* Sweetness distribution */}
           <section className="p-6 border-b border-brd">
-            <h2 className="font-display text-[22px] mb-4 tracking-[0.04em]">
+            <h2 className="font-display text-xl mb-4 tracking-tight">
               Sweetness distribution
             </h2>
             <div className="space-y-2">
               {sweetnessDistribution.map((bucket) => (
                 <div key={bucket.range} className="flex items-center gap-3">
-                  <span className="text-[12px] w-16">{bucket.range}</span>
+                  <span className="text-xs w-16">{bucket.range}</span>
                   <div className="flex-1 bg-bg2 border border-brd h-4">
                     <div
                       className="bg-accent h-full"
                       style={{ width: `${bucket.percentage}%` }}
                     />
                   </div>
-                  <span className="text-[12px] w-12 text-right">
+                  <span className="text-xs w-12 text-right">
                     {bucket.count}
                   </span>
                 </div>
@@ -588,7 +588,7 @@ export default function BobaDashboardPage() {
           {/* Recent Visits */}
           {recentVisits.length > 0 && (
             <section className="p-6 border-b border-brd">
-              <h2 className="font-display text-[22px] mb-4 tracking-[0.04em]">
+              <h2 className="font-display text-xl mb-4 tracking-tight">
                 Recent Visits
               </h2>
               <div className="space-y-3">
@@ -607,7 +607,7 @@ export default function BobaDashboardPage() {
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-display text-[18px] leading-tight">
+                            <h3 className="font-display text-lg leading-tight">
                               {menuItem?.name || "Unknown drink"}
                             </h3>
                             {visit.rating && (
@@ -616,19 +616,19 @@ export default function BobaDashboardPage() {
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-txt2 mb-1">
+                          <p className="text-xs text-txt2 mb-1">
                             {restaurant?.name} • {restaurant?.neighborhood}
                           </p>
-                          <p className="text-[12px] text-txt2 mb-2">
+                          <p className="text-xs text-txt2 mb-2">
                             {formatDate(visit.ordered_at)}
                           </p>
                           {visit.notes && (
-                            <p className="text-[14px] text-txt leading-relaxed italic mb-2">
+                            <p className="text-sm text-txt leading-relaxed italic mb-2">
                               {visit.notes}
                             </p>
                           )}
                           {visit.drink_details && (
-                            <p className="text-[12px] text-txt2">
+                            <p className="text-xs text-txt2">
                               {formatDrinkSummary(
                                 visit.drink_details as DrinkDetails,
                               )}
@@ -659,7 +659,7 @@ export default function BobaDashboardPage() {
           {/* Haven't been in a while */}
           {shops.length > 0 && (
             <section className="p-6">
-              <h2 className="font-display text-[22px] mb-4 tracking-[0.04em]">
+              <h2 className="font-display text-xl mb-4 tracking-tight">
                 Haven't been in a while
               </h2>
               <div className="space-y-3">
@@ -673,13 +673,13 @@ export default function BobaDashboardPage() {
                     >
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-display text-[18px] leading-tight">
+                          <h3 className="font-display text-lg leading-tight">
                             {shop.restaurant.name}
                           </h3>
-                          <p className="text-[11px] text-txt2">
+                          <p className="text-xs text-txt2">
                             {shop.restaurant.neighborhood}
                           </p>
-                          <p className="text-[13px] text-txt mt-1">
+                          <p className="text-sm text-txt mt-1">
                             Last visit: {formatDate(shop.lastVisit!)} (
                             {shop.daysSinceLastVisit} days ago)
                           </p>

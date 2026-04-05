@@ -118,11 +118,8 @@ const DEFAULT_CUISINE_OPTIONS = [
   "Vietnamese",
 ];
 
-const inputCls =
-  "w-full py-2 px-3 text-[15px] border-[1.5px] border-brd bg-bg text-txt rounded-none outline-none font-body transition-[border-color] duration-[0.12s] focus:border-accent";
-
 const labelCls =
-  "block text-[11px] tracking-[0.1em] uppercase font-medium text-txt2 mb-1";
+  "block text-xs tracking-wide uppercase font-medium text-txt2 mb-1";
 
 export default function AddModal({
   onSave,
@@ -400,8 +397,8 @@ export default function AddModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
       className="fixed inset-0 bg-black/55 z-[100] flex items-center justify-center p-4"
     >
-      <div className="bg-bg border-2 border-txt p-7 w-full max-w-[480px] max-h-[90vh] overflow-y-auto">
-        <p className="font-display text-4xl mb-5">
+      <div className="bg-bg border-2 border-txt p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto">
+        <p className="font-display text-2xl mb-5">
           {success
             ? editData
               ? "Spot updated!"
@@ -412,7 +409,7 @@ export default function AddModal({
         </p>
 
         {success && (
-          <p className="text-accent text-sm mb-4">
+          <p className="text-success text-sm mb-4">
             {editData
               ? "Changes saved successfully."
               : "Restaurant saved successfully."}
@@ -425,7 +422,7 @@ export default function AddModal({
             <input
               ref={autocompleteRef}
               placeholder="Search for a restaurant..."
-              className={inputCls}
+              className="input-base"
             />
           </div>
         )}
@@ -457,7 +454,7 @@ export default function AddModal({
               onChange={(e) => field.set(e.target.value)}
               placeholder={field.placeholder}
               onKeyDown={(e) => e.key === "Enter" && handleSave()}
-              className={inputCls}
+              className="input-base"
             />
           </div>
         ))}
@@ -499,7 +496,7 @@ export default function AddModal({
                 setCuisineOpen(false);
               }
             }}
-            className={inputCls}
+            className="input-base"
             autoComplete="off"
           />
           {cuisineOpen && (filteredCuisines.length > 0 || showCuisineAdd) && (
@@ -538,7 +535,7 @@ export default function AddModal({
               <button
                 key={p}
                 onClick={() => setPrice(p)}
-                className={`flex-1 p-2 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
                   price === p
                     ? "bg-txt text-bg border-txt"
                     : "bg-transparent text-txt2 border-brd"
@@ -555,10 +552,10 @@ export default function AddModal({
           <button
             type="button"
             onClick={() => setMustTry(!mustTry)}
-            className={`py-2 px-4 text-[13px] font-medium border-[1.5px] cursor-pointer font-body rounded-pill transition-all duration-[0.12s] ${
+            className={`chip ${
               mustTry
-                ? "bg-accent text-white border-accent"
-                : "bg-transparent text-txt2 border-brd"
+                ? "!bg-accent !text-white !border-accent"
+                : ""
             }`}
           >
             {mustTry ? "★ Must-Try" : "☆ Mark as Must-Try"}
@@ -582,7 +579,7 @@ export default function AddModal({
             />
             <div className="flex items-center gap-2">
               <div className="flex-1 h-px bg-brd" />
-              <span className="text-xs text-txt2 uppercase tracking-wider">
+              <span className="text-xs text-txt2 uppercase tracking-wide">
                 or
               </span>
               <div className="flex-1 h-px bg-brd" />
@@ -594,7 +591,7 @@ export default function AddModal({
                 setPhotoFile(null); // Clear file if URL is entered
               }}
               placeholder="Paste image URL"
-              className={inputCls}
+              className="input-base"
               disabled={!!photoFile}
             />
           </div>
@@ -617,17 +614,17 @@ export default function AddModal({
             onChange={(e) => setNote(e.target.value)}
             placeholder="What makes this place special?"
             rows={3}
-            className={`${inputCls} resize-y leading-relaxed`}
+            className="input-base resize-y leading-relaxed"
           />
         </div>
 
-        {error && <p className="text-accent text-[13px] mb-2">{error}</p>}
+        {error && <p className="text-error text-sm mb-2">{error}</p>}
 
         <div className="flex gap-2 mt-6">
           <button
             onClick={handleSave}
             disabled={saving || success}
-            className={`flex-1 p-2.5 bg-accent text-white border-none text-sm font-medium font-body rounded-none ${saving || success ? "cursor-default opacity-60" : "cursor-pointer opacity-100"}`}
+            className="btn-primary flex-1"
           >
             {uploading
               ? "Uploading photo..."
@@ -643,19 +640,12 @@ export default function AddModal({
             <button
               onClick={handleDeleteClick}
               disabled={saving || success}
-              className={`py-2.5 px-4 text-sm font-medium border-[1.5px] border-accent text-accent bg-transparent font-body rounded-none ${
-                saving || success
-                  ? "cursor-default opacity-30"
-                  : "cursor-pointer hover:bg-accent hover:text-white transition-colors duration-[0.12s]"
-              }`}
+              className="btn-outline !border-accent !text-accent hover:!bg-accent hover:!text-white"
             >
               Delete
             </button>
           )}
-          <button
-            onClick={onClose}
-            className="py-2.5 px-[18px] bg-transparent text-txt2 border-[1.5px] border-brd text-sm cursor-pointer font-body rounded-none"
-          >
+          <button onClick={onClose} className="btn-outline">
             Cancel
           </button>
         </div>

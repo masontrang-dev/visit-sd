@@ -22,18 +22,12 @@ export default function ConfirmModal({
     >
       <div className="bg-bg border-2 border-txt p-6 w-full max-w-[400px]">
         <p className="font-display text-2xl mb-4">{title}</p>
-        <p className="text-[15px] text-txt mb-6 leading-relaxed">{message}</p>
+        <p className="text-base text-txt mb-6 leading-relaxed">{message}</p>
         <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 py-2.5 px-4 bg-transparent text-txt2 border-[1.5px] border-brd text-sm font-medium cursor-pointer font-body rounded-none hover:bg-bg2 transition-colors duration-[0.12s]"
-          >
+          <button onClick={onCancel} className="btn-outline flex-1">
             {cancelText}
           </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 py-2.5 px-4 bg-accent text-white border-none text-sm font-medium cursor-pointer font-body rounded-none hover:bg-accent/90 transition-colors duration-[0.12s]"
-          >
+          <button onClick={onConfirm} className="btn-primary flex-1">
             {confirmText}
           </button>
         </div>

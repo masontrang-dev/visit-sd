@@ -13,6 +13,9 @@
     --txt: #1a1a18;
     --txt2: #5f5e5a;
     --brd: rgba(26, 26, 24, 0.12);
+    --error: #c0392b;
+    --success: #1d9e75;
+    --warning: #d4a017;
     --font-display: "Bebas Neue", sans-serif;
     --font-body: "DM Sans", sans-serif;
 
@@ -37,6 +40,9 @@
     --txt: #fafaf8;
     --txt2: #a8a7a3;
     --brd: rgba(250, 250, 248, 0.12);
+    --error: #e74c3c;
+    --success: #2bbf8e;
+    --warning: #f0c040;
 
     /* Cuisine palette (dark) */
     --cuisine-1: #e8734f;
@@ -53,5 +59,56 @@
 
   body {
     @apply font-body bg-bg text-txt antialiased;
+  }
+}
+
+@layer components {
+  /* ── Buttons ── */
+  .btn-base {
+    @apply font-body font-medium cursor-pointer transition-all duration-[0.12s]
+           focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn-base bg-accent text-white border-none text-sm py-2.5 px-4 rounded-none
+           hover:opacity-90;
+  }
+  .btn-secondary {
+    @apply btn-base bg-txt text-bg border-[1.5px] border-txt text-sm py-2.5 px-4 rounded-none;
+  }
+  .btn-outline {
+    @apply btn-base bg-transparent text-txt2 border-[1.5px] border-brd text-sm py-2.5 px-4 rounded-none
+           hover:bg-bg2;
+  }
+  .btn-ghost {
+    @apply btn-base bg-transparent border-none text-txt2 text-sm p-0;
+  }
+  .btn-pill {
+    @apply rounded-pill;
+  }
+
+  /* ── Inputs ── */
+  .input-base {
+    @apply w-full py-2 px-3 text-base border-[1.5px] border-brd bg-bg text-txt
+           rounded-none outline-none font-body transition-[border-color] duration-[0.12s]
+           focus:border-accent focus-visible:ring-2 focus-visible:ring-accent
+           focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+  }
+
+  /* ── Chips ── */
+  .chip {
+    @apply font-body text-sm font-medium py-1.5 px-3.5 rounded-pill border-[1.5px]
+           border-brd bg-transparent cursor-pointer text-txt2
+           transition-all duration-[0.12s] whitespace-nowrap;
+  }
+  .chip-active {
+    @apply font-body text-sm font-medium py-1.5 px-3.5 rounded-pill border-[1.5px]
+           border-txt bg-txt cursor-pointer text-bg
+           transition-all duration-[0.12s] whitespace-nowrap;
+  }
+
+  /* ── Badge ── */
+  .badge {
+    @apply text-2xs font-medium px-2 py-0.5 rounded-pill tracking-wide uppercase;
   }
 }
