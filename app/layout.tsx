@@ -5,6 +5,11 @@ import { AuthProvider } from "@/lib/auth-context";
 export const metadata: Metadata = {
   title: "VISIT SD — Our San Diego Picks",
   description: "Our favourite San Diego restaurants for visitors & friends",
+  appleWebApp: {
+    capable: true,
+    title: "VISIT SD",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export default function RootLayout({
