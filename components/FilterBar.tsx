@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 
+export type ImageDisplayMode = "full" | "compact" | "none";
+
 type Props = {
   cuisines: string[];
   activeCuisines: string[];
@@ -19,6 +21,8 @@ type Props = {
   isAdminView?: boolean;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
+  imageDisplayMode?: ImageDisplayMode;
+  onImageDisplayModeChange?: (mode: ImageDisplayMode) => void;
 };
 
 function toggleItem(arr: string[], item: string): string[] {
@@ -48,6 +52,8 @@ export default function FilterBar({
   isAdminView,
   searchQuery,
   onSearchChange,
+  imageDisplayMode,
+  onImageDisplayModeChange,
 }: Props) {
   const [activePanel, setActivePanel] = useState<
     "cuisine" | "area" | "price" | null
@@ -133,6 +139,25 @@ export default function FilterBar({
               Map
             </button>
           </div>
+        )}
+
+        {onImageDisplayModeChange && viewMode === "list" && (
+          <button
+            className="chip"
+            onClick={() => {
+              const modes: ImageDisplayMode[] = ["full", "compact", "none"];
+              const currentIndex = modes.indexOf(imageDisplayMode || "full");
+              const nextIndex = (currentIndex + 1) % modes.length;
+              onImageDisplayModeChange(modes[nextIndex]);
+            }}
+            title={`Images: ${imageDisplayMode === "full" ? "Full" : imageDisplayMode === "compact" ? "Compact" : "None"} (click to cycle)`}
+          >
+            {imageDisplayMode === "full"
+              ? "🖼️"
+              : imageDisplayMode === "compact"
+                ? "▢"
+                : "☰"}
+          </button>
         )}
 
         {onAdd && (

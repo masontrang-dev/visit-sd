@@ -108,6 +108,7 @@ export default function RestaurantDetailPage({ params }: Props) {
         return;
       }
 
+      // Fetch restaurant data first for fast initial render
       const { data: restaurantData, error: restaurantError } = await supabase
         .from("restaurants")
         .select("*")
@@ -120,40 +121,37 @@ export default function RestaurantDetailPage({ params }: Props) {
         return;
       }
 
-      const { data: visitsData } = await supabase
-        .from("restaurant_visits")
-        .select("*")
-        .eq("restaurant_id", restaurantId)
-        .order("visited_at", { ascending: false });
-
+      // Show restaurant immediately, then load the rest in parallel
       setRestaurant(restaurantData);
-      setVisits(visitsData ?? []);
-
-      // Load menu items and orders
-      const { data: menuData } = await supabase
-        .from("menu_items")
-        .select("*")
-        .eq("restaurant_id", restaurantId)
-        .order("name");
-      setMenuItems(menuData ?? []);
-
-      const { data: ordersData } = await supabase
-        .from("item_orders")
-        .select("*")
-        .eq("restaurant_id", restaurantId)
-        .order("ordered_at", { ascending: false });
-      setItemOrders(ordersData ?? []);
-
       setLoading(false);
 
-      // Load all cuisines for the edit modal
-      const { data: allRestaurants } = await supabase
-        .from("restaurants")
-        .select("cuisine");
+      const [visitsResult, menuResult, ordersResult, cuisinesResult] =
+        await Promise.all([
+          supabase
+            .from("restaurant_visits")
+            .select("*")
+            .eq("restaurant_id", restaurantId)
+            .order("visited_at", { ascending: false }),
+          supabase
+            .from("menu_items")
+            .select("*")
+            .eq("restaurant_id", restaurantId)
+            .order("name"),
+          supabase
+            .from("item_orders")
+            .select("*")
+            .eq("restaurant_id", restaurantId)
+            .order("ordered_at", { ascending: false }),
+          supabase.from("restaurants").select("cuisine"),
+        ]);
 
-      if (allRestaurants) {
+      setVisits(visitsResult.data ?? []);
+      setMenuItems(menuResult.data ?? []);
+      setItemOrders(ordersResult.data ?? []);
+
+      if (cuisinesResult.data) {
         const uniqueCuisines = Array.from(
-          new Set(allRestaurants.map((r) => r.cuisine).filter(Boolean)),
+          new Set(cuisinesResult.data.map((r) => r.cuisine).filter(Boolean)),
         ).sort();
         setCuisines(uniqueCuisines as string[]);
       }

@@ -9,7 +9,7 @@ import {
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import RestaurantGrid from "@/components/RestaurantGrid";
-import FilterBar from "@/components/FilterBar";
+import FilterBar, { type ImageDisplayMode } from "@/components/FilterBar";
 import AddModal from "@/components/AddModal";
 import OrderModal from "@/components/OrderModal";
 import Link from "next/link";
@@ -52,6 +52,17 @@ export default function AdminPage() {
   const [lastCleanup, setLastCleanup] = useState<string | null>(null);
   const [visits, setVisits] = useState<Record<number, RestaurantVisit[]>>({});
   const [visitingId, setVisitingId] = useState<number | null>(null);
+  const [imageDisplayMode, setImageDisplayMode] = useState<ImageDisplayMode>(
+    () => {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("visitsd-image-display");
+        if (saved === "full" || saved === "compact" || saved === "none") {
+          return saved;
+        }
+      }
+      return "full";
+    },
+  );
 
   async function loadStats() {
     setStatsLoading(true);
@@ -242,6 +253,13 @@ export default function AdminPage() {
     setShowOrderModal(true);
   }
 
+  function handleImageDisplayModeChange(mode: ImageDisplayMode) {
+    setImageDisplayMode(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("visitsd-image-display", mode);
+    }
+  }
+
   const cuisines = Array.from(
     new Set(restaurants.map((r) => r.cuisine).filter(Boolean)),
   ).sort();
@@ -285,9 +303,7 @@ export default function AdminPage() {
               setPwError(false);
             }}
             onKeyDown={(e) => e.key === "Enter" && checkPassword()}
-            className={`input-base mb-2 ${
-              pwError ? "!border-error" : ""
-            }`}
+            className={`input-base mb-2 ${pwError ? "!border-error" : ""}`}
           />
           <input
             type="password"
@@ -298,19 +314,14 @@ export default function AdminPage() {
               setPwError(false);
             }}
             onKeyDown={(e) => e.key === "Enter" && checkPassword()}
-            className={`input-base mb-2 ${
-              pwError ? "!border-error" : ""
-            }`}
+            className={`input-base mb-2 ${pwError ? "!border-error" : ""}`}
           />
           {pwError && (
             <p className="text-error text-sm mb-3">
               Invalid username or password
             </p>
           )}
-          <button
-            onClick={checkPassword}
-            className="btn-secondary w-full"
-          >
+          <button onClick={checkPassword} className="btn-secondary w-full">
             Sign in
           </button>
         </div>
@@ -354,11 +365,11 @@ export default function AdminPage() {
         mustTryFilter={mustTryFilter}
         onMustTryFilterChange={setMustTryFilter}
         isAdminView
+        imageDisplayMode={imageDisplayMode}
+        onImageDisplayModeChange={handleImageDisplayModeChange}
       />
 
-      {opError && (
-        <p className="py-3 px-6 text-error text-sm">{opError}</p>
-      )}
+      {opError && <p className="py-3 px-6 text-error text-sm">{opError}</p>}
 
       {loading ? (
         <p className="py-12 px-6 text-txt2">Loading...</p>
@@ -378,6 +389,7 @@ export default function AdminPage() {
           onMarkVisited={handleMarkVisited}
           visitingId={visitingId}
           visits={visits}
+          imageDisplayMode={imageDisplayMode}
         />
       )}
 

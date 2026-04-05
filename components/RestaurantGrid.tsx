@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import IllustrationEmpty from "@/components/IllustrationEmpty";
 import { formatRecencyTag } from "@/lib/utils";
+import { type ImageDisplayMode } from "@/components/FilterBar";
 
 type Props = {
   restaurants: Restaurant[];
@@ -23,6 +24,7 @@ type Props = {
   visits?: Record<number, RestaurantVisit[]>;
   baseDelay?: number;
   recommendedItems?: Record<number, MenuItem[]>;
+  imageDisplayMode?: ImageDisplayMode;
 };
 
 const CUISINE_COLORS = [
@@ -88,6 +90,7 @@ function Card({
   visitingId,
   visits,
   recommendedItems,
+  imageDisplayMode = "full",
 }: {
   r: Restaurant;
   cuisineColor: string;
@@ -97,6 +100,7 @@ function Card({
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   recommendedItems?: MenuItem[];
+  imageDisplayMode?: ImageDisplayMode;
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const isAdmin = !!(onEdit || onMarkVisited || onOrder);
@@ -124,24 +128,66 @@ function Card({
           : "3px solid transparent",
       }}
     >
-      {(r.photo_url || r.storefront_photo_url) && (
-        <div className="relative overflow-hidden aspect-[3/2]">
-          <Image
-            src={(r.photo_url || r.storefront_photo_url)!}
-            alt={r.name}
-            fill
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-            onError={(e) => {
-              (
-                e.target as HTMLImageElement
-              ).parentElement!.parentElement!.style.display = "none";
-            }}
-            unoptimized
-          />
-          <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg/40 to-transparent pointer-events-none" />
-        </div>
-      )}
+      {(r.photo_url || r.storefront_photo_url) &&
+        imageDisplayMode !== "none" && (
+          <div
+            className={`relative overflow-hidden ${
+              imageDisplayMode === "compact" ? "h-[100px]" : "aspect-[3/2]"
+            }`}
+          >
+            <Image
+              src={(r.photo_url || r.storefront_photo_url)!}
+              alt={r.name}
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={(e) => {
+                (
+                  e.target as HTMLImageElement
+                ).parentElement!.parentElement!.style.display = "none";
+              }}
+              unoptimized
+            />
+            <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg/40 to-transparent pointer-events-none" />
+
+            {/* Top-left badges */}
+            <div className="absolute top-2 left-2 flex gap-1.5">
+              {r.must_try && (
+                <span className="text-2xs font-medium px-2 py-1 rounded-pill bg-accent text-white shadow-sm tracking-tight uppercase border-2 border-white/80">
+                  Must-try
+                </span>
+              )}
+            </div>
+
+            {/* Top-right badges */}
+            <div className="absolute top-2 right-2 flex gap-1.5 flex-wrap justify-end">
+              {recencyTag && (
+                <span
+                  className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
+                  style={{
+                    backgroundColor: "rgba(250, 238, 218, 0.95)",
+                    color: "#633806",
+                  }}
+                >
+                  {recencyTag.text}
+                </span>
+              )}
+              {r.is_open_now !== null && (
+                <span
+                  className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
+                  style={{
+                    backgroundColor: r.is_open_now
+                      ? "rgba(234, 243, 222, 0.95)"
+                      : "rgba(241, 239, 232, 0.95)",
+                    color: r.is_open_now ? "#27500A" : "#5F5E5A",
+                  }}
+                >
+                  {r.is_open_now ? "Open now" : r.hours_text || "Closed"}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       <div className="p-4">
         {/* Name + price */}
         <div className="flex items-start justify-between gap-2">
@@ -181,22 +227,6 @@ function Card({
               {r.neighborhood}
             </span>
           )}
-          {r.must_try && (
-            <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase">
-              Must-try
-            </span>
-          )}
-          {r.is_open_now !== null && (
-            <span
-              className="text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight uppercase"
-              style={{
-                backgroundColor: r.is_open_now ? "#EAF3DE" : "#F1EFE8",
-                color: r.is_open_now ? "#27500A" : "#5F5E5A",
-              }}
-            >
-              {r.is_open_now ? "Open now" : r.hours_text || "Closed"}
-            </span>
-          )}
         </div>
 
         {/* Ratings row */}
@@ -220,21 +250,6 @@ function Card({
                 <span className="font-medium text-txt">{r.my_rating}/5</span>
                 <span className="text-txt2">My pick</span>
               </div>
-            )}
-            {recencyTag && (
-              <>
-                <div className="w-px h-3 bg-brd" />
-                <span
-                  className="text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight uppercase"
-                  style={{
-                    backgroundColor:
-                      recencyTag.style === "week" ? "#FAEEDA" : "#FAEEDA",
-                    color: recencyTag.style === "week" ? "#633806" : "#633806",
-                  }}
-                >
-                  {recencyTag.text}
-                </span>
-              </>
             )}
           </div>
         )}
@@ -417,6 +432,7 @@ function InfiniteCardGrid({
   visits,
   baseDelay = 0,
   recommendedItems,
+  imageDisplayMode = "full",
 }: {
   restaurants: Restaurant[];
   cuisineColorMap: Record<string, string>;
@@ -427,17 +443,30 @@ function InfiniteCardGrid({
   visits?: Record<number, RestaurantVisit[]>;
   baseDelay?: number;
   recommendedItems?: Record<number, MenuItem[]>;
+  imageDisplayMode?: ImageDisplayMode;
 }) {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const prevRestaurantIdsRef = useRef<string>("");
 
-  // Reset visible count when restaurant list changes (e.g. filter applied)
+  // Reset visible count only when the actual restaurant list changes (not on re-renders)
   useEffect(() => {
-    setVisibleCount(BATCH_SIZE);
+    const currentIds = restaurants.map((r) => r.id).join(",");
+    if (prevRestaurantIdsRef.current !== currentIds) {
+      setVisibleCount(BATCH_SIZE);
+      prevRestaurantIdsRef.current = currentIds;
+    }
   }, [restaurants]);
 
   const loadMore = useCallback(() => {
-    setVisibleCount((prev) => Math.min(prev + BATCH_SIZE, restaurants.length));
+    setIsLoadingMore(true);
+    setTimeout(() => {
+      setVisibleCount((prev) =>
+        Math.min(prev + BATCH_SIZE, restaurants.length),
+      );
+      setIsLoadingMore(false);
+    }, 100);
   }, [restaurants.length]);
 
   useEffect(() => {
@@ -473,16 +502,23 @@ function InfiniteCardGrid({
               visitingId={visitingId}
               visits={visits}
               recommendedItems={recommendedItems?.[r.id]}
+              imageDisplayMode={imageDisplayMode}
             />
           </FadeUpCard>
         ))}
       </div>
       {hasMore && (
-        <div ref={sentinelRef} className="py-6 text-center">
-          <button onClick={loadMore} className="btn-outline btn-pill">
-            Show more ({restaurants.length - visibleCount} remaining)
-          </button>
-        </div>
+        <>
+          <div ref={sentinelRef} className="h-px" />
+          {isLoadingMore && (
+            <div className="py-6 flex justify-center">
+              <div className="flex items-center gap-2 text-txt2 text-sm">
+                <div className="w-4 h-4 border-2 border-txt2 border-t-transparent rounded-full animate-spin" />
+                Loading more...
+              </div>
+            </div>
+          )}
+        </>
       )}
     </>
   );
@@ -499,6 +535,7 @@ export default function RestaurantGrid({
   visits,
   baseDelay,
   recommendedItems,
+  imageDisplayMode = "full",
 }: Props) {
   const cuisineColorMap = useMemo(
     () => buildCuisineColorMap(restaurants),
@@ -538,6 +575,7 @@ export default function RestaurantGrid({
         visits={visits}
         baseDelay={baseDelay}
         recommendedItems={recommendedItems}
+        imageDisplayMode={imageDisplayMode}
       />
     );
   }
@@ -580,6 +618,7 @@ export default function RestaurantGrid({
                   visitingId={visitingId}
                   visits={visits}
                   recommendedItems={recommendedItems?.[r.id]}
+                  imageDisplayMode={imageDisplayMode}
                 />
               ))}
             </div>

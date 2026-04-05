@@ -11,7 +11,7 @@ import {
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase, type Restaurant, type MenuItem } from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
-import FilterBar from "@/components/FilterBar";
+import FilterBar, { type ImageDisplayMode } from "@/components/FilterBar";
 import MapView from "@/components/MapView";
 import ContextHeader from "@/components/ContextHeader";
 import SurpriseBar from "@/components/SurpriseBar";
@@ -134,6 +134,17 @@ function HomeContent() {
     }
     return "list";
   });
+  const [imageDisplayMode, setImageDisplayMode] = useState<ImageDisplayMode>(
+    () => {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("visitsd-image-display");
+        if (saved === "full" || saved === "compact" || saved === "none") {
+          return saved;
+        }
+      }
+      return "full";
+    },
+  );
   const [mustTryFilter, setMustTryFilter] = useState(
     searchParams.get("must_try") === "true",
   );
@@ -190,6 +201,12 @@ function HomeContent() {
   function handlePriceChange(v: string[]) {
     setActivePrices(v);
     syncParams(activeCuisines, activeNeighborhoods, mustTryFilter, v);
+  }
+  function handleImageDisplayModeChange(mode: ImageDisplayMode) {
+    setImageDisplayMode(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("visitsd-image-display", mode);
+    }
   }
 
   useEffect(() => {
@@ -428,6 +445,8 @@ function HomeContent() {
         onPriceChange={handlePriceChange}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        imageDisplayMode={imageDisplayMode}
+        onImageDisplayModeChange={handleImageDisplayModeChange}
       />
 
       <div className="relative z-0">
@@ -444,6 +463,7 @@ function HomeContent() {
               grouped={false}
               baseDelay={isFirstVisit ? 400 : 0}
               recommendedItems={recommendedItems}
+              imageDisplayMode={imageDisplayMode}
             />
             {!loading && isFiltered && <SurpriseBar restaurants={filtered} />}
             {!loading && !isFiltered && (
