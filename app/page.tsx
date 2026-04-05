@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase, type Restaurant } from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
@@ -13,7 +13,7 @@ import AdminButton from "@/components/AdminButton";
 function SkeletonCard() {
   return (
     <div className="bg-bg border-b border-brd">
-      <div className="w-full h-[140px] bg-bg2 animate-pulse" />
+      <div className="w-full aspect-[3/2] bg-bg2 animate-pulse" />
       <div className="p-5">
         <div className="h-3 w-16 bg-bg2 rounded-pill animate-pulse mb-2" />
         <div className="h-7 w-3/4 bg-bg2 animate-pulse mb-2" />
@@ -25,7 +25,7 @@ function SkeletonCard() {
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-0 bg-brd border-l border-brd">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0 bg-brd border-l border-brd">
       {Array.from({ length: 6 }).map((_, i) => (
         <SkeletonCard key={i} />
       ))}
@@ -41,29 +41,36 @@ export default function HomePage() {
   );
 }
 
-function AnimatedCounter({ value, duration = 800 }: { value: number; duration?: number }) {
-  const [display, setDisplay] = useState(0);
-  const ref = useRef<number>(0);
+function StatPill({ value, label, duration = 800 }: { value: number; label: string; duration?: number }) {
+  const [display, setDisplay] = useState(value);
+  const prevRef = useRef(value);
+  const initialRef = useRef(true);
 
   useEffect(() => {
-    if (value === 0) return;
+    if (initialRef.current) {
+      initialRef.current = false;
+      setDisplay(value);
+      prevRef.current = value;
+      return;
+    }
+    if (value === prevRef.current) return;
+
     const start = performance.now();
-    const from = ref.current;
+    const from = prevRef.current;
 
     function tick(now: number) {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      // ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
       const current = Math.round(from + (value - from) * eased);
       setDisplay(current);
       if (progress < 1) requestAnimationFrame(tick);
-      else ref.current = value;
+      else prevRef.current = value;
     }
     requestAnimationFrame(tick);
   }, [value, duration]);
 
-  return <>{display}</>;
+  return <>{`${display} ${label}`}</>;
 }
 
 function HomeContent() {
@@ -91,16 +98,28 @@ function HomeContent() {
   const [mustTryFilter, setMustTryFilter] = useState(
     searchParams.get("must_try") === "true",
   );
+  const [activePrices, setActivePrices] = useState<string[]>(() => {
+    const param = searchParams.get("price");
+    return param ? param.split(",") : [];
+  });
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [mounted, setMounted] = useState(false);
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const syncParams = useCallback(
-    (cuisines: string[], neighborhoods: string[], mustTry: boolean) => {
+    (cuisines: string[], neighborhoods: string[], mustTry: boolean, prices: string[]) => {
       const params = new URLSearchParams();
       if (cuisines.length > 0) params.set("cuisine", cuisines.join(","));
       if (neighborhoods.length > 0)
         params.set("neighborhood", neighborhoods.join(","));
       if (mustTry) params.set("must_try", "true");
+      if (prices.length > 0) params.set("price", prices.join(","));
       const qs = params.toString();
       router.replace(qs ? `/?${qs}` : "/", { scroll: false });
     },
@@ -109,15 +128,19 @@ function HomeContent() {
 
   function handleCuisineChange(v: string[]) {
     setActiveCuisines(v);
-    syncParams(v, activeNeighborhoods, mustTryFilter);
+    syncParams(v, activeNeighborhoods, mustTryFilter, activePrices);
   }
   function handleNeighborhoodChange(v: string[]) {
     setActiveNeighborhoods(v);
-    syncParams(activeCuisines, v, mustTryFilter);
+    syncParams(activeCuisines, v, mustTryFilter, activePrices);
   }
   function handleMustTryChange(v: boolean) {
     setMustTryFilter(v);
-    syncParams(activeCuisines, activeNeighborhoods, v);
+    syncParams(activeCuisines, activeNeighborhoods, v, activePrices);
+  }
+  function handlePriceChange(v: string[]) {
+    setActivePrices(v);
+    syncParams(activeCuisines, activeNeighborhoods, mustTryFilter, v);
   }
 
   useEffect(() => {
@@ -161,7 +184,7 @@ function HomeContent() {
   const neighborhoods = Array.from(
     new Set(restaurants.map((r) => r.neighborhood).filter(Boolean)),
   ).sort();
-  const filtered = restaurants.filter((r) => {
+  const filtered = useMemo(() => restaurants.filter((r) => {
     if (activeCuisines.length > 0 && !activeCuisines.includes(r.cuisine || ""))
       return false;
     if (
@@ -170,13 +193,18 @@ function HomeContent() {
     )
       return false;
     if (mustTryFilter && !r.must_try) return false;
-    if (
-      searchQuery.trim() &&
-      !r.name.toLowerCase().includes(searchQuery.trim().toLowerCase())
-    )
+    if (activePrices.length > 0 && !activePrices.includes(r.price || ""))
       return false;
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.trim().toLowerCase();
+      const searchable = [r.name, r.cuisine, r.neighborhood, r.note]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!searchable.includes(q)) return false;
+    }
     return true;
-  });
+  }), [restaurants, activeCuisines, activeNeighborhoods, mustTryFilter, activePrices, debouncedSearch]);
 
   const totalCount = restaurants.length;
   const cuisineCount = cuisines.length;
@@ -184,23 +212,25 @@ function HomeContent() {
     activeCuisines.length > 0 ||
     activeNeighborhoods.length > 0 ||
     mustTryFilter ||
-    searchQuery.trim() !== "";
+    activePrices.length > 0 ||
+    debouncedSearch.trim() !== "";
 
   function handleClearAll() {
     setActiveCuisines([]);
     setActiveNeighborhoods([]);
     setMustTryFilter(false);
+    setActivePrices([]);
     setSearchQuery("");
-    syncParams([], [], false);
+    syncParams([], [], false, []);
   }
 
   return (
     <main className="min-h-screen">
       {/* Hero */}
       <header
-        className={`grain relative pt-10 px-6 pb-6 border-b-2 border-txt transition-opacity duration-500 overflow-hidden ${mounted ? "opacity-100" : "opacity-0"}`}
+        className={`relative pt-10 px-6 pb-6 border-b-2 border-txt transition-opacity duration-500 overflow-hidden ${mounted ? "grain opacity-100" : "opacity-0"}`}
       >
-        <div className="absolute top-4 right-4 flex gap-2 z-10">
+        <div className={`absolute top-4 right-4 flex gap-2 ${mounted ? "z-10" : ""}`}>
           <AdminButton />
           <ThemeToggle />
         </div>
@@ -225,10 +255,10 @@ function HomeContent() {
           ).map(([count, label], i) => (
             <span
               key={label}
-              className="text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt text-txt animate-fade-up"
-              style={{ animationDelay: `${300 + i * 100}ms` }}
+              className={`text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt text-txt ${mounted ? "animate-fade-up" : "opacity-0"}`}
+              style={mounted ? { animationDelay: `${300 + i * 100}ms` } : undefined}
             >
-              <AnimatedCounter value={count} /> {label}
+              <StatPill value={count} label={label} />
             </span>
           ))}
         </div>
@@ -245,6 +275,8 @@ function HomeContent() {
         onViewModeChange={setViewMode}
         mustTryFilter={mustTryFilter}
         onMustTryFilterChange={handleMustTryChange}
+        activePrices={activePrices}
+        onPriceChange={handlePriceChange}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
       />
@@ -253,10 +285,16 @@ function HomeContent() {
         {isFiltered && !loading && (
           <div className="flex items-center justify-between py-2.5 px-6 border-b-2 border-txt">
             <p className="text-sm text-txt2 font-body">
-              Showing{" "}
-              <span className="font-medium text-txt">{filtered.length}</span> of{" "}
-              <span className="font-medium text-txt">{restaurants.length}</span>{" "}
-              spots
+              {searchQuery !== debouncedSearch ? (
+                <span className="text-txt2 opacity-60">Searching...</span>
+              ) : (
+                <>
+                  Showing{" "}
+                  <span className="font-medium text-txt">{filtered.length}</span> of{" "}
+                  <span className="font-medium text-txt">{restaurants.length}</span>{" "}
+                  spots
+                </>
+              )}
             </p>
             <button
               onClick={handleClearAll}
@@ -271,7 +309,7 @@ function HomeContent() {
           <SkeletonGrid />
         ) : viewMode === "map" ? (
           <div className="animate-fade-up">
-            <MapView restaurants={filtered} />
+            <MapView restaurants={filtered} allRestaurants={restaurants} />
           </div>
         ) : (
           <RestaurantGrid restaurants={filtered} grouped={false} />

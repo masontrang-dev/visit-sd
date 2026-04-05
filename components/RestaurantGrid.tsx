@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { type Restaurant, type RestaurantVisit } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 
@@ -106,16 +107,18 @@ function Card({
       style={{ borderLeft: `3px solid ${cuisineColor}` }}
     >
       {r.photo_url && (
-        <div className="relative overflow-hidden">
-          <img
+        <div className="relative overflow-hidden aspect-[3/2]">
+          <Image
             src={r.photo_url}
             alt={r.name}
-            loading="lazy"
-            className="w-full h-[100px] object-cover block transition-transform duration-300 group-hover:scale-105"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
-              (e.target as HTMLImageElement).parentElement!.style.display =
+              (e.target as HTMLImageElement).parentElement!.parentElement!.style.display =
                 "none";
             }}
+            unoptimized
           />
           <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg/40 to-transparent pointer-events-none" />
         </div>
@@ -302,7 +305,7 @@ function FadeUpCard({ children, delay }: { children: React.ReactNode; delay: num
 }
 
 const gridClass =
-  "grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-0 bg-brd border-l border-brd";
+  "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0 bg-brd border-l border-brd";
 
 const BATCH_SIZE = 12;
 

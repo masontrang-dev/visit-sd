@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 type Props = {
   cuisines: string[];
@@ -14,6 +14,8 @@ type Props = {
   onViewModeChange?: (mode: "list" | "map") => void;
   mustTryFilter?: boolean;
   onMustTryFilterChange?: (v: boolean) => void;
+  activePrices?: string[];
+  onPriceChange?: (prices: string[]) => void;
   isAdminView?: boolean;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
@@ -41,15 +43,18 @@ export default function FilterBar({
   onViewModeChange,
   mustTryFilter,
   onMustTryFilterChange,
+  activePrices,
+  onPriceChange,
   isAdminView,
   searchQuery,
   onSearchChange,
 }: Props) {
-  const [activePanel, setActivePanel] = useState<"cuisine" | "area" | null>(
+  const [activePanel, setActivePanel] = useState<"cuisine" | "area" | "price" | null>(
     null,
   );
 
   const [isScrolled, setIsScrolled] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 10);
@@ -58,22 +63,25 @@ export default function FilterBar({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Close panel on clicks outside the filter bar
+  useEffect(() => {
+    if (!activePanel) return;
+    function handleClick(e: MouseEvent) {
+      if (barRef.current && !barRef.current.contains(e.target as Node)) {
+        setActivePanel(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [activePanel]);
+
   const hasCuisineFilter = activeCuisines.length > 0;
   const hasAreaFilter = (activeNeighborhoods ?? []).length > 0;
+  const hasPriceFilter = (activePrices ?? []).length > 0;
   const panelOpen = activePanel !== null;
 
   return (
-    <>
-      {/* Sticky bar with two rows */}
-      {/* Backdrop for click-outside-to-close — must be outside backdrop-blur parent */}
-      {panelOpen && (
-        <div
-          className="fixed inset-0 z-[9] bg-txt/5"
-          onClick={() => setActivePanel(null)}
-        />
-      )}
-
-      <div className={`sticky top-0 z-10 bg-bg isolate transition-[border-color] duration-200 ${isScrolled ? "border-b-2 border-txt" : "border-b-2 border-transparent"}`}>
+      <div ref={barRef} className={`sticky top-0 z-10 bg-bg isolate transition-[border-color] duration-200 ${isScrolled ? "border-b-2 border-txt" : "border-b-2 border-transparent"}`}>
         {/* Row 1: Search + View toggle + Add */}
         <div className="flex gap-2 pt-3 pb-2 px-6 items-center flex-wrap">
           {onSearchChange != null && (
@@ -147,6 +155,23 @@ export default function FilterBar({
             </button>
           )}
 
+          {/* Price toggle */}
+          {onPriceChange && (
+            <button
+              className={`chip flex items-center gap-1.5 ${hasPriceFilter || activePanel === "price" ? "!border-txt !bg-txt !text-bg" : ""}`}
+              onClick={() =>
+                setActivePanel(activePanel === "price" ? null : "price")
+              }
+            >
+              {filterLabel(activePrices ?? [], "Price")}
+              <span
+                className={`text-2xs transition-transform duration-[0.12s] ${activePanel === "price" ? "rotate-180" : ""}`}
+              >
+                ▾
+              </span>
+            </button>
+          )}
+
           {/* Must-Try */}
           {onMustTryFilterChange && (
             <button
@@ -172,7 +197,7 @@ export default function FilterBar({
           {/* Panel header */}
           <div className="flex items-center justify-between mb-2.5">
             <span className="font-body text-xs font-medium text-txt2 uppercase tracking-wide">
-              {activePanel === "cuisine" ? "Cuisine" : "Area"}
+              {activePanel === "cuisine" ? "Cuisine" : activePanel === "area" ? "Area" : "Price"}
             </span>
             <button
               onClick={() => setActivePanel(null)}
@@ -237,6 +262,33 @@ export default function FilterBar({
                 ))}
               </div>
             )}
+
+          {/* Price chips */}
+          {activePanel === "price" && onPriceChange && (
+            <div className="flex gap-1.5 flex-wrap items-center">
+              <button
+                className={!hasPriceFilter ? "chip-active" : "chip"}
+                onClick={() => onPriceChange([])}
+              >
+                All
+              </button>
+              {["$", "$$", "$$$", "$$$$"].map((p) => (
+                <button
+                  key={p}
+                  className={
+                    (activePrices ?? []).includes(p)
+                      ? "chip-active"
+                      : "chip"
+                  }
+                  onClick={() =>
+                    onPriceChange(toggleItem(activePrices ?? [], p))
+                  }
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         </div>
         </div>
@@ -247,6 +299,5 @@ export default function FilterBar({
           style={{ opacity: panelOpen ? 1 : 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.06), transparent)" }}
         />
       </div>
-    </>
   );
 }

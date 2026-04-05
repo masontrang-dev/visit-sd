@@ -16,6 +16,7 @@ import AddModal from "@/components/AddModal";
 import OrderModal from "@/components/OrderModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import Link from "next/link";
+import Image from "next/image";
 
 function Chevron({ open, className = "" }: { open: boolean; className?: string }) {
   return (
@@ -410,7 +411,7 @@ export default function RestaurantDetailPage({ params }: Props) {
   return (
     <main className={`min-h-screen ${isAdmin ? "pb-20" : ""}`}>
       {/* Breadcrumb */}
-      <div className="p-6 pb-4 border-b border-brd">
+      <div className="sticky top-0 z-10 bg-bg p-6 pb-4 border-b border-brd">
         <Link
           href={isAdmin ? "/admin" : "/"}
           className="text-xs tracking-wide uppercase font-medium text-accent2 no-underline"
@@ -422,15 +423,19 @@ export default function RestaurantDetailPage({ params }: Props) {
       {/* Restaurant Header */}
       <div className="border-b-2 border-txt">
         {restaurant.photo_url && (
-          <div className="relative overflow-hidden">
-            <img
+          <div className="relative overflow-hidden aspect-[16/9] max-h-[400px]">
+            <Image
               key={restaurant.photo_url}
               src={restaurant.photo_url}
               alt={restaurant.name}
-              className="w-full h-[400px] object-cover block"
+              fill
+              sizes="100vw"
+              priority
+              className="object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).parentElement!.style.display = "none";
+                (e.target as HTMLImageElement).parentElement!.parentElement!.style.display = "none";
               }}
+              unoptimized
             />
             <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-bg to-transparent pointer-events-none" />
           </div>
