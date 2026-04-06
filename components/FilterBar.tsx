@@ -134,58 +134,74 @@ export default function FilterBar({
         )}
       </div>
 
-      {/* Row 2: View toggle */}
-      <div className="flex gap-2 pb-2 px-6 items-center flex-wrap">
-        {/* View mode toggle */}
-        {onViewModeChange && (
-          <>
-            <span className="text-2xs font-medium text-txt2 uppercase tracking-wide">
-              View:
-            </span>
-            <div className="flex gap-1">
-              <button
-                className={viewMode === "list" ? "chip-active" : "chip"}
-                onClick={() => {
-                  if (viewMode === "list" && onImageDisplayModeChange) {
-                    // Cycle through image display modes when already in list view
-                    const modes: ImageDisplayMode[] = [
-                      "full",
-                      "compact",
-                      "none",
-                    ];
-                    const currentIndex = modes.indexOf(
-                      imageDisplayMode || "full",
-                    );
-                    const nextIndex = (currentIndex + 1) % modes.length;
-                    onImageDisplayModeChange(modes[nextIndex]);
-                  } else {
-                    // Switch to list view
-                    onViewModeChange("list");
+      {/* Row 2: View toggle + Must Try */}
+      <div className="flex gap-2 pb-2 px-6 items-center justify-between flex-wrap">
+        <div className="flex gap-2 items-center">
+          {/* View mode toggle */}
+          {onViewModeChange && (
+            <>
+              <span className="text-2xs font-medium text-txt2 uppercase tracking-wide">
+                View:
+              </span>
+              <div className="flex gap-1">
+                <button
+                  className={viewMode === "list" ? "chip-active" : "chip"}
+                  onClick={() => {
+                    if (viewMode === "list" && onImageDisplayModeChange) {
+                      // Cycle through image display modes when already in list view
+                      const modes: ImageDisplayMode[] = [
+                        "full",
+                        "compact",
+                        "none",
+                      ];
+                      const currentIndex = modes.indexOf(
+                        imageDisplayMode || "full",
+                      );
+                      const nextIndex = (currentIndex + 1) % modes.length;
+                      onImageDisplayModeChange(modes[nextIndex]);
+                    } else {
+                      // Switch to list view
+                      onViewModeChange("list");
+                    }
+                  }}
+                  title={
+                    viewMode === "list"
+                      ? `List view: ${imageDisplayMode === "full" ? "Full images" : imageDisplayMode === "compact" ? "Compact images" : "No images"} (click to cycle)`
+                      : "Switch to list view"
                   }
-                }}
-                title={
-                  viewMode === "list"
-                    ? `List view: ${imageDisplayMode === "full" ? "Full images" : imageDisplayMode === "compact" ? "Compact images" : "No images"} (click to cycle)`
-                    : "Switch to list view"
-                }
-              >
-                {viewMode === "list"
-                  ? imageDisplayMode === "full"
-                    ? "Full 🖼️"
-                    : imageDisplayMode === "compact"
-                      ? "Compact ▢"
-                      : "List ☰"
-                  : "List ☰"}
-              </button>
-              <button
-                className={viewMode === "map" ? "chip-active" : "chip"}
-                onClick={() => onViewModeChange("map")}
-                title="Switch to map view"
-              >
-                Map
-              </button>
-            </div>
-          </>
+                >
+                  {viewMode === "list"
+                    ? imageDisplayMode === "full"
+                      ? "Full 🖼️"
+                      : imageDisplayMode === "compact"
+                        ? "Compact ▢"
+                        : "List ☰"
+                    : "List ☰"}
+                </button>
+                <button
+                  className={viewMode === "map" ? "chip-active" : "chip"}
+                  onClick={() => onViewModeChange("map")}
+                  title="Switch to map view"
+                >
+                  Map
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Must-Try button on the right */}
+        {onMustTryFilterChange && (
+          <button
+            className={
+              mustTryFilter
+                ? "chip !border-accent !bg-accent !text-white"
+                : "chip"
+            }
+            onClick={() => onMustTryFilterChange(!mustTryFilter)}
+          >
+            ★ Must-Try
+          </button>
         )}
       </div>
 
@@ -278,20 +294,6 @@ export default function FilterBar({
             >
               ▾
             </span>
-          </button>
-        )}
-
-        {/* Must-Try */}
-        {onMustTryFilterChange && (
-          <button
-            className={
-              mustTryFilter
-                ? "chip !border-accent !bg-accent !text-white"
-                : "chip"
-            }
-            onClick={() => onMustTryFilterChange(!mustTryFilter)}
-          >
-            ★ Must-Try
           </button>
         )}
 
@@ -415,14 +417,15 @@ export default function FilterBar({
       </div>
 
       {/* Shadow — absolutely positioned so it's not clipped */}
-      <div
-        className="absolute left-0 right-0 bottom-0 h-6 pointer-events-none translate-y-full transition-opacity duration-200"
-        style={{
-          opacity: panelOpen ? 1 : 0,
-          background:
-            "linear-gradient(to bottom, rgba(0,0,0,0.06), transparent)",
-        }}
-      />
+      {panelOpen && (
+        <div
+          className="absolute left-0 right-0 bottom-0 h-6 pointer-events-none translate-y-full transition-opacity duration-200"
+          style={{
+            background:
+              "linear-gradient(to bottom, rgba(0,0,0,0.06), transparent)",
+          }}
+        />
+      )}
     </div>
   );
 }

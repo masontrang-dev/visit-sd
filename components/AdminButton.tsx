@@ -19,7 +19,8 @@ export default function AdminButton() {
     }
     if (showMenu) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showMenu]);
 
@@ -56,25 +57,7 @@ export default function AdminButton() {
         A
       </button>
       {showMenu && (
-        <div className="absolute right-0 top-full mt-2 bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[140px]">
-          {!isAdminPage && (
-            <a
-              href="/admin"
-              className="block px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
-              onClick={() => setShowMenu(false)}
-            >
-              Manage spots
-            </a>
-          )}
-          {isAdminPage && (
-            <a
-              href="/"
-              className="block px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
-              onClick={() => setShowMenu(false)}
-            >
-              Public view
-            </a>
-          )}
+        <div className="absolute right-0 top-full mt-2 bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[100px]">
           <button
             onClick={async () => {
               await logout();

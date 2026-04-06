@@ -12,9 +12,11 @@ import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar, { type ImageDisplayMode } from "@/components/FilterBar";
 import AddModal from "@/components/AddModal";
 import OrderModal from "@/components/OrderModal";
+import MapView from "@/components/MapView";
 import Link from "next/link";
 import AdminButton from "@/components/AdminButton";
 import ThemeToggle from "@/components/ThemeToggle";
+import AdminViewToggle from "@/components/AdminViewToggle";
 
 export default function AdminPage() {
   const { isAdmin, isLoading: authLoading, username, login } = useAuth();
@@ -63,6 +65,16 @@ export default function AdminPage() {
       return "full";
     },
   );
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [activePrices, setActivePrices] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   async function loadStats() {
     setStatsLoading(true);
@@ -275,6 +287,16 @@ export default function AdminPage() {
     )
       return false;
     if (mustTryFilter && !r.must_try) return false;
+    if (activePrices.length > 0 && !activePrices.includes(r.price || ""))
+      return false;
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.trim().toLowerCase();
+      const searchable = [r.name, r.cuisine, r.neighborhood, r.note]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!searchable.includes(q)) return false;
+    }
     return true;
   });
 
@@ -332,9 +354,12 @@ export default function AdminPage() {
   return (
     <main className="min-h-screen">
       <header className="relative pt-10 px-6 pb-6 border-b-2 border-txt">
-        <div className="absolute top-4 right-4 flex gap-2">
-          <AdminButton />
-          <ThemeToggle />
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+          <div className="flex gap-2">
+            <AdminButton />
+            <ThemeToggle />
+          </div>
+          <AdminViewToggle />
         </div>
         <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
           Admin · San Diego
@@ -362,9 +387,15 @@ export default function AdminPage() {
           setEditingRestaurant(null);
           setShowModal(true);
         }}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
         mustTryFilter={mustTryFilter}
         onMustTryFilterChange={setMustTryFilter}
+        activePrices={activePrices}
+        onPriceChange={setActivePrices}
         isAdminView
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
         imageDisplayMode={imageDisplayMode}
         onImageDisplayModeChange={handleImageDisplayModeChange}
       />
@@ -373,13 +404,17 @@ export default function AdminPage() {
 
       {loading ? (
         <p className="py-12 px-6 text-txt2">Loading...</p>
+      ) : viewMode === "map" ? (
+        <MapView restaurants={filtered} allRestaurants={restaurants} />
       ) : (
         <RestaurantGrid
           restaurants={filtered}
           grouped={
             activeCuisines.length === 0 &&
             activeNeighborhoods.length === 0 &&
-            !mustTryFilter
+            !mustTryFilter &&
+            activePrices.length === 0 &&
+            debouncedSearch.trim() === ""
           }
           onEdit={(r) => {
             setEditingRestaurant(r);

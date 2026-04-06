@@ -18,6 +18,7 @@ import SurpriseBar from "@/components/SurpriseBar";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import AdminButton from "@/components/AdminButton";
+import AdminViewToggle from "@/components/AdminViewToggle";
 
 function SkeletonCard() {
   return (
@@ -359,10 +360,13 @@ function HomeContent() {
           className={`relative pt-6 md:pt-10 px-6 pb-4 md:pb-6 border-b-2 border-txt transition-opacity duration-500 overflow-hidden ${mounted ? "grain opacity-100" : "opacity-0"}`}
         >
           <div
-            className={`absolute top-4 right-4 flex gap-2 ${mounted ? "z-10" : ""}`}
+            className={`absolute top-4 right-4 flex flex-col items-end gap-2 ${mounted ? "z-10" : ""}`}
           >
-            <AdminButton />
-            <ThemeToggle />
+            <div className="flex gap-2">
+              <AdminButton />
+              <ThemeToggle />
+            </div>
+            <AdminViewToggle />
           </div>
           <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
             Local Picks · San Diego
@@ -416,9 +420,12 @@ function HomeContent() {
         </header>
       ) : (
         <div className="relative">
-          <div className="absolute top-4 right-4 flex gap-2 z-10">
-            <AdminButton />
-            <ThemeToggle />
+          <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-10">
+            <div className="flex gap-2">
+              <AdminButton />
+              <ThemeToggle />
+            </div>
+            <AdminViewToggle />
           </div>
           <ContextHeader
             activeCuisines={activeCuisines}
