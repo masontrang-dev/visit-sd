@@ -19,6 +19,7 @@ import OrderModal from "@/components/OrderModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import Link from "next/link";
 import Image from "next/image";
+import { isCurrentlyOpen } from "@/lib/google-types";
 
 function Chevron({
   open,
@@ -540,11 +541,21 @@ export default function RestaurantDetailPage({ params }: Props) {
             <p className="text-xs tracking-wide uppercase font-medium text-accent">
               {restaurant.cuisine}
             </p>
-            {restaurant.hours_text && (
-              <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-[#EAF3DE] text-[#27500A] tracking-tight">
-                {restaurant.hours_text}
-              </span>
-            )}
+            {(() => {
+              const openNow = isCurrentlyOpen(restaurant.opening_hours);
+              if (openNow === null) return null;
+              return (
+                <span
+                  className={`text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight ${
+                    openNow
+                      ? "bg-[#EAF3DE] text-[#27500A]"
+                      : "bg-[#F1EFE8] text-[#5F5E5A]"
+                  }`}
+                >
+                  {openNow ? "Open now" : "Closed"}
+                </span>
+              );
+            })()}
           </div>
           <h1 className="font-display text-[clamp(48px,8vw,72px)] leading-[0.9] tracking-tight mb-3">
             {restaurant.name}

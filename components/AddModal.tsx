@@ -7,6 +7,11 @@ import { useAuth } from "@/lib/auth-context";
 import imageCompression from "browser-image-compression";
 import ConfirmModal from "@/components/ConfirmModal";
 import { type Restaurant } from "@/lib/supabase";
+import {
+  extractCuisineFromTypes,
+  extractNeighborhood,
+  DEFAULT_CUISINE_OPTIONS,
+} from "@/lib/google-types";
 
 type Props = {
   onSave: (entry: Omit<Restaurant, "id" | "created_at">) => Promise<boolean>;
@@ -31,105 +36,12 @@ const OCCASION_SUGGESTIONS = [
   "business-lunch",
 ];
 
-const GOOGLE_TYPE_TO_CUISINE: Record<string, string> = {
-  mexican_restaurant: "Mexican",
-  italian_restaurant: "Italian",
-  japanese_restaurant: "Japanese",
-  chinese_restaurant: "Chinese",
-  thai_restaurant: "Thai",
-  indian_restaurant: "Indian",
-  korean_restaurant: "Korean",
-  vietnamese_restaurant: "Vietnamese",
-  french_restaurant: "French",
-  greek_restaurant: "Greek",
-  mediterranean_restaurant: "Mediterranean",
-  middle_eastern_restaurant: "Middle Eastern",
-  seafood_restaurant: "Seafood",
-  steak_house: "Steakhouse",
-  sushi_restaurant: "Sushi",
-  pizza_restaurant: "Pizza",
-  hamburger_restaurant: "Burgers",
-  barbecue_restaurant: "BBQ",
-  breakfast_restaurant: "Breakfast",
-  brunch_restaurant: "Brunch",
-  vegan_restaurant: "Vegan",
-  vegetarian_restaurant: "Vegetarian",
-  ramen_restaurant: "Ramen",
-  sandwich_shop: "Sandwiches",
-  cafe: "Cafe",
-  coffee_shop: "Coffee",
-  bakery: "Bakery",
-  ice_cream_shop: "Dessert",
-  bar: "Bar",
-  american_restaurant: "American",
-  spanish_restaurant: "Spanish",
-  turkish_restaurant: "Turkish",
-  brazilian_restaurant: "Brazilian",
-  peruvian_restaurant: "Peruvian",
-  lebanese_restaurant: "Lebanese",
-  african_restaurant: "African",
-  ethiopian_restaurant: "Ethiopian",
-  caribbean_restaurant: "Caribbean",
-};
-
 const PRICE_LEVEL_MAP: Record<number, string> = {
   1: "$",
   2: "$$",
   3: "$$$",
   4: "$$$$",
 };
-
-function extractCuisine(types: string[]): string | null {
-  for (const t of types) {
-    if (GOOGLE_TYPE_TO_CUISINE[t]) return GOOGLE_TYPE_TO_CUISINE[t];
-  }
-  return null;
-}
-
-const DEFAULT_CUISINE_OPTIONS = [
-  "African",
-  "American",
-  "Asian Fusion",
-  "BBQ",
-  "Bakery",
-  "Bar",
-  "Brazilian",
-  "Breakfast",
-  "Brunch",
-  "Burgers",
-  "Cafe",
-  "Caribbean",
-  "Chinese",
-  "Coffee",
-  "Dessert",
-  "Ethiopian",
-  "French",
-  "Greek",
-  "Hawaiian",
-  "Indian",
-  "Italian",
-  "Japanese",
-  "Korean",
-  "Lebanese",
-  "Mediterranean",
-  "Mexican",
-  "Middle Eastern",
-  "Peruvian",
-  "Pizza",
-  "Ramen",
-  "Sandwiches",
-  "Seafood",
-  "Southern",
-  "Spanish",
-  "Steakhouse",
-  "Sushi",
-  "Tacos",
-  "Thai",
-  "Turkish",
-  "Vegan",
-  "Vegetarian",
-  "Vietnamese",
-];
 
 const labelCls =
   "block text-xs tracking-wide uppercase font-medium text-txt2 mb-1";
@@ -182,9 +94,15 @@ export default function AddModal({
     editData?.occasions ?? [],
   );
   const [occasionInput, setOccasionInput] = useState("");
+  const [openingHours, setOpeningHours] = useState<any>(
+    editData?.opening_hours ?? null,
+  );
+  const [storefrontPhotoUrl, setStorefrontPhotoUrl] = useState<string | null>(
+    editData?.storefront_photo_url ?? null,
+  );
 
   const cuisineOptions = Array.from(
-    new Set([...(existingCuisines ?? []), ...DEFAULT_CUISINE_OPTIONS]),
+    new Set([...DEFAULT_CUISINE_OPTIONS, ...(existingCuisines ?? [])]),
   ).sort();
   const filteredCuisines = cuisine.trim()
     ? cuisineOptions.filter((c) =>
@@ -227,15 +145,14 @@ export default function AddModal({
         setLat(place.geometry.location.lat());
         setLng(place.geometry.location.lng());
       }
-      // Try to extract neighborhood from address components
-      const hood = place.address_components?.find(
-        (c) =>
-          c.types.includes("neighborhood") || c.types.includes("sublocality"),
-      );
-      if (hood) setNeighborhood(hood.long_name);
-      // Auto-detect cuisine from place types
+      // Extract neighborhood from address components with fallback chain
+      if (place.address_components) {
+        const hood = extractNeighborhood(place.address_components);
+        if (hood) setNeighborhood(hood);
+      }
+      // Auto-detect cuisine from Google place types
       if (place.types) {
-        const detected = extractCuisine(place.types);
+        const detected = extractCuisineFromTypes(place.types);
         if (detected) setCuisine(detected);
       }
       // Auto-detect price range from price_level
@@ -248,6 +165,22 @@ export default function AddModal({
       }
       if (place.user_ratings_total != null) {
         setGoogleReviewCount(place.user_ratings_total);
+      }
+      // Auto-populate opening hours
+      const openingHoursData =
+        place.opening_hours || (place as any).current_opening_hours;
+      if (openingHoursData) {
+        setOpeningHours({
+          weekday_text: openingHoursData.weekday_text || [],
+          periods: openingHoursData.periods || [],
+        });
+      }
+      // Auto-populate storefront photo from first Google photo
+      if (place.photos && place.photos.length > 0) {
+        const photoRef = place.photos[0].getUrl({ maxWidth: 800 });
+        if (photoRef) {
+          setStorefrontPhotoUrl(photoRef);
+        }
       }
     },
     [],
@@ -277,6 +210,9 @@ export default function AddModal({
             "types",
             "rating",
             "user_ratings_total",
+            "opening_hours",
+            "current_opening_hours",
+            "photos",
           ],
         },
       );
@@ -390,7 +326,7 @@ export default function AddModal({
       lat,
       lng,
       photo_url: finalPhotoUrl.trim() || null,
-      storefront_photo_url: editData?.storefront_photo_url ?? null,
+      storefront_photo_url: storefrontPhotoUrl,
       must_try: mustTry,
       date_added: editData?.date_added ?? null,
       last_visited: editData?.last_visited ?? null,
@@ -398,9 +334,7 @@ export default function AddModal({
       google_review_count: googleReviewCount,
       my_rating: myRating,
       occasions: occasions.length > 0 ? occasions : null,
-      is_open_now: editData?.is_open_now ?? null,
-      hours_text: editData?.hours_text ?? null,
-      opening_hours: editData?.opening_hours ?? null,
+      opening_hours: openingHours,
     });
 
     // Save rating history if rating changed

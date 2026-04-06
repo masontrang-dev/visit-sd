@@ -15,39 +15,42 @@ export const dynamic = "force-dynamic";
 
 type PlaceDetails = {
   rating?: number;
-  user_ratings_total?: number;
-  photos?: Array<{
-    photo_reference: string;
-    height: number;
-    width: number;
-  }>;
-  opening_hours?: {
-    open_now?: boolean;
-    weekday_text?: string[];
+  userRatingCount?: number;
+  regularOpeningHours?: {
+    openNow?: boolean;
+    weekdayDescriptions?: string[];
     periods?: Array<{
-      open: { day: number; time: string };
-      close?: { day: number; time: string };
+      open: { day: number; hour: number; minute: number };
+      close?: { day: number; hour: number; minute: number };
     }>;
   };
-  current_opening_hours?: {
-    open_now?: boolean;
-    weekday_text?: string[];
+  currentOpeningHours?: {
+    openNow?: boolean;
+    weekdayDescriptions?: string[];
     periods?: Array<{
-      open: { day: number; time: string };
-      close?: { day: number; time: string };
+      open: { day: number; hour: number; minute: number };
+      close?: { day: number; hour: number; minute: number };
     }>;
   };
 };
 
-async function fetchPlaceDetails(placeId: string): Promise<{ result?: PlaceDetails; status: string }> {
-  const fields = "rating,user_ratings_total,opening_hours,current_opening_hours,photos";
-  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${googleApiKey}`;
-  const res = await fetch(url);
-  return res.json();
-}
+const PLACE_FIELDS = [
+  "rating",
+  "userRatingCount",
+  "regularOpeningHours",
+  "currentOpeningHours",
+].join(",");
 
-function buildPhotoUrl(photoReference: string): string {
-  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photoReference}&key=${googleApiKey}`;
+async function fetchPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
+  const url = `https://places.googleapis.com/v1/places/${placeId}`;
+  const res = await fetch(url, {
+    headers: {
+      "X-Goog-Api-Key": googleApiKey,
+      "X-Goog-FieldMask": PLACE_FIELDS,
+    },
+  });
+  if (!res.ok) return null;
+  return res.json();
 }
 
 export async function POST(req: NextRequest) {
@@ -69,7 +72,7 @@ export async function POST(req: NextRequest) {
 
   const { data: restaurants, error } = await supabase
     .from("restaurants")
-    .select("id, name, place_id, photo_url")
+    .select("id, name, place_id")
     .not("place_id", "is", null)
     .neq("place_id", "");
 
@@ -81,45 +84,25 @@ export async function POST(req: NextRequest) {
 
   for (const restaurant of restaurants) {
     try {
-      const response = await fetchPlaceDetails(restaurant.place_id);
+      const details = await fetchPlaceDetails(restaurant.place_id);
 
-      if (response.status !== "OK") {
-        results.push({ name: restaurant.name, status: `error: ${response.status}` });
-        continue;
-      }
-
-      const details = response.result;
       if (!details) {
-        results.push({ name: restaurant.name, status: "no result" });
+        results.push({ name: restaurant.name, status: "fetch failed" });
         continue;
       }
 
-      const openingHours = details.opening_hours || details.current_opening_hours;
-
-      // Build storefront photo URL from first Google photo
-      const storefrontPhotoUrl = details.photos?.[0]?.photo_reference
-        ? buildPhotoUrl(details.photos[0].photo_reference)
-        : null;
+      const openingHours = details.regularOpeningHours || details.currentOpeningHours;
 
       const updateData: Record<string, unknown> = {
         google_rating: details.rating ?? null,
-        google_review_count: details.user_ratings_total ?? null,
-        is_open_now: openingHours?.open_now ?? null,
-        hours_text: openingHours?.open_now != null
-          ? openingHours.open_now ? "Open now" : "Closed"
-          : null,
+        google_review_count: details.userRatingCount ?? null,
         opening_hours: openingHours
           ? {
-              weekday_text: openingHours.weekday_text || [],
+              weekday_text: openingHours.weekdayDescriptions || [],
               periods: openingHours.periods || [],
             }
           : null,
       };
-
-      // Always refresh storefront photo (photo_references expire)
-      if (storefrontPhotoUrl) {
-        updateData.storefront_photo_url = storefrontPhotoUrl;
-      }
 
       const { error: updateError } = await supabase
         .from("restaurants")

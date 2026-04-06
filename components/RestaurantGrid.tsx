@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import IllustrationEmpty from "@/components/IllustrationEmpty";
 import { formatRecencyTag } from "@/lib/utils";
+import { isCurrentlyOpen } from "@/lib/google-types";
 import { type ImageDisplayMode } from "@/components/FilterBar";
 
 type Props = {
@@ -91,6 +92,7 @@ function Card({
   visits,
   recommendedItems,
   imageDisplayMode = "full",
+  onNavigate,
 }: {
   r: Restaurant;
   cuisineColor: string;
@@ -101,6 +103,7 @@ function Card({
   visits?: Record<number, RestaurantVisit[]>;
   recommendedItems?: MenuItem[];
   imageDisplayMode?: ImageDisplayMode;
+  onNavigate?: () => void;
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const isAdmin = !!(onEdit || onMarkVisited || onOrder);
@@ -121,6 +124,7 @@ function Card({
   return (
     <Link
       href={`/restaurant/${r.id}`}
+      onClick={() => onNavigate?.()}
       className="group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-all duration-150 hover:bg-bg2 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.98]"
       style={{
         borderLeft: r.must_try
@@ -172,19 +176,23 @@ function Card({
                   {recencyTag.text}
                 </span>
               )}
-              {r.is_open_now !== null && (
-                <span
-                  className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
-                  style={{
-                    backgroundColor: r.is_open_now
-                      ? "rgba(234, 243, 222, 0.95)"
-                      : "rgba(241, 239, 232, 0.95)",
-                    color: r.is_open_now ? "#27500A" : "#5F5E5A",
-                  }}
-                >
-                  {r.is_open_now ? "Open now" : r.hours_text || "Closed"}
-                </span>
-              )}
+              {(() => {
+                const openNow = isCurrentlyOpen(r.opening_hours);
+                if (openNow === null) return null;
+                return (
+                  <span
+                    className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
+                    style={{
+                      backgroundColor: openNow
+                        ? "rgba(234, 243, 222, 0.95)"
+                        : "rgba(241, 239, 232, 0.95)",
+                      color: openNow ? "#27500A" : "#5F5E5A",
+                    }}
+                  >
+                    {openNow ? "Open now" : "Closed"}
+                  </span>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -422,6 +430,9 @@ const gridClass =
 
 const BATCH_SIZE = 12;
 
+const SCROLL_STORAGE_KEY = "visitsd-grid-scroll";
+const SCROLL_POS_KEY = SCROLL_STORAGE_KEY + "-pos";
+
 function InfiniteCardGrid({
   restaurants,
   cuisineColorMap,
@@ -445,16 +456,52 @@ function InfiniteCardGrid({
   recommendedItems?: Record<number, MenuItem[]>;
   imageDisplayMode?: ImageDisplayMode;
 }) {
-  const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
+  const [visibleCount, setVisibleCount] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(SCROLL_STORAGE_KEY);
+      if (saved) {
+        return Math.max(parseInt(saved, 10), BATCH_SIZE);
+      }
+    } catch {}
+    return BATCH_SIZE;
+  });
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const prevRestaurantIdsRef = useRef<string>("");
+  const restoredRef = useRef(false);
+  const [isRestoring] = useState(() => {
+    try {
+      return !!sessionStorage.getItem(SCROLL_POS_KEY);
+    } catch {
+      return false;
+    }
+  });
+
+  // Restore scroll position after the grid has rendered with the saved visible count
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    try {
+      const raw = sessionStorage.getItem(SCROLL_POS_KEY);
+      sessionStorage.removeItem(SCROLL_STORAGE_KEY);
+      sessionStorage.removeItem(SCROLL_POS_KEY);
+      if (raw) {
+        const scrollY = parseInt(raw, 10);
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollY);
+        });
+      }
+    } catch {}
+  }, []);
 
   // Reset visible count only when the actual restaurant list changes (not on re-renders)
   useEffect(() => {
     const currentIds = restaurants.map((r) => r.id).join(",");
     if (prevRestaurantIdsRef.current !== currentIds) {
-      setVisibleCount(BATCH_SIZE);
+      // Don't reset if this is the initial load (restoration case)
+      if (prevRestaurantIdsRef.current !== "") {
+        setVisibleCount(BATCH_SIZE);
+      }
       prevRestaurantIdsRef.current = currentIds;
     }
   }, [restaurants]);
@@ -486,11 +533,18 @@ function InfiniteCardGrid({
   const visible = restaurants.slice(0, visibleCount);
   const hasMore = visibleCount < restaurants.length;
 
+  const handleNavigate = useCallback(() => {
+    try {
+      sessionStorage.setItem(SCROLL_STORAGE_KEY, String(visibleCount));
+      sessionStorage.setItem(SCROLL_POS_KEY, String(window.scrollY));
+    } catch {}
+  }, [visibleCount]);
+
   return (
     <>
       <div className={gridClass}>
-        {visible.map((r, i) => (
-          <FadeUpCard key={r.id} delay={(i % BATCH_SIZE) * 50 + baseDelay}>
+        {visible.map((r, i) => {
+          const card = (
             <Card
               r={r}
               cuisineColor={
@@ -503,9 +557,17 @@ function InfiniteCardGrid({
               visits={visits}
               recommendedItems={recommendedItems?.[r.id]}
               imageDisplayMode={imageDisplayMode}
+              onNavigate={handleNavigate}
             />
-          </FadeUpCard>
-        ))}
+          );
+          return isRestoring ? (
+            <div key={r.id}>{card}</div>
+          ) : (
+            <FadeUpCard key={r.id} delay={(i % BATCH_SIZE) * 50 + baseDelay}>
+              {card}
+            </FadeUpCard>
+          );
+        })}
       </div>
       {hasMore && (
         <>

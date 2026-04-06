@@ -23,8 +23,6 @@ export type Restaurant = {
   google_review_count: number | null;
   my_rating: number | null;
   occasions: string[] | null;
-  is_open_now: boolean | null;
-  hours_text: string | null;
   opening_hours: any | null;
 };
 
