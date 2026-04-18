@@ -31,6 +31,9 @@ export type RestaurantVisit = {
   restaurant_id: number;
   visited_by: string;
   visited_at: string;
+  rating?: number | null;
+  note?: string | null;
+  photo_url?: string | null;
 };
 
 export type RatingHistory = {

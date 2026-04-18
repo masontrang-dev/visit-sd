@@ -5,3 +5,7 @@ node_modules/
 .env*.local
 /scripts
 /graze
+CHECK_*.sql
+DEBUG_*.sql
+FIX_*.sql
+VERIFY_*.sql

@@ -22,8 +22,6 @@ type AuthContextType = {
   roles: UserRole[];
   displayName: string | null;
   signInWithGoogle: () => Promise<void>;
-  signInWithGithub: () => Promise<void>;
-  signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshAuth: () => Promise<void>;
 };
@@ -91,24 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const signInWithGithub = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-  };
-
-  const signInWithApple = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "apple",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-  };
-
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -147,8 +127,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roles,
         displayName,
         signInWithGoogle,
-        signInWithGithub,
-        signInWithApple,
         signOut,
         refreshAuth,
       }}

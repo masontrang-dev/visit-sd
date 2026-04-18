@@ -20,7 +20,6 @@ type Props = {
   onEdit?: (r: Restaurant) => void;
   onOrder?: (r: Restaurant) => void;
   mustTryFilter?: boolean;
-  onMarkVisited?: (id: number, visitedBy: string) => Promise<void>;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   baseDelay?: number;
@@ -54,40 +53,11 @@ function buildCuisineColorMap(
   return map;
 }
 
-function MarkVisitedButton({
-  restaurantId,
-  onMarkVisited,
-  visitingId,
-}: {
-  restaurantId: number;
-  onMarkVisited: (id: number, visitedBy: string) => Promise<void>;
-  visitingId?: number | null;
-}) {
-  const { username } = useAuth();
-
-  return (
-    <button
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (username) {
-          onMarkVisited(restaurantId, username);
-        }
-      }}
-      disabled={visitingId === restaurantId}
-      className={`btn-base text-sm py-1.5 px-3 rounded-pill border-[1.5px] h-[38px] flex items-center justify-center ${visitingId === restaurantId ? "bg-transparent border-brd text-txt2" : "bg-accent2 text-white border-accent2"}`}
-    >
-      {visitingId === restaurantId ? "Marking..." : "✓ Mark as Visited"}
-    </button>
-  );
-}
-
 function Card({
   r,
   cuisineColor,
   onEdit,
   onOrder,
-  onMarkVisited,
   visitingId,
   visits,
   recommendedItems,
@@ -98,7 +68,6 @@ function Card({
   cuisineColor: string;
   onEdit?: (r: Restaurant) => void;
   onOrder?: (r: Restaurant) => void;
-  onMarkVisited?: (id: number, visitedBy: string) => Promise<void>;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   recommendedItems?: MenuItem[];
@@ -106,7 +75,7 @@ function Card({
   onNavigate?: () => void;
 }) {
   const [showHistory, setShowHistory] = useState(false);
-  const isAdmin = !!(onEdit || onMarkVisited || onOrder);
+  const isAdmin = !!(onEdit || onOrder);
   const restaurantVisits = visits?.[r.id] || [];
   const visitCount = restaurantVisits.length;
   const recencyTag = formatRecencyTag(r.last_visited);
@@ -290,28 +259,34 @@ function Card({
           </div>
         )}
 
-        {/* Added by (admin only) */}
-        {isAdmin && r.added_by && (
-          <p className="mt-2 text-2xs text-txt2 opacity-50 tracking-tight">
-            Added by {r.added_by}
-          </p>
-        )}
-
-        {/* Google Maps link (demoted)
-        {r.google_maps_url && (
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (r.google_maps_url) {
-                window.open(r.google_maps_url, "_blank", "noopener,noreferrer");
-              }
-            }}
-            className="inline-block mt-2 text-2xs font-medium text-accent2 cursor-pointer hover:opacity-70 transition-opacity duration-150 bg-transparent border-none p-0"
-          >
-            View on Maps ↗
-          </button>
-        )} */}
+        {/* Added by (admin only) and View on Maps */}
+        {(isAdmin && r.added_by) || r.google_maps_url ? (
+          <div className="mt-2 flex items-center justify-between gap-2">
+            {isAdmin && r.added_by && (
+              <p className="text-2xs text-txt2 opacity-50 tracking-tight">
+                Added by {r.added_by}
+              </p>
+            )}
+            {r.google_maps_url && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (r.google_maps_url) {
+                    window.open(
+                      r.google_maps_url,
+                      "_blank",
+                      "noopener,noreferrer",
+                    );
+                  }
+                }}
+                className="text-2xs font-medium text-accent2 hover:opacity-70 transition-opacity duration-150 bg-transparent border-none cursor-pointer p-0 tracking-tight ml-auto"
+              >
+                View on Maps ↗
+              </button>
+            )}
+          </div>
+        ) : null}
 
         {/* Admin: visit history */}
         {isAdmin && visitCount > 0 && (
@@ -344,42 +319,6 @@ function Card({
               </div>
             )}
           </div>
-        )}
-
-        {/* Admin actions */}
-        {onMarkVisited && (
-          <div className="flex gap-2 mt-2 items-center">
-            <MarkVisitedButton
-              restaurantId={r.id}
-              onMarkVisited={onMarkVisited}
-              visitingId={visitingId}
-            />
-            {onOrder && (
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onOrder(r);
-                }}
-                className="text-sm font-medium py-1.5 px-3 rounded-pill border-[1.5px] bg-accent text-white border-accent font-body h-[38px] flex items-center justify-center"
-              >
-                + Order
-              </button>
-            )}
-          </div>
-        )}
-        {onEdit && (
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onEdit(r);
-            }}
-            className={`absolute ${onMarkVisited ? "bottom-[72px]" : "bottom-4"} right-4 bg-transparent border-none cursor-pointer text-sm text-txt2 font-body opacity-60 p-0`}
-            title="Edit"
-          >
-            Edit
-          </button>
         )}
       </div>
     </Link>
@@ -438,7 +377,6 @@ function InfiniteCardGrid({
   cuisineColorMap,
   onEdit,
   onOrder,
-  onMarkVisited,
   visitingId,
   visits,
   baseDelay = 0,
@@ -449,7 +387,6 @@ function InfiniteCardGrid({
   cuisineColorMap: Record<string, string>;
   onEdit?: (r: Restaurant) => void;
   onOrder?: (r: Restaurant) => void;
-  onMarkVisited?: (id: number, visitedBy: string) => Promise<void>;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   baseDelay?: number;
@@ -552,7 +489,6 @@ function InfiniteCardGrid({
               }
               onEdit={onEdit}
               onOrder={onOrder}
-              onMarkVisited={onMarkVisited}
               visitingId={visitingId}
               visits={visits}
               recommendedItems={recommendedItems?.[r.id]}
@@ -592,7 +528,6 @@ export default function RestaurantGrid({
   onEdit,
   onOrder,
   mustTryFilter,
-  onMarkVisited,
   visitingId,
   visits,
   baseDelay,
@@ -632,7 +567,6 @@ export default function RestaurantGrid({
         cuisineColorMap={cuisineColorMap}
         onEdit={onEdit}
         onOrder={onOrder}
-        onMarkVisited={onMarkVisited}
         visitingId={visitingId}
         visits={visits}
         baseDelay={baseDelay}
@@ -676,7 +610,6 @@ export default function RestaurantGrid({
                   }
                   onEdit={onEdit}
                   onOrder={onOrder}
-                  onMarkVisited={onMarkVisited}
                   visitingId={visitingId}
                   visits={visits}
                   recommendedItems={recommendedItems?.[r.id]}

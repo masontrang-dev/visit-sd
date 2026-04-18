@@ -15,10 +15,12 @@ import FilterBar, { type ImageDisplayMode } from "@/components/FilterBar";
 import MapView from "@/components/MapView";
 import ContextHeader from "@/components/ContextHeader";
 import SurpriseBar from "@/components/SurpriseBar";
+import CheckInModal from "@/components/CheckInModal";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import AdminButton from "@/components/AdminButton";
 import AdminViewToggle from "@/components/AdminViewToggle";
+import { useAuth } from "@/lib/auth-context";
 
 function SkeletonCard() {
   return (
@@ -116,8 +118,13 @@ function StatPill({
 function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkInRestaurant, setCheckInRestaurant] = useState<Restaurant | null>(
+    null,
+  );
+  const [visitingId, setVisitingId] = useState<number | null>(null);
   const [activeCuisines, setActiveCuisines] = useState<string[]>(() => {
     const param = searchParams.get("cuisine");
     return param ? param.split(",") : [];
@@ -161,6 +168,49 @@ function HomeContent() {
     Record<number, MenuItem[]>
   >({});
   const surpriseBtnRef = useRef<HTMLButtonElement>(null);
+
+  function handleCheckInClick(restaurant: Restaurant) {
+    setCheckInRestaurant(restaurant);
+  }
+
+  async function handleCheckIn(visitDate: string, shouldLogOrder: boolean) {
+    if (!checkInRestaurant || !user) return;
+
+    const visitedBy = user.user_metadata?.name || user.email || "Unknown";
+
+    setVisitingId(checkInRestaurant.id);
+    setCheckInRestaurant(null);
+
+    const { error: visitError } = await supabase
+      .from("restaurant_visits")
+      .insert([
+        {
+          restaurant_id: checkInRestaurant.id,
+          visited_by: visitedBy,
+          visited_at: visitDate,
+        },
+      ]);
+
+    if (visitError) {
+      console.error("Failed to log visit:", visitError);
+      setVisitingId(null);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from("restaurants")
+      .update({ last_visited: visitDate })
+      .eq("id", checkInRestaurant.id);
+
+    if (updateError) {
+      console.error("Failed to update last visited:", updateError);
+    }
+
+    setVisitingId(null);
+
+    // Optionally reload data to show updated visit info
+    // For now, we'll just clear the visiting state
+  }
 
   // Debounce search input
   useEffect(() => {
@@ -471,6 +521,8 @@ function HomeContent() {
               baseDelay={isFirstVisit ? 400 : 0}
               recommendedItems={recommendedItems}
               imageDisplayMode={imageDisplayMode}
+              onCheckIn={handleCheckInClick}
+              visitingId={visitingId}
             />
             {!loading && isFiltered && <SurpriseBar restaurants={filtered} />}
             {!loading && !isFiltered && (
@@ -503,13 +555,22 @@ function HomeContent() {
             Privacy
           </Link>
           <Link
-            href="/admin"
+            href="/login"
             className="text-2xs tracking-wide uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline flex items-center gap-1"
           >
-            Admin <span className="text-[8px]">→</span>
+            Login <span className="text-[8px]">→</span>
           </Link>
         </footer>
       </div>
+
+      {/* Check-In Modal */}
+      {checkInRestaurant && (
+        <CheckInModal
+          restaurantName={checkInRestaurant.name}
+          onConfirm={handleCheckIn}
+          onClose={() => setCheckInRestaurant(null)}
+        />
+      )}
     </main>
   );
 }

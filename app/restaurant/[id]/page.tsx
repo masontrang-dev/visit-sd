@@ -17,6 +17,7 @@ import { useToast } from "@/components/Toast";
 import AddModal from "@/components/AddModal";
 import OrderModal from "@/components/OrderModal";
 import ConfirmModal from "@/components/ConfirmModal";
+import CheckInModal from "@/components/CheckInModal";
 import Link from "next/link";
 import Image from "next/image";
 import { isCurrentlyOpen } from "@/lib/google-types";
@@ -53,7 +54,7 @@ type Props = {
 
 export default function RestaurantDetailPage({ params }: Props) {
   const router = useRouter();
-  const { isAdmin, username } = useAuth();
+  const { isAdmin, isSuperuser, displayName } = useAuth();
   const { toast } = useToast();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [visits, setVisits] = useState<RestaurantVisit[]>([]);
@@ -64,6 +65,7 @@ export default function RestaurantDetailPage({ params }: Props) {
   const [showVisitHistory, setShowVisitHistory] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [cuisines, setCuisines] = useState<string[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -75,11 +77,29 @@ export default function RestaurantDetailPage({ params }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(
     null,
   );
+  const [deletingVisitId, setDeletingVisitId] = useState<number | null>(null);
+  const [showDeleteVisitConfirm, setShowDeleteVisitConfirm] = useState<
+    number | null
+  >(null);
+  const [superuserNames, setSuperuserNames] = useState<string[]>([]);
+  const [adminNames, setAdminNames] = useState<string[]>([]);
   const [togglingRecommended, setTogglingRecommended] = useState<number | null>(
     null,
   );
   const [isScrolled, setIsScrolled] = useState(false);
   const hasScrolled = useRef(false);
+
+  // Check if user has checked in within last 24 hours
+  const hasRecentCheckIn = visits.some((visit) => {
+    if (visit.visited_by !== displayName) return false;
+    const visitTime = new Date(visit.visited_at).getTime();
+    const now = Date.now();
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+    return now - visitTime < twentyFourHours;
+  });
+
+  // Check if current user can check in (not within 24 hours for regular users)
+  const canCheckIn = isAdmin || isSuperuser ? true : !hasRecentCheckIn;
 
   function handleBackClick(e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
@@ -108,20 +128,58 @@ export default function RestaurantDetailPage({ params }: Props) {
   }, []);
 
   useEffect(() => {
-    async function load() {
+    async function fetchData() {
       const resolvedParams = await params;
-      const restaurantId = parseInt(resolvedParams.id);
-      if (isNaN(restaurantId)) {
+      const id = parseInt(resolvedParams.id, 10);
+      if (isNaN(id)) {
         setError("Invalid restaurant ID");
         setLoading(false);
         return;
+      }
+
+      // Fetch superuser and admin names if admin (to determine delete permissions)
+      if (isAdmin && !isSuperuser) {
+        const { data: roles } = await supabase
+          .from("user_roles")
+          .select("user_id, role")
+          .in("role", ["superuser", "admin"]);
+
+        if (roles) {
+          const superuserIds = roles
+            .filter((r) => r.role === "superuser")
+            .map((r) => r.user_id);
+          const adminIds = roles
+            .filter((r) => r.role === "admin")
+            .map((r) => r.user_id);
+
+          const { data: profiles } = await supabase
+            .from("user_profiles")
+            .select("user_id, display_name")
+            .in("user_id", [...superuserIds, ...adminIds]);
+
+          if (profiles) {
+            const superuserProfiles = profiles.filter((p) =>
+              superuserIds.includes(p.user_id),
+            );
+            const adminProfiles = profiles.filter((p) =>
+              adminIds.includes(p.user_id),
+            );
+
+            setSuperuserNames(
+              superuserProfiles.map((p) => p.display_name).filter(Boolean),
+            );
+            setAdminNames(
+              adminProfiles.map((p) => p.display_name).filter(Boolean),
+            );
+          }
+        }
       }
 
       // Fetch restaurant data first for fast initial render
       const { data: restaurantData, error: restaurantError } = await supabase
         .from("restaurants")
         .select("*")
-        .eq("id", restaurantId)
+        .eq("id", id)
         .single();
 
       if (restaurantError || !restaurantData) {
@@ -139,17 +197,17 @@ export default function RestaurantDetailPage({ params }: Props) {
           supabase
             .from("restaurant_visits")
             .select("*")
-            .eq("restaurant_id", restaurantId)
+            .eq("restaurant_id", id)
             .order("visited_at", { ascending: false }),
           supabase
             .from("menu_items")
             .select("*")
-            .eq("restaurant_id", restaurantId)
+            .eq("restaurant_id", id)
             .order("name"),
           supabase
             .from("item_orders")
             .select("*")
-            .eq("restaurant_id", restaurantId)
+            .eq("restaurant_id", id)
             .order("ordered_at", { ascending: false }),
           supabase.from("restaurants").select("cuisine"),
         ]);
@@ -165,19 +223,33 @@ export default function RestaurantDetailPage({ params }: Props) {
         setCuisines(uniqueCuisines as string[]);
       }
     }
-    load();
+    fetchData();
   }, [params]);
 
-  async function handleMarkVisited() {
-    if (!restaurant || !username) return;
+  async function handleCheckIn(
+    visitDate: string,
+    shouldLogOrder: boolean,
+    rating?: number | null,
+    note?: string,
+  ) {
+    if (!restaurant || !displayName) return;
 
-    const visitedBy = username;
+    const visitedBy = displayName;
 
     setVisitingId(restaurant.id);
+    setShowCheckInModal(false);
 
     const { error: insertError } = await supabase
       .from("restaurant_visits")
-      .insert([{ restaurant_id: restaurant.id, visited_by: visitedBy }]);
+      .insert([
+        {
+          restaurant_id: restaurant.id,
+          visited_by: visitedBy,
+          visited_at: visitDate,
+          rating: rating,
+          note: note || null,
+        },
+      ]);
 
     if (insertError) {
       toast("Failed to mark as visited", "error");
@@ -187,7 +259,7 @@ export default function RestaurantDetailPage({ params }: Props) {
 
     const { error: updateError } = await supabase
       .from("restaurants")
-      .update({ last_visited: new Date().toISOString() })
+      .update({ last_visited: visitDate })
       .eq("id", restaurant.id);
 
     if (updateError) {
@@ -209,6 +281,15 @@ export default function RestaurantDetailPage({ params }: Props) {
     setVisits(visitsData ?? []);
     if (restaurantData) setRestaurant(restaurantData);
     setVisitingId(null);
+
+    toast("Check-in logged", "success");
+
+    // Open order modal if user chose to log order
+    if (shouldLogOrder) {
+      setEditingOrder(null);
+      setEditingMenuItem(null);
+      setShowOrderModal(true);
+    }
   }
 
   async function handleDelete() {
@@ -342,12 +423,58 @@ export default function RestaurantDetailPage({ params }: Props) {
       .delete()
       .eq("id", orderId);
     if (error) {
-      // Could show an error state, but for now just reset
       setDeletingOrderId(null);
     } else {
       await reloadOrders();
     }
     setDeletingOrderId(null);
+  }
+
+  async function handleDeleteVisit(visitId: number) {
+    if (!restaurant) return;
+
+    setDeletingVisitId(visitId);
+    setShowDeleteVisitConfirm(null);
+
+    const { error } = await supabase
+      .from("restaurant_visits")
+      .delete()
+      .eq("id", visitId);
+
+    if (error) {
+      toast("Failed to delete visit", "error");
+      setDeletingVisitId(null);
+      return;
+    }
+
+    // Reload visits
+    const { data: visitsData } = await supabase
+      .from("restaurant_visits")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .order("visited_at", { ascending: false });
+
+    setVisits(visitsData ?? []);
+
+    // Update last_visited if needed
+    const newLastVisited =
+      visitsData && visitsData.length > 0 ? visitsData[0].visited_at : null;
+
+    await supabase
+      .from("restaurants")
+      .update({ last_visited: newLastVisited })
+      .eq("id", restaurant.id);
+
+    // Reload restaurant data
+    const { data: restaurantData } = await supabase
+      .from("restaurants")
+      .select("*")
+      .eq("id", restaurant.id)
+      .single();
+
+    if (restaurantData) setRestaurant(restaurantData);
+    setDeletingVisitId(null);
+    toast("Visit deleted", "success");
   }
 
   // Compute highlighted menu items (is_recommended or has orders)
@@ -560,13 +687,23 @@ export default function RestaurantDetailPage({ params }: Props) {
           <h1 className="font-display text-[clamp(48px,8vw,72px)] leading-[0.9] tracking-tight mb-3">
             {restaurant.name}
           </h1>
-          <div className="flex items-center gap-3 flex-wrap text-base text-txt2 mb-4">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-accent2 shrink-0" />
-              {restaurant.neighborhood}
-            </span>
-            <span className="text-brd">·</span>
-            <span className="font-medium">{restaurant.price}</span>
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-3 flex-wrap text-base text-txt2">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-accent2 shrink-0" />
+                {restaurant.neighborhood}
+              </span>
+              <span className="text-brd">·</span>
+              <span className="font-medium">{restaurant.price}</span>
+            </div>
+            {isAdmin && (
+              <button
+                onClick={handleEdit}
+                className="btn-outline btn-pill !py-1.5 !px-3 !text-xs !border-txt !text-txt shrink-0"
+              >
+                Edit
+              </button>
+            )}
           </div>
           {(restaurant.must_try ||
             (restaurant.occasions && restaurant.occasions.length > 0)) && (
@@ -829,16 +966,63 @@ export default function RestaurantDetailPage({ params }: Props) {
                 {visits.map((visit) => (
                   <div
                     key={visit.id}
-                    className="flex items-center gap-3 pb-3 border-b border-brd last:border-0"
+                    className="flex items-start justify-between gap-3 pb-3 border-b border-brd last:border-0"
                   >
-                    <div className="w-2 h-2 rounded-full bg-accent2 shrink-0" />
-                    <div>
-                      <p className="text-sm text-txt font-medium">
-                        {formatDate(visit.visited_at)} at{" "}
-                        {formatTime(visit.visited_at)}
-                      </p>
-                      <p className="text-xs text-txt2">by {visit.visited_by}</p>
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="w-2 h-2 rounded-full bg-accent2 shrink-0 mt-1.5" />
+                      <div className="flex-1 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm text-txt font-medium">
+                            {formatDate(visit.visited_at)} at{" "}
+                            {formatTime(visit.visited_at)}
+                          </p>
+                          <p className="text-xs text-txt2">
+                            by {visit.visited_by}
+                          </p>
+                          {visit.note && (
+                            <p className="text-xs text-txt2 mt-1.5 italic">
+                              "{visit.note}"
+                            </p>
+                          )}
+                        </div>
+                        {visit.rating && (
+                          <div className="flex flex-col items-end shrink-0">
+                            <div className="flex items-center gap-0.5">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <span
+                                  key={star}
+                                  className={`text-sm ${
+                                    star <= visit.rating!
+                                      ? "text-accent"
+                                      : "text-brd"
+                                  }`}
+                                >
+                                  ★
+                                </span>
+                              ))}
+                            </div>
+                            <span className="text-xs text-txt2 mt-0.5">
+                              {visit.rating}/5
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    {(isSuperuser ||
+                      (isAdmin && visit.visited_by === displayName) ||
+                      (isAdmin &&
+                        !superuserNames.includes(visit.visited_by) &&
+                        !adminNames.includes(visit.visited_by))) && (
+                      <button
+                        onClick={() => setShowDeleteVisitConfirm(visit.id)}
+                        disabled={deletingVisitId === visit.id}
+                        className="text-xs text-txt2 hover:text-error transition-colors shrink-0"
+                      >
+                        {deletingVisitId === visit.id
+                          ? "Deleting..."
+                          : "Delete"}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -874,7 +1058,7 @@ export default function RestaurantDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Action Buttons - View on Maps & Share - Sticky at bottom */}
+      {/* Action Buttons - Sticky at bottom */}
       <div className="fixed bottom-0 left-0 right-0 bg-bg border-t-2 border-txt p-4 z-40">
         <div className="max-w-4xl mx-auto flex gap-3">
           {restaurant.google_maps_url ? (
@@ -892,6 +1076,33 @@ export default function RestaurantDetailPage({ params }: Props) {
               className="flex-1 py-3 px-4 rounded-lg text-sm font-medium text-center bg-brd text-txt2 cursor-not-allowed"
             >
               View on Maps
+            </button>
+          )}
+          {displayName && (
+            <button
+              onClick={() => {
+                if ((isAdmin || isSuperuser) && hasRecentCheckIn) {
+                  setEditingOrder(null);
+                  setEditingMenuItem(null);
+                  setShowOrderModal(true);
+                } else if (canCheckIn) {
+                  setShowCheckInModal(true);
+                }
+              }}
+              disabled={visitingId === restaurant.id || !canCheckIn}
+              className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium text-center transition-opacity ${
+                visitingId === restaurant.id || !canCheckIn
+                  ? "bg-txt2 text-white cursor-not-allowed opacity-50"
+                  : "bg-accent2 text-white hover:opacity-90"
+              }`}
+            >
+              {visitingId === restaurant.id
+                ? "Checking in..."
+                : (isAdmin || isSuperuser) && hasRecentCheckIn
+                  ? "Log Order"
+                  : !canCheckIn
+                    ? "✓ Checked In"
+                    : "✓ Check In"}
             </button>
           )}
           <button
@@ -913,9 +1124,26 @@ export default function RestaurantDetailPage({ params }: Props) {
                 toast("Link copied to clipboard", "success");
               }
             }}
-            className="flex-1 py-3 px-4 rounded-lg text-sm font-medium text-center bg-bg2 text-txt border-[1.5px] border-brd transition-colors hover:border-txt"
+            className="py-3 px-4 rounded-lg text-sm font-medium text-center bg-bg2 text-txt border-[1.5px] border-brd transition-colors hover:border-txt"
+            aria-label="Share"
           >
-            Share this spot
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="mx-auto"
+            >
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
           </button>
         </div>
       </div>
@@ -923,9 +1151,21 @@ export default function RestaurantDetailPage({ params }: Props) {
       {/* Order History - Admin Only */}
       {isAdmin && itemOrders.length > 0 && (
         <div className="p-6 border-t border-brd scroll-fade-in">
-          <h2 className="text-2xs uppercase tracking-wide text-txt2 mb-3 font-medium">
-            Full order history (Admin)
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-2xs uppercase tracking-wide text-txt2 font-medium">
+              Full order history (Admin)
+            </h2>
+            <button
+              onClick={() => {
+                setEditingOrder(null);
+                setEditingMenuItem(null);
+                setShowOrderModal(true);
+              }}
+              className="py-1.5 px-3 bg-accent text-white text-xs font-medium border-[1.5px] border-accent rounded-pill transition-all hover:opacity-90"
+            >
+              + Log Order
+            </button>
+          </div>
           <div className="space-y-3">
             {itemOrders.map((order) => {
               const menuItem = menuItems.find(
@@ -1031,43 +1271,14 @@ export default function RestaurantDetailPage({ params }: Props) {
         />
       )}
 
-      {/* Floating Action Bar */}
-      {isAdmin && (
-        <div className="fixed bottom-0 left-0 right-0 bg-bg border-t-2 border-txt p-3 z-50">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-txt2 mr-3">Admin:</span>
-              <button
-                onClick={handleMarkVisited}
-                disabled={visitingId === restaurant.id}
-                className={`btn-base text-sm py-2 px-3 rounded-pill border-[1.5px] ${
-                  visitingId === restaurant.id
-                    ? "bg-transparent border-brd text-txt2"
-                    : "bg-accent2 text-white border-accent2"
-                }`}
-              >
-                {visitingId === restaurant.id ? "Marking..." : "✓ Visited"}
-              </button>
-              <button
-                onClick={() => {
-                  setEditingOrder(null);
-                  setEditingMenuItem(null);
-                  setShowOrderModal(true);
-                }}
-                className="btn-primary btn-pill !py-2 !px-3"
-              >
-                + Order
-              </button>
-              <button
-                onClick={handleEdit}
-                className="btn-outline btn-pill !py-2 !px-3 !border-txt !text-txt"
-              >
-                Edit
-              </button>
-            </div>
-            {saveError && <p className="text-error text-xs">{saveError}</p>}
-          </div>
-        </div>
+      {/* Check-In Modal */}
+      {showCheckInModal && restaurant && (
+        <CheckInModal
+          restaurantName={restaurant.name}
+          onConfirm={handleCheckIn}
+          onClose={() => setShowCheckInModal(false)}
+          isAdmin={isAdmin || isSuperuser}
+        />
       )}
 
       {/* Delete Order Confirmation Modal */}
@@ -1079,6 +1290,18 @@ export default function RestaurantDetailPage({ params }: Props) {
           cancelText="Cancel"
           onConfirm={() => handleDeleteOrderConfirm(showDeleteConfirm)}
           onCancel={() => setShowDeleteConfirm(null)}
+        />
+      )}
+
+      {/* Delete Visit Confirmation Modal */}
+      {showDeleteVisitConfirm && (
+        <ConfirmModal
+          title="Delete Visit"
+          message="Are you sure you want to delete this visit? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={() => handleDeleteVisit(showDeleteVisitConfirm)}
+          onCancel={() => setShowDeleteVisitConfirm(null)}
         />
       )}
     </main>
