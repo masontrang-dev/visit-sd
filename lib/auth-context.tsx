@@ -12,7 +12,7 @@ import {
 import { createClient } from "./supabase-client";
 import type { User } from "@supabase/supabase-js";
 
-type UserRole = "superuser" | "admin" | "user";
+type UserRole = "superuser" | "admin" | "curator" | "user";
 
 type AuthContextType = {
   user: User | null;
@@ -29,6 +29,17 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function pickAvatarFromUser(user: User): string | null {
+  const googleIdentity = user.identities?.find((id) => id.provider === "google");
+  return (
+    googleIdentity?.identity_data?.avatar_url ||
+    googleIdentity?.identity_data?.picture ||
+    user.user_metadata?.avatar_url ||
+    user.user_metadata?.picture ||
+    null
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
@@ -37,12 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
-  const fetchUserRoles = useCallback(
-    async (userId: string) => {
+  const hydrateUserData = useCallback(
+    async (currentUser: User) => {
       const { data: rolesData } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", userId);
+        .eq("user_id", currentUser.id);
 
       const userRoles = (rolesData?.map((r: { role: string }) => r.role) ||
         []) as UserRole[];
@@ -51,11 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: profile } = await supabase
         .from("user_profiles")
         .select("display_name, avatar_url")
-        .eq("user_id", userId)
-        .single();
+        .eq("user_id", currentUser.id)
+        .maybeSingle();
 
       setDisplayName(profile?.display_name || null);
-      setAvatarUrl(profile?.avatar_url || null);
+      setAvatarUrl(profile?.avatar_url || pickAvatarFromUser(currentUser));
     },
     [supabase],
   );
@@ -69,26 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentUser);
 
       if (currentUser) {
-        await fetchUserRoles(currentUser.id);
-
-        // If no avatar_url in profile, try to get from Google user metadata
-        if (!avatarUrl) {
-          // Check Google identity metadata first
-          const googleIdentity = currentUser.identities?.find(
-            (id) => id.provider === "google",
-          );
-          const googlePicture =
-            googleIdentity?.identity_data?.avatar_url ||
-            googleIdentity?.identity_data?.picture ||
-            currentUser.user_metadata?.picture ||
-            currentUser.user_metadata?.avatar_url ||
-            currentUser.user_metadata?.user_metadata?.picture ||
-            currentUser.user_metadata?.user_metadata?.avatar_url;
-
-          if (googlePicture) {
-            setAvatarUrl(googlePicture);
-          }
-        }
+        await hydrateUserData(currentUser);
       } else {
         setRoles([]);
         setDisplayName(null);
@@ -102,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [supabase, fetchUserRoles, avatarUrl]);
+  }, [supabase, hydrateUserData]);
 
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({
@@ -128,9 +120,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserRoles(session.user.id);
+      const sessionUser = session?.user ?? null;
+      setUser(sessionUser);
+      if (sessionUser) {
+        hydrateUserData(sessionUser);
       } else {
         setRoles([]);
         setDisplayName(null);
@@ -139,9 +132,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase, refreshAuth, fetchUserRoles]);
+  }, [supabase, refreshAuth, hydrateUserData]);
 
-  const isAdmin = roles.includes("admin") || roles.includes("superuser");
+  const isAdmin =
+    roles.includes("admin") ||
+    roles.includes("superuser") ||
+    roles.includes("curator");
   const isSuperuser = roles.includes("superuser");
 
   return (

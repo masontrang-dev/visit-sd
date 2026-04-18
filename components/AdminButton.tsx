@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { usePathname } from "next/navigation";
+import RequestAccessModal from "./RequestAccessModal";
 
 export default function AdminButton() {
   const { isAdmin, isSuperuser, user, signOut, avatarUrl } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const isAdminPage = pathname === "/admin";
@@ -86,7 +88,7 @@ export default function AdminButton() {
         )}
       </button>
       {showMenu && (
-        <div className="absolute right-0 top-full mt-2 bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[120px] z-50">
+        <div className="absolute right-0 top-full mt-2 bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[140px] z-50">
           {isSuperuser && (
             <a
               href="/admin/users"
@@ -95,6 +97,17 @@ export default function AdminButton() {
             >
               Manage Users
             </a>
+          )}
+          {!isAdmin && (
+            <button
+              onClick={() => {
+                setShowRequestModal(true);
+                setShowMenu(false);
+              }}
+              className="w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
+            >
+              Request access
+            </button>
           )}
           <button
             onClick={async () => {
@@ -107,6 +120,9 @@ export default function AdminButton() {
             Logout
           </button>
         </div>
+      )}
+      {showRequestModal && (
+        <RequestAccessModal onClose={() => setShowRequestModal(false)} />
       )}
     </div>
   );

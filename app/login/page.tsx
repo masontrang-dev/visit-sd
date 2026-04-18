@@ -1,12 +1,31 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginPageInner() {
   const { user, isLoading, signInWithGoogle } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const queryError = searchParams.get("error");
+    if (queryError) {
+      setErrorMessage(queryError);
+      return;
+    }
+
+    if (typeof window !== "undefined" && window.location.hash) {
+      const hash = new URLSearchParams(window.location.hash.slice(1));
+      const hashError = hash.get("error_description") ?? hash.get("error");
+      if (hashError) {
+        setErrorMessage(hashError.replace(/\+/g, " "));
+        history.replaceState(null, "", window.location.pathname);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!isLoading && user) {
@@ -48,6 +67,14 @@ export default function LoginPage() {
         <p className="text-txt2 text-sm mb-6">
           Sign in to access your personalized restaurant guide.
         </p>
+        {errorMessage && (
+          <div
+            role="alert"
+            className="mb-4 p-3 border border-error bg-error/10 rounded-md text-error text-sm"
+          >
+            {errorMessage}
+          </div>
+        )}
         <button
           onClick={signInWithGoogle}
           className="btn-secondary w-full flex items-center justify-center gap-2"
@@ -74,5 +101,19 @@ export default function LoginPage() {
         </button>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center p-8">
+          <p className="text-txt2 text-sm">Loading...</p>
+        </main>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
   );
 }
