@@ -413,8 +413,8 @@ function HomeContent() {
             className={`absolute top-4 right-4 flex flex-col items-end gap-2 ${mounted ? "z-10" : ""}`}
           >
             <div className="flex gap-2">
-              <AdminButton />
               <ThemeToggle />
+              <AdminButton />
             </div>
             <AdminViewToggle />
           </div>
@@ -472,8 +472,8 @@ function HomeContent() {
         <div className="relative">
           <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-10">
             <div className="flex gap-2">
-              <AdminButton />
               <ThemeToggle />
+              <AdminButton />
             </div>
             <AdminViewToggle />
           </div>

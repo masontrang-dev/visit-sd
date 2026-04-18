@@ -133,8 +133,8 @@ export default function UsersPage() {
     <main className="min-h-screen">
       <header className="relative pt-10 px-6 pb-6 border-b-2 border-txt">
         <div className="absolute top-4 right-4 flex gap-2">
-          <AdminButton />
           <ThemeToggle />
+          <AdminButton />
         </div>
         <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
           Admin · User Management

@@ -53,7 +53,7 @@ export default function AddModal({
   existingCuisines,
   onDeleteSuccess,
 }: Props) {
-  const { username } = useAuth();
+  const { displayName } = useAuth();
   const [name, setName] = useState(editData?.name ?? "");
   const [neighborhood, setNeighborhood] = useState(
     editData?.neighborhood ?? "",
@@ -61,7 +61,9 @@ export default function AddModal({
   const [cuisine, setCuisine] = useState(editData?.cuisine ?? "");
   const [price, setPrice] = useState(editData?.price ?? "$$$");
   const [note, setNote] = useState(editData?.note ?? "");
-  const [addedBy, setAddedBy] = useState(editData?.added_by ?? username ?? "");
+  const [addedBy, setAddedBy] = useState(
+    editData?.added_by ?? displayName ?? "",
+  );
   const [mustTry, setMustTry] = useState(editData?.must_try ?? false);
   const [myRating, setMyRating] = useState<number | null>(
     editData?.my_rating ?? null,
@@ -342,7 +344,7 @@ export default function AddModal({
       await supabase.from("rating_history").insert({
         restaurant_id: editData.id,
         rating: myRating,
-        changed_by: username || "Unknown",
+        changed_by: displayName || "Unknown",
         notes: ratingNotes.trim() || null,
       });
     }

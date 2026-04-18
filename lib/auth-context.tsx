@@ -21,6 +21,7 @@ type AuthContextType = {
   isLoading: boolean;
   roles: UserRole[];
   displayName: string | null;
+  avatarUrl: string | null;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshAuth: () => Promise<void>;
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
   const fetchUserRoles = useCallback(
@@ -48,11 +50,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data: profile } = await supabase
         .from("user_profiles")
-        .select("display_name")
+        .select("display_name, avatar_url")
         .eq("user_id", userId)
         .single();
 
       setDisplayName(profile?.display_name || null);
+      setAvatarUrl(profile?.avatar_url || null);
     },
     [supabase],
   );
@@ -67,24 +70,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (currentUser) {
         await fetchUserRoles(currentUser.id);
+
+        // If no avatar_url in profile, try to get from Google user metadata
+        if (!avatarUrl) {
+          // Check Google identity metadata first
+          const googleIdentity = currentUser.identities?.find(
+            (id) => id.provider === "google",
+          );
+          const googlePicture =
+            googleIdentity?.identity_data?.avatar_url ||
+            googleIdentity?.identity_data?.picture ||
+            currentUser.user_metadata?.picture ||
+            currentUser.user_metadata?.avatar_url ||
+            currentUser.user_metadata?.user_metadata?.picture ||
+            currentUser.user_metadata?.user_metadata?.avatar_url;
+
+          if (googlePicture) {
+            setAvatarUrl(googlePicture);
+          }
+        }
       } else {
         setRoles([]);
         setDisplayName(null);
+        setAvatarUrl(null);
       }
     } catch {
       setUser(null);
       setRoles([]);
       setDisplayName(null);
+      setAvatarUrl(null);
     } finally {
       setIsLoading(false);
     }
-  }, [supabase, fetchUserRoles]);
+  }, [supabase, fetchUserRoles, avatarUrl]);
 
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        scopes: "profile email",
       },
     });
   };
@@ -94,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setRoles([]);
     setDisplayName(null);
+    setAvatarUrl(null);
   };
 
   useEffect(() => {
@@ -108,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setRoles([]);
         setDisplayName(null);
+        setAvatarUrl(null);
       }
     });
 
@@ -126,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         roles,
         displayName,
+        avatarUrl,
         signInWithGoogle,
         signOut,
         refreshAuth,

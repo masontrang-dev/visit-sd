@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   supabase,
   type Restaurant,
@@ -17,6 +17,68 @@ import Link from "next/link";
 import AdminButton from "@/components/AdminButton";
 import ThemeToggle from "@/components/ThemeToggle";
 import AdminViewToggle from "@/components/AdminViewToggle";
+
+function StatPill({
+  value,
+  label,
+  duration = 800,
+  countFromZero = false,
+}: {
+  value: number;
+  label: string;
+  duration?: number;
+  countFromZero?: boolean;
+}) {
+  const [display, setDisplay] = useState(countFromZero ? 0 : value);
+  const prevRef = useRef(countFromZero ? 0 : value);
+  const initialRef = useRef(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (initialRef.current) {
+      initialRef.current = false;
+      if (countFromZero && value > 0) {
+        timerRef.current = setTimeout(() => {
+          const start = performance.now();
+          function tick(now: number) {
+            const elapsed = now - start;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setDisplay(Math.round(value * eased));
+            if (progress < 1) requestAnimationFrame(tick);
+            else prevRef.current = value;
+          }
+          requestAnimationFrame(tick);
+        }, 600);
+        return;
+      }
+      setDisplay(value);
+      prevRef.current = value;
+      return;
+    }
+    if (value === prevRef.current) return;
+
+    const start = performance.now();
+    const from = prevRef.current;
+
+    function tick(now: number) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(from + (value - from) * eased);
+      setDisplay(current);
+      if (progress < 1) requestAnimationFrame(tick);
+      else prevRef.current = value;
+    }
+    requestAnimationFrame(tick);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [value, duration, countFromZero]);
+
+  return <>{`${display} ${label}`}</>;
+}
 
 export default function AdminPage() {
   const { isAdmin, isSuperuser, isLoading: authLoading, user } = useAuth();
@@ -66,6 +128,7 @@ export default function AdminPage() {
   const [activePrices, setActivePrices] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [mounted, setMounted] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -149,6 +212,7 @@ export default function AdminPage() {
     if (!authLoading && isAdmin) {
       loadData();
     }
+    setMounted(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, authLoading]);
 
@@ -283,8 +347,8 @@ export default function AdminPage() {
       <header className="relative pt-10 px-6 pb-6 border-b-2 border-txt">
         <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
           <div className="flex gap-2">
-            <AdminButton />
             <ThemeToggle />
+            <AdminButton />
           </div>
           <AdminViewToggle />
         </div>
@@ -297,17 +361,23 @@ export default function AdminPage() {
           <span className="text-accent">SPOTS</span>
         </h1>
         <div className="flex gap-2.5 mt-4 items-center">
-          <span className="text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt">
-            {restaurants.length} spots
-          </span>
-          {isSuperuser && (
-            <Link
-              href="/admin/users"
-              className="text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-accent text-accent hover:bg-accent hover:text-white transition-colors"
+          {(
+            [
+              [restaurants.length, "spots"],
+              [cuisines.length, "cuisines"],
+              [neighborhoods.length, "areas"],
+            ] as const
+          ).map(([count, label], i) => (
+            <span
+              key={label}
+              className={`text-xs font-medium px-3 py-1 rounded-pill border-[1.5px] border-txt text-txt ${mounted ? "animate-fade-up" : "opacity-0"}`}
+              style={
+                mounted ? { animationDelay: `${300 + i * 100}ms` } : undefined
+              }
             >
-              Manage Users
-            </Link>
-          )}
+              <StatPill value={count} label={label} countFromZero={true} />
+            </span>
+          ))}
         </div>
       </header>
 
