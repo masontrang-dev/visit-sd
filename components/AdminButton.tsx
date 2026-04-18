@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { usePathname } from "next/navigation";
 
 export default function AdminButton() {
-  const { isAdmin, logout } = useAuth();
+  const { isAdmin, signOut } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -57,10 +57,10 @@ export default function AdminButton() {
         A
       </button>
       {showMenu && (
-        <div className="absolute right-0 top-full mt-2 bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[100px]">
+        <div className="absolute right-0 top-full mt-2 bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[100px] z-50">
           <button
             onClick={async () => {
-              await logout();
+              await signOut();
               setShowMenu(false);
               window.location.href = "/";
             }}

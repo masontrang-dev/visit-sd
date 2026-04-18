@@ -89,9 +89,7 @@ export function isGoogleFoodDrinkType(type: string): boolean {
 
 /** Formats a Google place type for display: "mexican_restaurant" → "Mexican Restaurant" */
 export function formatGoogleType(type: string): string {
-  return type
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**
