@@ -99,9 +99,7 @@ function Card({
       onClick={() => onNavigate?.()}
       className="group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-all duration-150 hover:bg-bg2 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.98]"
       style={{
-        borderLeft: r.must_try
-          ? `3px solid ${cuisineColor}`
-          : "3px solid transparent",
+        borderLeft: `3px solid ${cuisineColor}`,
       }}
     >
       {(r.photo_url || r.storefront_photo_url) &&

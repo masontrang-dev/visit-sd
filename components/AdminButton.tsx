@@ -11,6 +11,11 @@ export default function AdminButton() {
   const pathname = usePathname();
   const isAdminPage = pathname === "/admin";
   const [avatarLoaded, setAvatarLoaded] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleImageError = () => {
     setAvatarLoaded(false);
@@ -28,6 +33,17 @@ export default function AdminButton() {
         document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showMenu]);
+
+  // Before mount, render a neutral placeholder to avoid hydration mismatch
+  // (auth state is only known on the client)
+  if (!mounted) {
+    return (
+      <div
+        aria-hidden
+        className="w-9 h-9 rounded-full border border-brd bg-bg opacity-30"
+      />
+    );
+  }
 
   // Not logged in
   if (!user) {

@@ -1,4 +1,5 @@
 .env.local
+.env.production
 .next/
 node_modules/
 .vercel
@@ -9,3 +10,6 @@ CHECK_*.sql
 DEBUG_*.sql
 FIX_*.sql
 VERIFY_*.sql
+DIAGNOSE_*.sql
+MIGRATION_*.sql
+UPDATE_*.sql
