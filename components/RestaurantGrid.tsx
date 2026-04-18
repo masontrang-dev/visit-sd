@@ -19,6 +19,7 @@ type Props = {
   grouped: boolean;
   onEdit?: (r: Restaurant) => void;
   onOrder?: (r: Restaurant) => void;
+  onCheckIn?: (r: Restaurant) => void;
   mustTryFilter?: boolean;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
@@ -58,6 +59,7 @@ function Card({
   cuisineColor,
   onEdit,
   onOrder,
+  onCheckIn,
   visitingId,
   visits,
   recommendedItems,
@@ -68,6 +70,7 @@ function Card({
   cuisineColor: string;
   onEdit?: (r: Restaurant) => void;
   onOrder?: (r: Restaurant) => void;
+  onCheckIn?: (r: Restaurant) => void;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   recommendedItems?: MenuItem[];
@@ -377,6 +380,7 @@ function InfiniteCardGrid({
   cuisineColorMap,
   onEdit,
   onOrder,
+  onCheckIn,
   visitingId,
   visits,
   baseDelay = 0,
@@ -387,6 +391,7 @@ function InfiniteCardGrid({
   cuisineColorMap: Record<string, string>;
   onEdit?: (r: Restaurant) => void;
   onOrder?: (r: Restaurant) => void;
+  onCheckIn?: (r: Restaurant) => void;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   baseDelay?: number;
@@ -489,6 +494,7 @@ function InfiniteCardGrid({
               }
               onEdit={onEdit}
               onOrder={onOrder}
+              onCheckIn={onCheckIn}
               visitingId={visitingId}
               visits={visits}
               recommendedItems={recommendedItems?.[r.id]}
@@ -527,6 +533,7 @@ export default function RestaurantGrid({
   grouped,
   onEdit,
   onOrder,
+  onCheckIn,
   mustTryFilter,
   visitingId,
   visits,
@@ -567,6 +574,7 @@ export default function RestaurantGrid({
         cuisineColorMap={cuisineColorMap}
         onEdit={onEdit}
         onOrder={onOrder}
+        onCheckIn={onCheckIn}
         visitingId={visitingId}
         visits={visits}
         baseDelay={baseDelay}
@@ -610,6 +618,7 @@ export default function RestaurantGrid({
                   }
                   onEdit={onEdit}
                   onOrder={onOrder}
+                  onCheckIn={onCheckIn}
                   visitingId={visitingId}
                   visits={visits}
                   recommendedItems={recommendedItems?.[r.id]}

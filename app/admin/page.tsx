@@ -344,13 +344,7 @@ export default function AdminPage() {
       ) : (
         <RestaurantGrid
           restaurants={filtered}
-          grouped={
-            activeCuisines.length === 0 &&
-            activeNeighborhoods.length === 0 &&
-            !mustTryFilter &&
-            activePrices.length === 0 &&
-            debouncedSearch.trim() === ""
-          }
+          grouped={false}
           onEdit={(r) => {
             setEditingRestaurant(r);
             setShowModal(true);
