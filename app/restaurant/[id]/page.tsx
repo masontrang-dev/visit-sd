@@ -75,8 +75,13 @@ type Props = {
 
 export default function RestaurantDetailPage({ params }: Props) {
   const router = useRouter();
-  const { isAdmin, isSuperuser, displayName, user, isLoading: authLoading } =
-    useAuth();
+  const {
+    isAdmin,
+    isSuperuser,
+    displayName,
+    user,
+    isLoading: authLoading,
+  } = useAuth();
   const { toast } = useToast();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [visits, setVisits] = useState<RestaurantVisit[]>([]);
@@ -122,8 +127,7 @@ export default function RestaurantDetailPage({ params }: Props) {
   const stickySentinelRef = useRef<HTMLDivElement>(null);
 
   const cuisineColor = useMemo(() => {
-    if (!restaurant?.cuisine || cuisines.length === 0)
-      return CUISINE_COLORS[0];
+    if (!restaurant?.cuisine || cuisines.length === 0) return CUISINE_COLORS[0];
     const idx = cuisines.indexOf(restaurant.cuisine);
     return idx >= 0
       ? CUISINE_COLORS[idx % CUISINE_COLORS.length]
@@ -895,7 +899,9 @@ export default function RestaurantDetailPage({ params }: Props) {
                       href={restaurant.google_maps_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={() => trackEvent("outbound_click", "google_maps")}
+                      onClick={() =>
+                        trackEvent("outbound_click", "google_maps")
+                      }
                       className="text-xs text-txt2 no-underline hover:text-accent2 transition-colors inline-flex items-center gap-1"
                     >
                       <svg
@@ -1084,6 +1090,8 @@ export default function RestaurantDetailPage({ params }: Props) {
                     <img
                       src={item.latestPhotoUrl}
                       alt={item.menuItem.name}
+                      loading="lazy"
+                      decoding="async"
                       className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
                     />
                   )}
@@ -1229,9 +1237,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                   >
                     <button
                       onClick={() =>
-                        setExpandedDishId(
-                          expanded ? null : group.menuItem.id,
-                        )
+                        setExpandedDishId(expanded ? null : group.menuItem.id)
                       }
                       className="w-full text-left p-3 flex items-start justify-between gap-3 bg-transparent cursor-pointer"
                     >
@@ -1261,6 +1267,8 @@ export default function RestaurantDetailPage({ params }: Props) {
                         <img
                           src={group.latestPhotoUrl}
                           alt={group.menuItem.name}
+                          loading="lazy"
+                          decoding="async"
                           className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
                         />
                       )}
@@ -1325,11 +1333,12 @@ export default function RestaurantDetailPage({ params }: Props) {
                               <img
                                 src={order.photo_url}
                                 alt={group.menuItem.name}
+                                loading="lazy"
+                                decoding="async"
                                 className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
                                 onError={(e) => {
-                                  (
-                                    e.target as HTMLImageElement
-                                  ).style.display = "none";
+                                  (e.target as HTMLImageElement).style.display =
+                                    "none";
                                 }}
                               />
                             )}
@@ -1382,6 +1391,8 @@ export default function RestaurantDetailPage({ params }: Props) {
                         <img
                           src={order.photo_url}
                           alt={menuItem?.name}
+                          loading="lazy"
+                          decoding="async"
                           className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display =
@@ -1503,7 +1514,9 @@ export default function RestaurantDetailPage({ params }: Props) {
       {(restaurant.added_by || restaurant.date_added) && (
         <div className="px-6 py-4 border-t border-brd">
           <p className="text-2xs text-txt2 opacity-70">
-            {restaurant.added_by && <>Added by {formatDisplayName(restaurant.added_by)}</>}
+            {restaurant.added_by && (
+              <>Added by {formatDisplayName(restaurant.added_by)}</>
+            )}
             {restaurant.added_by && restaurant.date_added && " · "}
             {restaurant.date_added && formatDate(restaurant.date_added)}
           </p>

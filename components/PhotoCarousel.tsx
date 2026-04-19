@@ -78,39 +78,39 @@ export default function PhotoCarousel({
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex h-full w-full overflow-x-auto snap-x snap-mandatory scrollbar-hide touch-pan-x overscroll-x-contain"
+        className="flex h-full w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide touch-pan-x overscroll-x-contain"
       >
         {photos.map((photo, i) => (
           <div
             key={`${photo.url}-${i}`}
             className="relative h-full basis-full grow-0 shrink-0 min-w-full snap-start [scroll-snap-stop:always]"
             style={
-              heroName && i === 0
-                ? { viewTransitionName: heroName }
-                : undefined
+              heroName && i === 0 ? { viewTransitionName: heroName } : undefined
             }
           >
-            {photo.isStorefront ? (
-              <Image
-                src={photo.url}
-                alt={photo.itemName ?? ""}
-                fill
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-                priority={priority}
-                className="object-cover"
-                unoptimized
-              />
-            ) : (
-              <img
-                src={photo.url}
-                alt={photo.itemName ?? ""}
-                loading="lazy"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.visibility = "hidden";
-                }}
-              />
-            )}
+            {Math.abs(i - activeIndex) <= 1 &&
+              (photo.isStorefront ? (
+                <Image
+                  src={photo.url}
+                  alt={photo.itemName ?? ""}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                  priority={priority && i === 0}
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <img
+                  src={photo.url}
+                  alt={photo.itemName ?? ""}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.visibility = "hidden";
+                  }}
+                />
+              ))}
 
             {/* Bottom-left: item name caption */}
             {photo.itemName && (
