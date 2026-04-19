@@ -10,7 +10,9 @@ import {
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase, type Restaurant, type MenuItem } from "@/lib/supabase";
-import RestaurantGrid from "@/components/RestaurantGrid";
+import RestaurantGrid, {
+  type RestaurantPhoto,
+} from "@/components/RestaurantGrid";
 import FilterBar, {
   type ImageDisplayMode,
   type VisibilityFilter,
@@ -174,6 +176,9 @@ function HomeContent() {
   const [recommendedItems, setRecommendedItems] = useState<
     Record<number, MenuItem[]>
   >({});
+  const [restaurantPhotos, setRestaurantPhotos] = useState<
+    Record<number, RestaurantPhoto[]>
+  >({});
   const surpriseBtnRef = useRef<HTMLButtonElement>(null);
 
   function handleCheckInClick(restaurant: Restaurant) {
@@ -301,6 +306,7 @@ function HomeContent() {
         const recommendedIds = Array.from(
           new Set((recRows ?? []).map((r) => r.menu_item_id)),
         );
+        const recommendedSet = new Set(recommendedIds);
 
         if (recommendedIds.length > 0) {
           const { data: menuData } = (await supabase
@@ -320,6 +326,66 @@ function HomeContent() {
             });
             setRecommendedItems(itemsByRestaurant);
           }
+        }
+
+        // Fetch order photos for the carousel: recommended items first, then others
+        const { data: orderRows } = (await supabase
+          .from("item_orders")
+          .select("restaurant_id, menu_item_id, photo_url, ordered_at")
+          .in("restaurant_id", visibleRestaurantIds)
+          .not("photo_url", "is", null)
+          .order("ordered_at", { ascending: false })) as {
+          data:
+            | {
+                restaurant_id: number;
+                menu_item_id: number;
+                photo_url: string;
+                ordered_at: string;
+              }[]
+            | null;
+        };
+
+        if (orderRows && orderRows.length > 0) {
+          const orderMenuIds = Array.from(
+            new Set(orderRows.map((o) => o.menu_item_id)),
+          );
+          const { data: namedItems } = (await supabase
+            .from("menu_items")
+            .select("id, name")
+            .in("id", orderMenuIds)) as {
+            data: { id: number; name: string }[] | null;
+          };
+          const nameById = new Map<number, string>();
+          (namedItems ?? []).forEach((m) => nameById.set(m.id, m.name));
+
+          const PHOTOS_PER_RESTAURANT = 8;
+          const buckets: Record<number, RestaurantPhoto[]> = {};
+          const seen: Record<number, Set<string>> = {};
+          orderRows.forEach((o) => {
+            const photo: RestaurantPhoto = {
+              url: o.photo_url,
+              itemName: nameById.get(o.menu_item_id) ?? null,
+              isStorefront: false,
+              isRecommended: recommendedSet.has(o.menu_item_id),
+            };
+            if (!buckets[o.restaurant_id]) {
+              buckets[o.restaurant_id] = [];
+              seen[o.restaurant_id] = new Set();
+            }
+            if (seen[o.restaurant_id].has(photo.url)) return;
+            seen[o.restaurant_id].add(photo.url);
+            buckets[o.restaurant_id].push(photo);
+          });
+
+          // Sort each bucket: recommended first, then chronological order preserved
+          Object.keys(buckets).forEach((key) => {
+            const id = Number(key);
+            buckets[id].sort(
+              (a, b) => Number(b.isRecommended) - Number(a.isRecommended),
+            );
+            buckets[id] = buckets[id].slice(0, PHOTOS_PER_RESTAURANT);
+          });
+          setRestaurantPhotos(buckets);
         }
       }
 
@@ -553,6 +619,7 @@ function HomeContent() {
               grouped={false}
               baseDelay={isFirstVisit ? 400 : 0}
               recommendedItems={recommendedItems}
+              restaurantPhotos={restaurantPhotos}
               imageDisplayMode={imageDisplayMode}
               onCheckIn={handleCheckInClick}
               visitingId={visitingId}

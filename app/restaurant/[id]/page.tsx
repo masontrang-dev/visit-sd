@@ -568,6 +568,7 @@ export default function RestaurantDetailPage({ params }: Props) {
     orders: ItemOrder[];
     latestOrder: ItemOrder | null;
     latestNote: string | null;
+    latestPhotoUrl: string | null;
     orderCount: number;
     recommenderIds: string[];
   };
@@ -577,6 +578,9 @@ export default function RestaurantDetailPage({ params }: Props) {
     const latestOrder = orders[0] ?? null;
     const latestNote =
       orders.find((o) => (o.notes ?? "").trim().length > 0)?.notes ?? null;
+    const latestPhotoUrl =
+      orders.find((o) => (o.photo_url ?? "").trim().length > 0)?.photo_url ??
+      null;
     const recommenderIds = recommendations
       .filter((r) => r.menu_item_id === mi.id)
       .map((r) => r.user_id);
@@ -585,6 +589,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       orders,
       latestOrder,
       latestNote,
+      latestPhotoUrl,
       orderCount: orders.length,
       recommenderIds,
     };
@@ -966,17 +971,6 @@ export default function RestaurantDetailPage({ params }: Props) {
                   key={item.menuItem.id}
                   className="flex items-start gap-3 border-[1.5px] border-brd p-3"
                 >
-                  <div className="w-16 h-16 rounded-lg bg-bg2 border border-brd shrink-0 overflow-hidden">
-                    {item.latestOrder?.photo_url ? (
-                      <img
-                        src={item.latestOrder.photo_url}
-                        alt={item.menuItem.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-bg2 to-brd" />
-                    )}
-                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <p className="font-display text-lg leading-tight">
@@ -1014,6 +1008,13 @@ export default function RestaurantDetailPage({ params }: Props) {
                       </button>
                     )}
                   </div>
+                  {item.latestPhotoUrl && (
+                    <img
+                      src={item.latestPhotoUrl}
+                      alt={item.menuItem.name}
+                      className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
+                    />
+                  )}
                 </div>
               );
             })}
@@ -1172,6 +1173,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                               {group.menuItem.category}
                             </span>
                           )}
+                          <Chevron open={expanded} className="text-txt2" />
                         </div>
                         <p className="text-2xs text-txt2 mb-1">
                           {group.orderCount} order
@@ -1183,7 +1185,13 @@ export default function RestaurantDetailPage({ params }: Props) {
                           </p>
                         )}
                       </div>
-                      <Chevron open={expanded} className="text-txt2 mt-1" />
+                      {group.latestPhotoUrl && (
+                        <img
+                          src={group.latestPhotoUrl}
+                          alt={group.menuItem.name}
+                          className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
+                        />
+                      )}
                     </button>
                     <div className="px-3 pb-3 -mt-1">
                       <MenuItemRecommendToggle
@@ -1245,7 +1253,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                               <img
                                 src={order.photo_url}
                                 alt={group.menuItem.name}
-                                className="w-16 h-16 object-cover border border-brd shrink-0"
+                                className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
                                 onError={(e) => {
                                   (
                                     e.target as HTMLImageElement
@@ -1302,7 +1310,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                         <img
                           src={order.photo_url}
                           alt={menuItem?.name}
-                          className="w-16 h-16 object-cover border border-brd shrink-0"
+                          className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display =
                               "none";

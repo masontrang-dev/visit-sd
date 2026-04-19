@@ -14,6 +14,13 @@ import { formatRecencyTag, formatDisplayName } from "@/lib/utils";
 import { isCurrentlyOpen } from "@/lib/google-types";
 import { type ImageDisplayMode } from "@/components/FilterBar";
 
+export type RestaurantPhoto = {
+  url: string;
+  itemName: string | null;
+  isStorefront: boolean;
+  isRecommended: boolean;
+};
+
 type Props = {
   restaurants: Restaurant[];
   grouped: boolean;
@@ -25,6 +32,7 @@ type Props = {
   visits?: Record<number, RestaurantVisit[]>;
   baseDelay?: number;
   recommendedItems?: Record<number, MenuItem[]>;
+  restaurantPhotos?: Record<number, RestaurantPhoto[]>;
   imageDisplayMode?: ImageDisplayMode;
 };
 
@@ -54,6 +62,157 @@ function buildCuisineColorMap(
   return map;
 }
 
+function PhotoCarousel({
+  photos,
+  priority,
+  recencyTag,
+  openNow,
+  mustTry,
+}: {
+  photos: RestaurantPhoto[];
+  priority: boolean;
+  recencyTag: ReturnType<typeof formatRecencyTag>;
+  openNow: boolean | null;
+  mustTry: boolean;
+}) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    setActiveIndex(Math.max(0, Math.min(photos.length - 1, idx)));
+  }, [photos.length]);
+
+  const scrollToIndex = useCallback((i: number) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+  }, []);
+
+  const multiple = photos.length > 1;
+
+  return (
+    <div className="relative overflow-hidden aspect-[3/2] bg-bg2">
+      <div
+        ref={scrollerRef}
+        onScroll={handleScroll}
+        className="flex h-full w-full overflow-x-auto snap-x snap-mandatory scrollbar-hide [-webkit-overflow-scrolling:touch]"
+      >
+        {photos.map((photo, i) => (
+          <div
+            key={`${photo.url}-${i}`}
+            className="relative w-full h-full shrink-0 snap-start"
+          >
+            {photo.isStorefront ? (
+              <Image
+                src={photo.url}
+                alt={photo.itemName ?? ""}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                priority={priority}
+                className="object-cover"
+                unoptimized
+              />
+            ) : (
+              <img
+                src={photo.url}
+                alt={photo.itemName ?? ""}
+                loading="lazy"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.visibility = "hidden";
+                }}
+              />
+            )}
+
+            {/* Bottom-left: item name caption */}
+            {photo.itemName && (
+              <span className="absolute bottom-2 left-2 max-w-[55%] text-2xs font-medium tracking-tight text-white px-2.5 py-1 rounded-pill bg-black/55 backdrop-blur-md truncate z-[1]">
+                {photo.itemName}
+              </span>
+            )}
+
+            {/* Bottom-right: recommended badge */}
+            {photo.isRecommended && (
+              <span className="absolute bottom-2 right-2 text-2xs font-semibold tracking-tight uppercase px-2 py-1 rounded-pill bg-white/95 text-accent shadow-sm border-2 border-white/80 flex items-center gap-1 z-[1]">
+                <span aria-hidden>★</span>
+                <span>Pick</span>
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg/40 to-transparent pointer-events-none" />
+
+      {/* Top-left: must-try (restaurant-level, persists across slides) */}
+      <div className="absolute top-2 left-2 flex gap-1.5 z-[2]">
+        {mustTry && (
+          <span className="text-2xs font-medium px-2 py-1 rounded-pill bg-accent text-white shadow-sm tracking-tight uppercase border-2 border-white/80">
+            Must-try
+          </span>
+        )}
+      </div>
+
+      {/* Top-right: recency, open/closed */}
+      <div className="absolute top-2 right-2 flex gap-1.5 flex-wrap justify-end z-[2]">
+        {recencyTag && (
+          <span
+            className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
+            style={{
+              backgroundColor: "rgba(250, 238, 218, 0.95)",
+              color: "#633806",
+            }}
+          >
+            {recencyTag.text}
+          </span>
+        )}
+        {openNow !== null && (
+          <span
+            className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
+            style={{
+              backgroundColor: openNow
+                ? "rgba(234, 243, 222, 0.95)"
+                : "rgba(241, 239, 232, 0.95)",
+              color: openNow ? "#27500A" : "#5F5E5A",
+            }}
+          >
+            {openNow ? "Open now" : "Closed"}
+          </span>
+        )}
+      </div>
+
+      {/* Bottom-center: dot indicator */}
+      {multiple && (
+        <div
+          className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 z-[2] px-2 py-1 rounded-pill bg-black/30 backdrop-blur-sm"
+          onClick={(e) => e.preventDefault()}
+        >
+          {photos.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Go to photo ${i + 1}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                scrollToIndex(i);
+              }}
+              className={`h-1.5 rounded-full transition-all duration-200 ${
+                i === activeIndex
+                  ? "w-4 bg-white"
+                  : "w-1.5 bg-white/60 hover:bg-white/80"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Card({
   r,
   cuisineColor,
@@ -63,6 +222,7 @@ function Card({
   visitingId,
   visits,
   recommendedItems,
+  restaurantPhotos,
   imageDisplayMode = "full",
   onNavigate,
   priority = false,
@@ -75,6 +235,7 @@ function Card({
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   recommendedItems?: MenuItem[];
+  restaurantPhotos?: RestaurantPhoto[];
   imageDisplayMode?: ImageDisplayMode;
   onNavigate?: () => void;
   priority?: boolean;
@@ -104,71 +265,89 @@ function Card({
         borderLeft: `3px solid ${cuisineColor}`,
       }}
     >
-      {(r.photo_url || r.storefront_photo_url) &&
-        imageDisplayMode !== "none" && (
-          <div
-            className={`relative overflow-hidden ${
-              imageDisplayMode === "compact" ? "h-[100px]" : "aspect-[3/2]"
-            }`}
-          >
-            <Image
-              src={(r.photo_url || r.storefront_photo_url)!}
-              alt={r.name}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-              priority={priority}
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
-              onError={(e) => {
-                (
-                  e.target as HTMLImageElement
-                ).parentElement!.parentElement!.style.display = "none";
-              }}
-              unoptimized
-            />
-            <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg/40 to-transparent pointer-events-none" />
+      {imageDisplayMode !== "none" &&
+        (() => {
+          const openNow = isCurrentlyOpen(r.opening_hours);
+          const storefrontUrl = r.photo_url || r.storefront_photo_url;
+          const slides: RestaurantPhoto[] = [];
+          if (storefrontUrl) {
+            slides.push({
+              url: storefrontUrl,
+              itemName: null,
+              isStorefront: true,
+              isRecommended: false,
+            });
+          }
+          (restaurantPhotos ?? []).forEach((p) => slides.push(p));
 
-            {/* Top-left badges */}
-            <div className="absolute top-2 left-2 flex gap-1.5">
-              {r.must_try && (
-                <span className="text-2xs font-medium px-2 py-1 rounded-pill bg-accent text-white shadow-sm tracking-tight uppercase border-2 border-white/80">
-                  Must-try
-                </span>
-              )}
-            </div>
+          if (slides.length === 0) return null;
 
-            {/* Top-right badges */}
-            <div className="absolute top-2 right-2 flex gap-1.5 flex-wrap justify-end">
-              {recencyTag && (
-                <span
-                  className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
-                  style={{
-                    backgroundColor: "rgba(250, 238, 218, 0.95)",
-                    color: "#633806",
+          // Compact mode: single image, no carousel
+          if (imageDisplayMode === "compact") {
+            return (
+              <div className="relative overflow-hidden h-[100px]">
+                <Image
+                  src={slides[0].url}
+                  alt={r.name}
+                  fill
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                  priority={priority}
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
+                  onError={(e) => {
+                    (
+                      e.target as HTMLImageElement
+                    ).parentElement!.parentElement!.style.display = "none";
                   }}
-                >
-                  {recencyTag.text}
-                </span>
-              )}
-              {(() => {
-                const openNow = isCurrentlyOpen(r.opening_hours);
-                if (openNow === null) return null;
-                return (
-                  <span
-                    className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
-                    style={{
-                      backgroundColor: openNow
-                        ? "rgba(234, 243, 222, 0.95)"
-                        : "rgba(241, 239, 232, 0.95)",
-                      color: openNow ? "#27500A" : "#5F5E5A",
-                    }}
-                  >
-                    {openNow ? "Open now" : "Closed"}
-                  </span>
-                );
-              })()}
-            </div>
-          </div>
-        )}
+                  unoptimized
+                />
+                <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg/40 to-transparent pointer-events-none" />
+                <div className="absolute top-2 left-2 flex gap-1.5">
+                  {r.must_try && (
+                    <span className="text-2xs font-medium px-2 py-1 rounded-pill bg-accent text-white shadow-sm tracking-tight uppercase border-2 border-white/80">
+                      Must-try
+                    </span>
+                  )}
+                </div>
+                <div className="absolute top-2 right-2 flex gap-1.5 flex-wrap justify-end">
+                  {recencyTag && (
+                    <span
+                      className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
+                      style={{
+                        backgroundColor: "rgba(250, 238, 218, 0.95)",
+                        color: "#633806",
+                      }}
+                    >
+                      {recencyTag.text}
+                    </span>
+                  )}
+                  {openNow !== null && (
+                    <span
+                      className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
+                      style={{
+                        backgroundColor: openNow
+                          ? "rgba(234, 243, 222, 0.95)"
+                          : "rgba(241, 239, 232, 0.95)",
+                        color: openNow ? "#27500A" : "#5F5E5A",
+                      }}
+                    >
+                      {openNow ? "Open now" : "Closed"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <PhotoCarousel
+              photos={slides}
+              priority={priority}
+              recencyTag={recencyTag}
+              openNow={openNow}
+              mustTry={!!r.must_try}
+            />
+          );
+        })()}
       <div className="p-4">
         {/* Name + price */}
         <div className="flex items-start justify-between gap-2">
@@ -386,6 +565,7 @@ function InfiniteCardGrid({
   visits,
   baseDelay = 0,
   recommendedItems,
+  restaurantPhotos,
   imageDisplayMode = "full",
 }: {
   restaurants: Restaurant[];
@@ -397,6 +577,7 @@ function InfiniteCardGrid({
   visits?: Record<number, RestaurantVisit[]>;
   baseDelay?: number;
   recommendedItems?: Record<number, MenuItem[]>;
+  restaurantPhotos?: Record<number, RestaurantPhoto[]>;
   imageDisplayMode?: ImageDisplayMode;
 }) {
   const [visibleCount, setVisibleCount] = useState(() => {
@@ -499,6 +680,7 @@ function InfiniteCardGrid({
               visitingId={visitingId}
               visits={visits}
               recommendedItems={recommendedItems?.[r.id]}
+              restaurantPhotos={restaurantPhotos?.[r.id]}
               imageDisplayMode={imageDisplayMode}
               onNavigate={handleNavigate}
               priority={i === 0}
@@ -541,6 +723,7 @@ export default function RestaurantGrid({
   visits,
   baseDelay,
   recommendedItems,
+  restaurantPhotos,
   imageDisplayMode = "full",
 }: Props) {
   const cuisineColorMap = useMemo(
@@ -581,6 +764,7 @@ export default function RestaurantGrid({
         visits={visits}
         baseDelay={baseDelay}
         recommendedItems={recommendedItems}
+        restaurantPhotos={restaurantPhotos}
         imageDisplayMode={imageDisplayMode}
       />
     );
@@ -624,6 +808,7 @@ export default function RestaurantGrid({
                   visitingId={visitingId}
                   visits={visits}
                   recommendedItems={recommendedItems?.[r.id]}
+                  restaurantPhotos={restaurantPhotos?.[r.id]}
                   imageDisplayMode={imageDisplayMode}
                   priority={i === 0 && j === 0}
                 />
