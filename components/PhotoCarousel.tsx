@@ -19,6 +19,7 @@ type Props = {
   mustTry?: boolean;
   aspectClass?: string;
   heroName?: string;
+  cuisineColor?: string;
 };
 
 export default function PhotoCarousel({
@@ -29,6 +30,7 @@ export default function PhotoCarousel({
   mustTry = false,
   aspectClass = "aspect-[3/2]",
   heroName,
+  cuisineColor,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -63,7 +65,16 @@ export default function PhotoCarousel({
   const multiple = photos.length > 1;
 
   return (
-    <div className={`relative overflow-hidden ${aspectClass} bg-bg2`}>
+    <div
+      className={`relative overflow-hidden ${aspectClass} bg-bg2`}
+      style={
+        cuisineColor
+          ? {
+              backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${cuisineColor} 25%, transparent), var(--bg2))`,
+            }
+          : undefined
+      }
+    >
       <div
         ref={scrollerRef}
         onScroll={handleScroll}

@@ -174,6 +174,7 @@ function HomeContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [mapEverMounted, setMapEverMounted] = useState(false);
   const [isFirstVisit, setIsFirstVisit] = useState(false);
   const [recommendedItems, setRecommendedItems] = useState<
     Record<number, MenuItem[]>
@@ -394,6 +395,10 @@ function HomeContent() {
     }, [isAdmin]);
 
   useEffect(() => {
+    if (viewMode === "map") setMapEverMounted(true);
+  }, [viewMode]);
+
+  useEffect(() => {
     load();
     setMounted(true);
 
@@ -441,12 +446,44 @@ function HomeContent() {
     },
   });
 
+  const visibilityScoped = useMemo(
+    () =>
+      restaurants.filter((r) => {
+        if (isAdmin && activeVisibility !== "all") {
+          if ((r.visibility ?? "public") !== activeVisibility) return false;
+        }
+        return true;
+      }),
+    [restaurants, isAdmin, activeVisibility],
+  );
+
   const cuisines = Array.from(
-    new Set(restaurants.map((r) => r.cuisine).filter(Boolean)),
+    new Set(visibilityScoped.map((r) => r.cuisine).filter(Boolean)),
   ).sort();
   const neighborhoods = Array.from(
-    new Set(restaurants.map((r) => r.neighborhood).filter(Boolean)),
+    new Set(visibilityScoped.map((r) => r.neighborhood).filter(Boolean)),
   ).sort();
+  const cuisineCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    visibilityScoped.forEach((r) => {
+      if (r.cuisine) m[r.cuisine] = (m[r.cuisine] ?? 0) + 1;
+    });
+    return m;
+  }, [visibilityScoped]);
+  const neighborhoodCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    visibilityScoped.forEach((r) => {
+      if (r.neighborhood) m[r.neighborhood] = (m[r.neighborhood] ?? 0) + 1;
+    });
+    return m;
+  }, [visibilityScoped]);
+  const priceCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    visibilityScoped.forEach((r) => {
+      if (r.price) m[r.price] = (m[r.price] ?? 0) + 1;
+    });
+    return m;
+  }, [visibilityScoped]);
   const filtered = useMemo(
     () =>
       restaurants.filter((r) => {
@@ -625,9 +662,12 @@ function HomeContent() {
         cuisines={cuisines}
         activeCuisines={activeCuisines}
         onCuisineChange={handleCuisineChange}
+        cuisineCounts={cuisineCounts}
         neighborhoods={neighborhoods}
         activeNeighborhoods={activeNeighborhoods}
         onNeighborhoodChange={handleNeighborhoodChange}
+        neighborhoodCounts={neighborhoodCounts}
+        priceCounts={priceCounts}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         mustTryFilter={mustTryFilter}
@@ -646,24 +686,41 @@ function HomeContent() {
       <div className="relative z-0">
         {loading ? (
           <SkeletonGrid />
-        ) : viewMode === "map" ? (
-          <div className="animate-fade-up">
-            <MapView restaurants={filtered} allRestaurants={restaurants} />
-          </div>
         ) : (
-          <>
-            <RestaurantGrid
-              restaurants={filtered}
-              grouped={false}
-              baseDelay={isFirstVisit ? 400 : 0}
-              recommendedItems={recommendedItems}
-              restaurantPhotos={restaurantPhotos}
-              imageDisplayMode={imageDisplayMode}
-              onCheckIn={handleCheckInClick}
-              visitingId={visitingId}
-            />
-            {!loading && isFiltered && <SurpriseBar restaurants={filtered} />}
-            {!loading && !isFiltered && (
+          <div className="relative">
+            <div
+              className={`transition-opacity duration-200 ${
+                viewMode === "list"
+                  ? "opacity-100"
+                  : "opacity-0 pointer-events-none absolute inset-x-0 top-0"
+              }`}
+              aria-hidden={viewMode !== "list"}
+            >
+              <RestaurantGrid
+                restaurants={filtered}
+                grouped={false}
+                baseDelay={isFirstVisit ? 400 : 0}
+                recommendedItems={recommendedItems}
+                restaurantPhotos={restaurantPhotos}
+                imageDisplayMode={imageDisplayMode}
+                onCheckIn={handleCheckInClick}
+                visitingId={visitingId}
+              />
+              {isFiltered && <SurpriseBar restaurants={filtered} />}
+            </div>
+            {mapEverMounted && (
+              <div
+                className={`transition-opacity duration-200 ${
+                  viewMode === "map"
+                    ? "opacity-100"
+                    : "opacity-0 pointer-events-none absolute inset-x-0 top-0"
+                }`}
+                aria-hidden={viewMode !== "map"}
+              >
+                <MapView restaurants={filtered} allRestaurants={restaurants} />
+              </div>
+            )}
+            {!isFiltered && viewMode === "list" && (
               <button
                 ref={surpriseBtnRef}
                 onClick={() => {
@@ -680,7 +737,7 @@ function HomeContent() {
                 Surprise me ✦
               </button>
             )}
-          </>
+          </div>
         )}
 
         <footer className="p-6 flex justify-end items-center gap-4">

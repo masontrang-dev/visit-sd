@@ -530,7 +530,11 @@ export default function ActivityFeed() {
           <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
         </svg>
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-accent text-white text-2xs font-medium flex items-center justify-center">
+          <span
+            className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-accent text-white text-2xs font-medium flex items-center justify-center origin-center ${
+              open ? "" : "motion-safe:animate-badge-pulse"
+            }`}
+          >
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}

@@ -64,6 +64,10 @@ module.exports = {
           from: { opacity: "0", transform: "translateY(0.3em)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "badge-pulse": {
+          "0%, 100%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.15)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.4s ease-out both",
@@ -72,6 +76,7 @@ module.exports = {
         "toast-out": "toast-out 0.2s ease-in both",
         "scroll-fade-in": "scroll-fade-in 0.5s ease-out both",
         "word-reveal": "word-reveal 0.4s cubic-bezier(0.22,1,0.36,1) both",
+        "badge-pulse": "badge-pulse 2s ease-in-out infinite",
       },
     },
   },

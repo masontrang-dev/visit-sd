@@ -134,7 +134,12 @@ function Card({
           // Compact mode: single image, no carousel
           if (imageDisplayMode === "compact") {
             return (
-              <div className="relative overflow-hidden h-[100px]">
+              <div
+                className="relative overflow-hidden h-[100px] bg-bg2"
+                style={{
+                  backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${cuisineColor} 25%, transparent), var(--bg2))`,
+                }}
+              >
                 <Image
                   src={slides[0].url}
                   alt={r.name}
@@ -195,6 +200,7 @@ function Card({
               openNow={openNow}
               mustTry={!!r.must_try}
               heroName={heroName}
+              cuisineColor={cuisineColor}
             />
           );
         })()}

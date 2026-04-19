@@ -16,9 +16,12 @@ type Props = {
   cuisines: string[];
   activeCuisines: string[];
   onCuisineChange: (f: string[]) => void;
+  cuisineCounts?: Record<string, number>;
   neighborhoods?: string[];
   activeNeighborhoods?: string[];
   onNeighborhoodChange?: (f: string[]) => void;
+  neighborhoodCounts?: Record<string, number>;
+  priceCounts?: Record<string, number>;
   onAdd?: () => void;
   viewMode?: "list" | "map";
   onViewModeChange?: (mode: "list" | "map") => void;
@@ -49,9 +52,12 @@ export default function FilterBar({
   cuisines,
   activeCuisines,
   onCuisineChange,
+  cuisineCounts,
   neighborhoods,
   activeNeighborhoods,
   onNeighborhoodChange,
+  neighborhoodCounts,
+  priceCounts,
   onAdd,
   viewMode,
   onViewModeChange,
@@ -388,19 +394,27 @@ export default function FilterBar({
                 >
                   All
                 </button>
-                {cuisines.map((c) => (
-                  <button
-                    key={c}
-                    className={
-                      activeCuisines.includes(c) ? "chip-active" : "chip"
-                    }
-                    onClick={() =>
-                      onCuisineChange(toggleItem(activeCuisines, c))
-                    }
-                  >
-                    {c}
-                  </button>
-                ))}
+                {cuisines.map((c) => {
+                  const count = cuisineCounts?.[c] ?? 0;
+                  const empty = cuisineCounts && count === 0;
+                  return (
+                    <button
+                      key={c}
+                      disabled={empty}
+                      className={`${
+                        activeCuisines.includes(c) ? "chip-active" : "chip"
+                      } ${empty ? "opacity-40 cursor-not-allowed" : ""}`}
+                      onClick={() =>
+                        onCuisineChange(toggleItem(activeCuisines, c))
+                      }
+                    >
+                      {c}
+                      {cuisineCounts && (
+                        <span className="ml-1 opacity-60">({count})</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -415,23 +429,31 @@ export default function FilterBar({
                   >
                     All
                   </button>
-                  {neighborhoods.map((n) => (
-                    <button
-                      key={n}
-                      className={
-                        (activeNeighborhoods ?? []).includes(n)
-                          ? "chip-active"
-                          : "chip"
-                      }
-                      onClick={() =>
-                        onNeighborhoodChange(
-                          toggleItem(activeNeighborhoods ?? [], n),
-                        )
-                      }
-                    >
-                      {n}
-                    </button>
-                  ))}
+                  {neighborhoods.map((n) => {
+                    const count = neighborhoodCounts?.[n] ?? 0;
+                    const empty = neighborhoodCounts && count === 0;
+                    return (
+                      <button
+                        key={n}
+                        disabled={empty}
+                        className={`${
+                          (activeNeighborhoods ?? []).includes(n)
+                            ? "chip-active"
+                            : "chip"
+                        } ${empty ? "opacity-40 cursor-not-allowed" : ""}`}
+                        onClick={() =>
+                          onNeighborhoodChange(
+                            toggleItem(activeNeighborhoods ?? [], n),
+                          )
+                        }
+                      >
+                        {n}
+                        {neighborhoodCounts && (
+                          <span className="ml-1 opacity-60">({count})</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
@@ -444,19 +466,29 @@ export default function FilterBar({
                 >
                   All
                 </button>
-                {["$", "$$", "$$$", "$$$$"].map((p) => (
-                  <button
-                    key={p}
-                    className={
-                      (activePrices ?? []).includes(p) ? "chip-active" : "chip"
-                    }
-                    onClick={() =>
-                      onPriceChange(toggleItem(activePrices ?? [], p))
-                    }
-                  >
-                    {p}
-                  </button>
-                ))}
+                {["$", "$$", "$$$", "$$$$"].map((p) => {
+                  const count = priceCounts?.[p] ?? 0;
+                  const empty = priceCounts && count === 0;
+                  return (
+                    <button
+                      key={p}
+                      disabled={empty}
+                      className={`${
+                        (activePrices ?? []).includes(p)
+                          ? "chip-active"
+                          : "chip"
+                      } ${empty ? "opacity-40 cursor-not-allowed" : ""}`}
+                      onClick={() =>
+                        onPriceChange(toggleItem(activePrices ?? [], p))
+                      }
+                    >
+                      {p}
+                      {priceCounts && (
+                        <span className="ml-1 opacity-60">({count})</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
