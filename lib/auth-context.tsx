@@ -10,7 +10,7 @@ import {
   ReactNode,
 } from "react";
 import { createClient } from "./supabase-client";
-import type { User } from "@supabase/supabase-js";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 type UserRole = "superuser" | "admin" | "curator" | "user";
 
@@ -119,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       const sessionUser = session?.user ?? null;
       setUser(sessionUser);
       if (sessionUser) {

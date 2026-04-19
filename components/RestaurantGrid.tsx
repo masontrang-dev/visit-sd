@@ -274,11 +274,11 @@ function Card({
                   e.preventDefault();
                   e.stopPropagation();
                   if (r.google_maps_url) {
-                    window.open(
-                      r.google_maps_url,
-                      "_blank",
-                      "noopener,noreferrer",
-                    );
+                    const a = document.createElement("a");
+                    a.href = r.google_maps_url;
+                    a.target = "_blank";
+                    a.rel = "noopener noreferrer";
+                    a.click();
                   }
                 }}
                 className="text-2xs font-medium text-accent2 hover:opacity-70 transition-opacity duration-150 bg-transparent border-none cursor-pointer p-0 tracking-tight ml-auto"

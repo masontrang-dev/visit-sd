@@ -160,10 +160,12 @@ export default function RestaurantDetailPage({ params }: Props) {
 
       // Fetch superuser and admin names if admin (to determine delete permissions)
       if (isAdmin && !isSuperuser) {
-        const { data: roles } = await supabase
+        const { data: roles } = (await supabase
           .from("user_roles")
           .select("user_id, role")
-          .in("role", ["superuser", "admin"]);
+          .in("role", ["superuser", "admin"])) as {
+          data: { user_id: string; role: string }[] | null;
+        };
 
         if (roles) {
           const superuserIds = roles
@@ -173,10 +175,12 @@ export default function RestaurantDetailPage({ params }: Props) {
             .filter((r) => r.role === "admin")
             .map((r) => r.user_id);
 
-          const { data: profiles } = await supabase
+          const { data: profiles } = (await supabase
             .from("user_profiles")
             .select("user_id, display_name")
-            .in("user_id", [...superuserIds, ...adminIds]);
+            .in("user_id", [...superuserIds, ...adminIds])) as {
+            data: { user_id: string; display_name: string | null }[] | null;
+          };
 
           if (profiles) {
             const superuserProfiles = profiles.filter((p) =>
@@ -187,10 +191,14 @@ export default function RestaurantDetailPage({ params }: Props) {
             );
 
             setSuperuserNames(
-              superuserProfiles.map((p) => p.display_name).filter(Boolean),
+              superuserProfiles
+                .map((p) => p.display_name)
+                .filter((n): n is string => Boolean(n)),
             );
             setAdminNames(
-              adminProfiles.map((p) => p.display_name).filter(Boolean),
+              adminProfiles
+                .map((p) => p.display_name)
+                .filter((n): n is string => Boolean(n)),
             );
           }
         }
@@ -238,8 +246,9 @@ export default function RestaurantDetailPage({ params }: Props) {
       setItemOrders(ordersResult.data ?? []);
 
       if (cuisinesResult.data) {
+        const rows = cuisinesResult.data as { cuisine: string | null }[];
         const uniqueCuisines = Array.from(
-          new Set(cuisinesResult.data.map((r) => r.cuisine).filter(Boolean)),
+          new Set(rows.map((r) => r.cuisine).filter(Boolean)),
         ).sort();
         setCuisines(uniqueCuisines as string[]);
       }

@@ -84,11 +84,11 @@ export default function BobaDashboardPage() {
     setLoading(true);
 
     // Load all menu items with category 'boba'
-    const { data: bobaMenuItems } = await supabase
+    const { data: bobaMenuItems } = (await supabase
       .from("menu_items")
       .select("*")
       .eq("category", "boba")
-      .order("name");
+      .order("name")) as { data: MenuItem[] | null };
 
     if (!bobaMenuItems || bobaMenuItems.length === 0) {
       setLoading(false);
@@ -101,11 +101,11 @@ export default function BobaDashboardPage() {
     );
 
     // Load those restaurants
-    const { data: bobaRestaurants } = await supabase
+    const { data: bobaRestaurants } = (await supabase
       .from("restaurants")
       .select("*")
       .in("id", bobaRestaurantIds)
-      .order("name");
+      .order("name")) as { data: Restaurant[] | null };
 
     // Load all orders for restaurants that have boba menu items
     const { data: allOrders } = await supabase

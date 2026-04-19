@@ -53,13 +53,19 @@ export default function UsersPage() {
   }
 
   async function loadUsers() {
-    const { data: profiles, error: profileError } = await supabase
+    const { data: profiles, error: profileError } = (await supabase
       .from("user_profiles")
-      .select("user_id, display_name");
+      .select("user_id, display_name")) as {
+      data: { user_id: string; display_name: string | null }[] | null;
+      error: { message: string } | null;
+    };
 
-    const { data: roles, error: roleError } = await supabase
+    const { data: roles, error: roleError } = (await supabase
       .from("user_roles")
-      .select("user_id, role");
+      .select("user_id, role")) as {
+      data: { user_id: string; role: string }[] | null;
+      error: { message: string } | null;
+    };
 
     if (profileError) {
       setError(`Profiles: ${profileError.message}`);
@@ -81,17 +87,20 @@ export default function UsersPage() {
         id: p.user_id,
         email: p.display_name || "User",
         roles: rolesByUser[p.user_id] || ["user"],
-        display_name: p.display_name,
+        display_name: p.display_name ?? undefined,
       })) || [],
     );
   }
 
   async function loadRequests() {
-    const { data, error: reqErr } = await supabase
+    const { data, error: reqErr } = (await supabase
       .from("role_requests")
       .select("id, user_id, requested_role, message, created_at")
       .eq("status", "pending")
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })) as {
+      data: Omit<PendingRequest, "display_name">[] | null;
+      error: { message: string } | null;
+    };
 
     if (reqErr) {
       setError(`Requests: ${reqErr.message}`);
@@ -103,10 +112,12 @@ export default function UsersPage() {
     }
 
     const userIds = Array.from(new Set(data.map((r) => r.user_id)));
-    const { data: profiles } = await supabase
+    const { data: profiles } = (await supabase
       .from("user_profiles")
       .select("user_id, display_name")
-      .in("user_id", userIds);
+      .in("user_id", userIds)) as {
+      data: { user_id: string; display_name: string | null }[] | null;
+    };
 
     const nameByUser: Record<string, string | null> = {};
     profiles?.forEach((p) => {

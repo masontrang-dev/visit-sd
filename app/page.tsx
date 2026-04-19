@@ -275,27 +275,29 @@ function HomeContent() {
       if (!isAdmin) {
         query = query.eq("visibility", "public");
       }
-      const { data } = await query;
+      const { data } = (await query) as { data: Restaurant[] | null };
       setRestaurants(data ?? []);
 
       // Fetch recommended menu items, scoped to restaurants the viewer can see
       if (data && data.length > 0) {
         const visibleRestaurantIds = data.map((r) => r.id);
-        const { data: recRows } = await supabase
+        const { data: recRows } = (await supabase
           .from("menu_item_recommendations")
-          .select("menu_item_id");
+          .select("menu_item_id")) as {
+          data: { menu_item_id: number }[] | null;
+        };
 
         const recommendedIds = Array.from(
           new Set((recRows ?? []).map((r) => r.menu_item_id)),
         );
 
         if (recommendedIds.length > 0) {
-          const { data: menuData } = await supabase
+          const { data: menuData } = (await supabase
             .from("menu_items")
             .select("*")
             .in("id", recommendedIds)
             .in("restaurant_id", visibleRestaurantIds)
-            .order("name");
+            .order("name")) as { data: MenuItem[] | null };
 
           if (menuData) {
             const itemsByRestaurant: Record<number, MenuItem[]> = {};
