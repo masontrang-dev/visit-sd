@@ -20,10 +20,19 @@ function getDeviceType(userAgent: string): string {
   return "desktop";
 }
 
+const ALLOWED_EVENT_TYPES = new Set(["outbound_click", "search"]);
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { path, referrer, user_agent } = body;
+    const {
+      path,
+      referrer,
+      user_agent,
+      session_id,
+      event_type,
+      event_label,
+    } = body;
 
     // Get IP address from request headers
     const ip =
@@ -33,6 +42,19 @@ export async function POST(request: NextRequest) {
 
     // Detect device type from user agent
     const deviceType = user_agent ? getDeviceType(user_agent) : null;
+
+    const safeEventType =
+      typeof event_type === "string" && ALLOWED_EVENT_TYPES.has(event_type)
+        ? event_type
+        : null;
+    const safeEventLabel =
+      safeEventType && typeof event_label === "string"
+        ? event_label.slice(0, 500)
+        : null;
+    const safeSessionId =
+      typeof session_id === "string" && session_id.length <= 64
+        ? session_id
+        : null;
 
     // Get geolocation data from IP
     let country = null;
@@ -70,6 +92,9 @@ export async function POST(request: NextRequest) {
         region,
         city,
         device_type: deviceType,
+        session_id: safeSessionId,
+        event_type: safeEventType,
+        event_label: safeEventLabel,
       },
     ]);
 

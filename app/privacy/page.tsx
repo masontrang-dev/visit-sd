@@ -20,111 +20,215 @@ export default function PrivacyPage() {
         <section className="mb-8">
           <h2 className="font-display text-2xl mb-3">Overview</h2>
           <p className="text-base text-txt leading-relaxed mb-4">
-            Visit SD is a personal restaurant guide. We collect minimal
-            analytics data to understand how the site is used and where our
-            visitors come from. We do not sell or share your data with third
-            parties.
+            Visit SD is a personal restaurant guide. This page describes what we
+            collect, why, and how long we keep it. We do not sell or share your
+            data with third parties outside of the service providers listed
+            below.
           </p>
-        </section>
-
-        <section className="mb-8">
-          <h2 className="font-display text-2xl mb-3">Data We Collect</h2>
-          <p className="text-base text-txt leading-relaxed mb-4">
-            When you visit this site, we automatically collect:
-          </p>
-          <ul className="list-disc list-inside text-base text-txt leading-relaxed space-y-2 mb-4">
-            <li>
-              <strong>Page URL</strong> — which pages you visit on our site
-            </li>
-            <li>
-              <strong>Referrer</strong> — the website you came from (if any)
-            </li>
-            <li>
-              <strong>User Agent</strong> — your browser and device type
-              (mobile/desktop/tablet)
-            </li>
-            <li>
-              <strong>IP Address</strong> — your internet connection's IP
-              address
-            </li>
-            <li>
-              <strong>Geographic Location</strong> — approximate city, region,
-              and country derived from your IP address
-            </li>
-          </ul>
           <p className="text-base text-txt leading-relaxed">
-            We do <strong>not</strong> collect cookies, personal identifiers, or
-            any personally identifiable information (PII).
+            Two different kinds of data are handled: (1){" "}
+            <strong>anonymous site analytics</strong> that everyone generates
+            just by visiting, and (2) <strong>account data</strong> that only
+            exists if you sign in.
           </p>
         </section>
 
         <section className="mb-8">
           <h2 className="font-display text-2xl mb-3">
-            How We Use Your Data
+            1. Anonymous Site Analytics
           </h2>
           <p className="text-base text-txt leading-relaxed mb-4">
-            We use this data solely for:
+            When you load a page on the public site, we record a page-view
+            entry with the following fields:
+          </p>
+          <ul className="list-disc list-inside text-base text-txt leading-relaxed space-y-2 mb-4">
+            <li>
+              <strong>Page URL</strong> — which page on our site was viewed
+            </li>
+            <li>
+              <strong>Referrer</strong> — the URL you came from, if any
+            </li>
+            <li>
+              <strong>User agent</strong> — your browser string, and the device
+              category (mobile / tablet / desktop) derived from it
+            </li>
+            <li>
+              <strong>IP address</strong> — your connection's IP, used to look
+              up approximate location and to attribute traffic
+            </li>
+            <li>
+              <strong>Approximate location</strong> — city, region, and country,
+              looked up from your IP via ipapi.co
+            </li>
+            <li>
+              <strong>Session ID</strong> — a random identifier stored in your
+              browser's <code>sessionStorage</code> for the duration of the
+              browser tab only. It is not a cookie, is not shared across tabs or
+              devices, and is discarded when you close the tab. We use it to
+              count unique sessions separately from raw page views.
+            </li>
+          </ul>
+          <p className="text-base text-txt leading-relaxed mb-4">
+            We also record a small number of interaction events, each tagged
+            with the same session ID:
+          </p>
+          <ul className="list-disc list-inside text-base text-txt leading-relaxed space-y-2 mb-4">
+            <li>
+              <strong>Outbound clicks</strong> — when you click through to an
+              external destination such as Google Maps from a restaurant page
+            </li>
+            <li>
+              <strong>Search queries</strong> — the text of searches you run on
+              the site, so we can understand what people are looking for. Only
+              "settled" queries (after you pause typing) are recorded, not every
+              keystroke.
+            </li>
+          </ul>
+          <p className="text-base text-txt leading-relaxed">
+            This data is anonymous: it is not tied to an account, an email, or a
+            name. If you are signed in and browsing the public site, these
+            entries are still recorded the same way and are not linked to your
+            user record.
+          </p>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="font-display text-2xl mb-3">
+            2. Account Data (When You Sign In)
+          </h2>
+          <p className="text-base text-txt leading-relaxed mb-4">
+            You can sign in with your Google account. If you do, the following
+            data is stored in our database, associated with your user record:
+          </p>
+          <ul className="list-disc list-inside text-base text-txt leading-relaxed space-y-2 mb-4">
+            <li>
+              <strong>Identity from Google</strong> — your email address, your
+              display name, and a URL to your Google profile picture. We receive
+              these from Google when you sign in and do not see your Google
+              password.
+            </li>
+            <li>
+              <strong>Role assignments</strong> — whether your account has
+              admin, curator, or superuser permissions
+            </li>
+            <li>
+              <strong>Role requests</strong> — if you request elevated access,
+              the role requested, any message you sent with the request, and the
+              outcome
+            </li>
+            <li>
+              <strong>Check-ins</strong> — any restaurant check-ins you record
+              (date, optional note, optional photo), tagged with your display
+              name
+            </li>
+            <li>
+              <strong>Dish & drink logs</strong> — items you log having ordered,
+              including the restaurant, a thumbs up/down, optional notes,
+              optional photos, and for drinks any customizations you noted
+              (sweetness, ice, toppings, etc.), tied to your user ID
+            </li>
+            <li>
+              <strong>Curator recommendations</strong> — if you're a curator,
+              which menu items you've recommended
+            </li>
+          </ul>
+          <p className="text-base text-txt leading-relaxed">
+            Account data is kept for as long as your account exists. To request
+            deletion of your account and all associated data, use the contact
+            method below.
+          </p>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="font-display text-2xl mb-3">Cookies & Storage</h2>
+          <p className="text-base text-txt leading-relaxed mb-4">
+            We don't use tracking cookies. Your browser stores:
           </p>
           <ul className="list-disc list-inside text-base text-txt leading-relaxed space-y-2">
-            <li>Understanding visitor traffic patterns</li>
-            <li>Identifying which devices people use (mobile vs desktop)</li>
-            <li>Seeing where our visitors are located geographically</li>
-            <li>Tracking which external sites refer visitors to us</li>
+            <li>
+              A <strong>session cookie from Supabase</strong> after you sign in,
+              so you stay signed in. It is cleared when you sign out.
+            </li>
+            <li>
+              A <strong>session ID in sessionStorage</strong> (see above), which
+              is cleared when you close the browser tab.
+            </li>
+            <li>
+              A handful of UI preferences in <strong>localStorage</strong>{" "}
+              (theme, image density, etc.). These never leave your browser.
+            </li>
+          </ul>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="font-display text-2xl mb-3">How We Use This Data</h2>
+          <ul className="list-disc list-inside text-base text-txt leading-relaxed space-y-2">
+            <li>
+              Understanding traffic patterns and which pages and restaurants are
+              popular
+            </li>
+            <li>Seeing where visitors are roughly located</li>
+            <li>Learning which searches lead to results we don't yet have</li>
+            <li>Operating sign-in, role-based access, and personal logs</li>
+            <li>Debugging and improving the site</li>
           </ul>
         </section>
 
         <section className="mb-8">
           <h2 className="font-display text-2xl mb-3">Data Retention</h2>
-          <p className="text-base text-txt leading-relaxed">
-            Analytics data is automatically deleted after{" "}
-            <strong>90 days</strong> via a daily scheduled cleanup job. We do
-            not retain historical analytics beyond this period.
-          </p>
+          <ul className="list-disc list-inside text-base text-txt leading-relaxed space-y-2">
+            <li>
+              <strong>Anonymous analytics</strong> (page views, events,
+              searches) are automatically deleted after <strong>90 days</strong>{" "}
+              by a daily scheduled job.
+            </li>
+            <li>
+              <strong>Account data</strong> (identity, roles, check-ins, dish
+              logs, photos) is kept until you request deletion.
+            </li>
+          </ul>
         </section>
 
         <section className="mb-8">
-          <h2 className="font-display text-2xl mb-3">
-            Third-Party Services
-          </h2>
-          <p className="text-base text-txt leading-relaxed mb-4">
-            We use the following third-party services:
-          </p>
+          <h2 className="font-display text-2xl mb-3">Third-Party Services</h2>
           <ul className="list-disc list-inside text-base text-txt leading-relaxed space-y-2 mb-4">
             <li>
-              <strong>Supabase</strong> — database hosting for restaurant data
-              and analytics
+              <strong>Supabase</strong> — database, authentication, and file
+              storage (for photos you upload)
             </li>
             <li>
               <strong>Vercel</strong> — web hosting and deployment
             </li>
             <li>
-              <strong>Google Maps</strong> — interactive maps and place search
+              <strong>Google</strong> — OAuth sign-in and Google Maps. Your
+              email, name, and avatar are received from Google when you sign in.
             </li>
             <li>
-              <strong>ipapi.co</strong> — IP geolocation lookup (converts IP
-              addresses to city/region/country)
+              <strong>ipapi.co</strong> — IP geolocation lookup (receives your
+              IP address only, to return a city/region/country)
             </li>
           </ul>
           <p className="text-base text-txt leading-relaxed">
-            Each service has its own privacy policy. Your IP address is shared
-            with ipapi.co for geolocation lookup only.
+            Each service has its own privacy policy.
           </p>
         </section>
 
         <section className="mb-8">
           <h2 className="font-display text-2xl mb-3">Your Rights</h2>
           <p className="text-base text-txt leading-relaxed">
-            Since we do not collect personally identifiable information, there
-            is no personal data to request, modify, or delete. All analytics
-            data is anonymous and aggregated.
+            You can request a copy of the account data associated with your
+            user, or deletion of your account and all associated data, by
+            contacting the site administrator (see below). Anonymous analytics
+            entries cannot be individually identified or removed on request,
+            but they are auto-deleted after 90 days.
           </p>
         </section>
 
         <section className="mb-8">
           <h2 className="font-display text-2xl mb-3">Contact</h2>
           <p className="text-base text-txt leading-relaxed">
-            If you have questions about this privacy policy, please contact the
-            site administrator through the admin panel.
+            For questions or data requests, contact the site administrator
+            through the admin panel or via the account used to host this site.
           </p>
         </section>
 

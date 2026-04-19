@@ -90,13 +90,29 @@ export default function AdminButton() {
       {showMenu && (
         <div className="absolute right-0 top-full mt-2 bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[140px] z-50">
           {isSuperuser && (
-            <a
-              href="/admin/users"
-              className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
-              onClick={() => setShowMenu(false)}
-            >
-              Manage Users
-            </a>
+            <>
+              <a
+                href="/admin/users"
+                className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
+                onClick={() => setShowMenu(false)}
+              >
+                Manage Users
+              </a>
+              <a
+                href="/admin/stats"
+                className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
+                onClick={() => setShowMenu(false)}
+              >
+                Site Stats
+              </a>
+              <a
+                href="/admin/boba"
+                className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
+                onClick={() => setShowMenu(false)}
+              >
+                Boba Analytics
+              </a>
+            </>
           )}
           {!isAdmin && (
             <button

@@ -23,6 +23,7 @@ import MenuItemRecommendToggle from "@/components/MenuItemRecommendToggle";
 import Link from "next/link";
 import Image from "next/image";
 import { isCurrentlyOpen } from "@/lib/google-types";
+import { trackEvent } from "@/lib/analytics";
 
 function Chevron({
   open,
@@ -472,7 +473,6 @@ export default function RestaurantDetailPage({ params }: Props) {
         menu_item_id: source.menu_item_id,
         restaurant_id: source.restaurant_id,
         ordered_at: new Date().toISOString().slice(0, 10),
-        liked: source.liked,
         notes: source.notes,
         drink_details: source.drink_details,
         photo_url: null,
@@ -560,13 +560,10 @@ export default function RestaurantDetailPage({ params }: Props) {
     toast("Visit deleted", "success");
   }
 
-  // Build one group per menu item with aggregated thumb / order / recommender data
+  // Build one group per menu item with aggregated order / recommender data
   type DishGroup = {
     menuItem: MenuItem;
     orders: ItemOrder[];
-    likedCount: number;
-    dislikedCount: number;
-    noVerdictCount: number;
     latestOrder: ItemOrder | null;
     latestNote: string | null;
     orderCount: number;
@@ -575,9 +572,6 @@ export default function RestaurantDetailPage({ params }: Props) {
 
   const dishGroups: DishGroup[] = menuItems.map((mi) => {
     const orders = itemOrders.filter((o) => o.menu_item_id === mi.id);
-    const likedCount = orders.filter((o) => o.liked === true).length;
-    const dislikedCount = orders.filter((o) => o.liked === false).length;
-    const noVerdictCount = orders.filter((o) => o.liked === null).length;
     const latestOrder = orders[0] ?? null;
     const latestNote =
       orders.find((o) => (o.notes ?? "").trim().length > 0)?.notes ?? null;
@@ -587,9 +581,6 @@ export default function RestaurantDetailPage({ params }: Props) {
     return {
       menuItem: mi,
       orders,
-      likedCount,
-      dislikedCount,
-      noVerdictCount,
       latestOrder,
       latestNote,
       orderCount: orders.length,
@@ -603,7 +594,6 @@ export default function RestaurantDetailPage({ params }: Props) {
     .sort((a, b) => {
       if (b.recommenderIds.length !== a.recommenderIds.length)
         return b.recommenderIds.length - a.recommenderIds.length;
-      if (b.likedCount !== a.likedCount) return b.likedCount - a.likedCount;
       return b.orderCount - a.orderCount;
     });
 
@@ -829,6 +819,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                       href={restaurant.google_maps_url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() => trackEvent("outbound_click", "google_maps")}
                       className="text-xs text-txt2 no-underline hover:text-accent2 transition-colors inline-flex items-center gap-1"
                     >
                       <svg
@@ -968,14 +959,6 @@ export default function RestaurantDetailPage({ params }: Props) {
           <div className="space-y-3">
             {publicDishes.map((item) => {
               const isUsual = item.menuItem.id === usualBadgeDishId;
-              const liked = item.likedCount;
-              const disliked = item.dislikedCount;
-              const verdict =
-                disliked === 0 && liked >= 3
-                  ? "👍 always"
-                  : liked + disliked === 0
-                    ? null
-                    : `👍 ${liked} · 👎 ${disliked}`;
               return (
                 <div
                   key={item.menuItem.id}
@@ -1009,11 +992,6 @@ export default function RestaurantDetailPage({ params }: Props) {
                       </p>
                     )}
                     <div className="flex items-center gap-3 text-2xs text-txt2 flex-wrap">
-                      {verdict && (
-                        <span className="text-accent font-medium">
-                          {verdict}
-                        </span>
-                      )}
                       <span>
                         {item.orderCount} order
                         {item.orderCount !== 1 ? "s" : ""}
@@ -1049,6 +1027,7 @@ export default function RestaurantDetailPage({ params }: Props) {
               href={restaurant.google_maps_url}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackEvent("outbound_click", "google_maps")}
               className="flex-1 py-3 px-4 rounded-lg text-sm font-medium text-center bg-accent text-white no-underline transition-opacity hover:opacity-90"
             >
               View on Maps
@@ -1168,8 +1147,6 @@ export default function RestaurantDetailPage({ params }: Props) {
             <div className="space-y-3">
               {curatorDishes.map((group) => {
                 const expanded = expandedDishId === group.menuItem.id;
-                const mixedVerdict =
-                  group.likedCount > 0 && group.dislikedCount > 0;
                 return (
                   <div
                     key={group.menuItem.id}
@@ -1193,17 +1170,8 @@ export default function RestaurantDetailPage({ params }: Props) {
                               {group.menuItem.category}
                             </span>
                           )}
-                          {mixedVerdict && (
-                            <span className="text-2xs font-medium px-2 py-0.5 rounded-pill border border-brd text-txt2 uppercase tracking-tight">
-                              Split opinion
-                            </span>
-                          )}
                         </div>
                         <p className="text-2xs text-txt2 mb-1">
-                          👍 {group.likedCount} · 👎 {group.dislikedCount}
-                          {group.noVerdictCount > 0 &&
-                            ` · no verdict ${group.noVerdictCount}`}
-                          {" · "}
                           {group.orderCount} order
                           {group.orderCount !== 1 ? "s" : ""}
                         </p>
@@ -1232,13 +1200,6 @@ export default function RestaurantDetailPage({ params }: Props) {
                           >
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <span className="text-sm">
-                                  {order.liked === true
-                                    ? "👍"
-                                    : order.liked === false
-                                      ? "👎"
-                                      : "—"}
-                                </span>
                                 <p className="text-xs text-txt2">
                                   {formatDate(order.ordered_at)} · by{" "}
                                   {ordererNames[order.ordered_by] || "curator"}
@@ -1312,13 +1273,6 @@ export default function RestaurantDetailPage({ params }: Props) {
                           <p className="font-display text-lg leading-tight">
                             {menuItem?.name || "Unknown item"}
                           </p>
-                          <span className="text-sm">
-                            {order.liked === true
-                              ? "👍"
-                              : order.liked === false
-                                ? "👎"
-                                : "—"}
-                          </span>
                           {menuItem?.category && (
                             <span className="text-2xs text-txt2 capitalize">
                               {menuItem.category}

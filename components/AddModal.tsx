@@ -329,6 +329,25 @@ export default function AddModal({
 
     console.log("Saving restaurant with photo_url:", finalPhotoUrl);
 
+    const nextMustTry = isPublic ? mustTry : false;
+    const wasMustTry = editData?.must_try ?? false;
+    let nextMustTrySince = editData?.must_try_since ?? null;
+    if (nextMustTry && !wasMustTry) {
+      nextMustTrySince = new Date().toISOString();
+    } else if (!nextMustTry) {
+      nextMustTrySince = null;
+    }
+
+    const previousVisibility = editData?.visibility ?? null;
+    const visibilityChanged =
+      !!editData && previousVisibility !== visibility;
+    const nextVisibilityChangedAt = visibilityChanged
+      ? new Date().toISOString()
+      : (editData?.visibility_changed_at ?? null);
+    const nextPreviousVisibility = visibilityChanged
+      ? previousVisibility
+      : (editData?.previous_visibility ?? null);
+
     const ok = await onSave({
       name: name.trim(),
       neighborhood: neighborhood.trim(),
@@ -343,7 +362,8 @@ export default function AddModal({
       lng,
       photo_url: finalPhotoUrl.trim() || null,
       storefront_photo_url: storefrontPhotoUrl,
-      must_try: isPublic ? mustTry : false,
+      must_try: nextMustTry,
+      must_try_since: nextMustTrySince,
       date_added: editData?.date_added ?? null,
       last_visited: editData?.last_visited ?? null,
       google_rating: googleRating,
@@ -352,6 +372,8 @@ export default function AddModal({
       occasions: occasions.length > 0 ? occasions : null,
       opening_hours: openingHours,
       visibility,
+      visibility_changed_at: nextVisibilityChangedAt,
+      previous_visibility: nextPreviousVisibility,
     });
 
     setSaving(false);
@@ -376,11 +398,15 @@ export default function AddModal({
 
     const { error } = await supabase
       .from("restaurants")
-      .delete()
+      .update({
+        visibility: "archived",
+        visibility_changed_at: new Date().toISOString(),
+        previous_visibility: editData.visibility,
+      })
       .eq("id", editData.id);
 
     if (error) {
-      setError("Failed to delete restaurant.");
+      setError("Failed to archive restaurant.");
       setSaving(false);
       return;
     }
@@ -759,13 +785,13 @@ export default function AddModal({
                     ? "Save changes"
                     : "Save restaurant"}
           </button>
-          {editData && (
+          {editData && editData.visibility !== "archived" && (
             <button
               onClick={handleDeleteClick}
               disabled={saving || success}
               className="btn-outline !border-accent !text-accent hover:!bg-accent hover:!text-white"
             >
-              Delete
+              Archive
             </button>
           )}
           <button onClick={onClose} className="btn-outline">
@@ -777,9 +803,9 @@ export default function AddModal({
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && editData && (
         <ConfirmModal
-          title="Delete Restaurant"
-          message={`Are you sure you want to delete "${editData.name}"? This action cannot be undone.`}
-          confirmText="Delete"
+          title="Archive Restaurant"
+          message={`Archive "${editData.name}"? It will be hidden from public listings but can be restored from the admin view.`}
+          confirmText="Archive"
           cancelText="Cancel"
           onConfirm={handleDeleteConfirm}
           onCancel={() => setShowDeleteConfirm(false)}

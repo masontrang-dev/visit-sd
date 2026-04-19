@@ -18,6 +18,7 @@ export type Restaurant = {
   photo_url: string | null;
   storefront_photo_url: string | null;
   must_try: boolean;
+  must_try_since: string | null;
   date_added: string | null;
   last_visited: string | null;
   google_rating: number | null;
@@ -26,6 +27,8 @@ export type Restaurant = {
   occasions: string[] | null;
   opening_hours: any | null;
   visibility: "public" | "private" | "archived";
+  visibility_changed_at: string | null;
+  previous_visibility: string | null;
 };
 
 export type RestaurantVisit = {
@@ -42,6 +45,7 @@ export type CuratorRating = {
   restaurant_id: number;
   user_id: string;
   rating: number;
+  previous_rating: number | null;
   note: string | null;
   created_at: string;
   updated_at: string;
@@ -86,7 +90,6 @@ export type ItemOrder = {
   menu_item_id: number;
   restaurant_id: number;
   ordered_at: string;
-  liked: boolean | null;
   ordered_by: string;
   notes: string | null;
   photo_url: string | null;
@@ -110,6 +113,9 @@ export type PageView = {
   country: string | null;
   region: string | null;
   device_type: string | null;
+  session_id: string | null;
+  event_type: string | null;
+  event_label: string | null;
 };
 
 export const supabase =

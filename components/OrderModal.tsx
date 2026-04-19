@@ -88,10 +88,6 @@ export default function OrderModal({
   const [selectedCategory, setSelectedCategory] = useState(
     sourceItem?.category ?? "food",
   );
-  const [liked, setLiked] = useState<boolean | null>(
-    sourceOrder?.liked ?? null,
-  );
-
   // Determine form type based on current category selection
   const formType =
     selectedCategory === "boba"
@@ -334,7 +330,6 @@ export default function OrderModal({
       menu_item_id: menuItemId,
       restaurant_id: restaurantId,
       ordered_at: orderedAt,
-      liked,
       notes: notes.trim() || null,
       photo_url: finalPhotoUrl,
       drink_details: drinkDetails,
@@ -387,7 +382,6 @@ export default function OrderModal({
         menu_item_id: past.menu_item_id,
         restaurant_id: past.restaurant_id,
         ordered_at: new Date().toISOString().slice(0, 10),
-        liked: past.liked,
         notes: past.notes,
         drink_details: past.drink_details,
         photo_url: null,
@@ -413,7 +407,6 @@ export default function OrderModal({
       setMenuSearch(item.name);
       if (item.category) setSelectedCategory(item.category);
     }
-    setLiked(past.liked);
     setNotes(past.notes ?? "");
     setOrderedAt(new Date().toISOString().slice(0, 10));
     setPhotoFile(null);
@@ -550,12 +543,6 @@ export default function OrderModal({
                         </p>
                       )}
                       <p className="text-2xs text-txt2 opacity-70 mt-0.5">
-                        {past.liked === true
-                          ? "👍"
-                          : past.liked === false
-                            ? "👎"
-                            : "—"}
-                        {" · "}
                         last {new Date(past.ordered_at).toLocaleDateString()}
                       </p>
                     </div>
@@ -693,33 +680,6 @@ export default function OrderModal({
                 {c}
               </button>
             ))}
-          </div>
-        </div>
-
-        {/* Verdict — thumbs up/down (nullable) */}
-        <div className="mb-4">
-          <label className={labelCls}>Verdict</label>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setLiked(liked === true ? null : true)}
-              className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
-                liked === true
-                  ? "bg-accent2 text-white border-accent2"
-                  : "bg-transparent text-txt2 border-brd"
-              }`}
-            >
-              👍 Liked
-            </button>
-            <button
-              onClick={() => setLiked(liked === false ? null : false)}
-              className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
-                liked === false
-                  ? "bg-txt text-bg border-txt"
-                  : "bg-transparent text-txt2 border-brd"
-              }`}
-            >
-              👎 Didn&rsquo;t like
-            </button>
           </div>
         </div>
 

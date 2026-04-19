@@ -21,9 +21,11 @@ import SurpriseBar from "@/components/SurpriseBar";
 import CheckInModal from "@/components/CheckInModal";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
+import ActivityFeed from "@/components/ActivityFeed";
 import AdminButton from "@/components/AdminButton";
 import AdminViewToggle from "@/components/AdminViewToggle";
 import { useAuth } from "@/lib/auth-context";
+import { trackEvent } from "@/lib/analytics";
 
 function SkeletonCard() {
   return (
@@ -223,6 +225,15 @@ function HomeContent() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Log search queries separately with a longer settle window so we only
+  // capture queries the user actually paused on (not every keystroke).
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) return;
+    const timer = setTimeout(() => trackEvent("search", q.slice(0, 100)), 1200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const syncParams = useCallback(
     (
       cuisines: string[],
@@ -322,17 +333,6 @@ function HomeContent() {
       setIsFirstVisit(true);
       localStorage.setItem("visitsd-visited", "1");
     }
-
-    // Fire-and-forget page view log with geolocation
-    fetch("/api/log-view", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        path: window.location.pathname + window.location.search,
-        referrer: document.referrer || null,
-        user_agent: navigator.userAgent || null,
-      }),
-    }).catch(() => {});
 
     // Optimize for mobile on initial load
     const handleResize = () => {
@@ -442,6 +442,7 @@ function HomeContent() {
           >
             <div className="flex gap-2">
               <ThemeToggle />
+              <ActivityFeed />
               <AdminButton />
             </div>
             <AdminViewToggle />
@@ -501,6 +502,7 @@ function HomeContent() {
           <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-10">
             <div className="flex gap-2">
               <ThemeToggle />
+              <ActivityFeed />
               <AdminButton />
             </div>
             <AdminViewToggle />
@@ -585,12 +587,6 @@ function HomeContent() {
             className="text-2xs tracking-wide uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline"
           >
             Privacy
-          </Link>
-          <Link
-            href="/login"
-            className="text-2xs tracking-wide uppercase font-medium text-txt2 opacity-30 hover:opacity-60 transition-opacity duration-150 no-underline flex items-center gap-1"
-          >
-            Login <span className="text-[8px]">→</span>
           </Link>
         </footer>
       </div>

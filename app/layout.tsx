@@ -3,6 +3,7 @@ import { Bebas_Neue, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import ToastProvider from "@/components/Toast";
+import PageViewTracker from "@/components/PageViewTracker";
 
 const bebasNeue = Bebas_Neue({
   weight: "400",
@@ -59,6 +60,7 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <ToastProvider>
+            <PageViewTracker />
             {children}
           </ToastProvider>
         </AuthProvider>

@@ -10,13 +10,14 @@ import {
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
+import AdminButton from "@/components/AdminButton";
+import ThemeToggle from "@/components/ThemeToggle";
 
 type ShopSummary = {
   restaurant: Restaurant;
   totalVisits: number;
   lastVisit: string | null;
   mostOrderedDrink: string | null;
-  mostOrderedDrinkLikeRate: number | null;
   commonCustomization: string | null;
   daysSinceLastVisit: number;
 };
@@ -47,7 +48,7 @@ const ICE_LABELS: Record<number, string> = {
 };
 
 export default function BobaDashboardPage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { isSuperuser, isLoading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<BobaStats>({
     totalCheckins: 0,
@@ -74,11 +75,11 @@ export default function BobaDashboardPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
   useEffect(() => {
-    if (!authLoading && isAdmin) {
+    if (!authLoading && isSuperuser) {
       loadDashboard();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, authLoading]);
+  }, [isSuperuser, authLoading]);
 
   async function loadDashboard() {
     setLoading(true);
@@ -210,26 +211,11 @@ export default function BobaDashboardPage() {
           )
         : 999;
 
-      const topDrinkVerdicts = topDrink
-        ? shopOrders.filter(
-            (o) => o.menu_item_id === topDrink.id && o.liked !== null,
-          )
-        : [];
-      const topDrinkLikeRate =
-        topDrinkVerdicts.length > 0
-          ? Math.round(
-              (topDrinkVerdicts.filter((o) => o.liked === true).length /
-                topDrinkVerdicts.length) *
-                100,
-            )
-          : null;
-
       return {
         restaurant: r,
         totalVisits: shopOrders.length,
         lastVisit,
         mostOrderedDrink: topDrink?.name ?? null,
-        mostOrderedDrinkLikeRate: topDrinkLikeRate,
         commonCustomization,
         daysSinceLastVisit,
       };
@@ -346,10 +332,18 @@ export default function BobaDashboardPage() {
     );
   }
 
-  if (!isAdmin) {
+  if (!isSuperuser) {
     return (
       <main className="min-h-screen flex items-center justify-center p-8">
-        <p className="text-txt2 text-sm">Admin access required.</p>
+        <div className="text-center">
+          <p className="text-error text-lg mb-4">Access Denied</p>
+          <p className="text-txt2 text-sm mb-6">
+            Only superusers can access boba analytics.
+          </p>
+          <Link href="/admin" className="text-accent hover:underline">
+            Back to Admin
+          </Link>
+        </div>
       </main>
     );
   }
@@ -366,7 +360,11 @@ export default function BobaDashboardPage() {
         </Link>
       </div>
 
-      <header className="pt-10 px-6 pb-6 border-b-2 border-txt">
+      <header className="relative pt-10 px-6 pb-6 border-b-2 border-txt">
+        <div className="absolute top-4 right-4 flex gap-2">
+          <ThemeToggle />
+          <AdminButton />
+        </div>
         <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
           Admin · Boba Dashboard
         </p>
@@ -457,11 +455,6 @@ export default function BobaDashboardPage() {
                       <span className="font-medium">
                         {shop.mostOrderedDrink}
                       </span>
-                      {shop.mostOrderedDrinkLikeRate !== null && (
-                        <span className="text-accent ml-1">
-                          👍 {shop.mostOrderedDrinkLikeRate}%
-                        </span>
-                      )}
                     </p>
                   )}
                   {shop.commonCustomization && (
@@ -618,11 +611,6 @@ export default function BobaDashboardPage() {
                             <h3 className="font-display text-lg leading-tight">
                               {menuItem?.name || "Unknown drink"}
                             </h3>
-                            {visit.liked !== null && (
-                              <span className="text-accent font-medium text-sm">
-                                {visit.liked ? "👍" : "👎"}
-                              </span>
-                            )}
                           </div>
                           <p className="text-xs text-txt2 mb-1">
                             {restaurant?.name} • {restaurant?.neighborhood}

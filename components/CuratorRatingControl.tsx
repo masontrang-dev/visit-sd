@@ -82,6 +82,7 @@ export default function CuratorRatingControl({
           restaurant_id: restaurantId,
           user_id: user.id,
           rating: next,
+          previous_rating: myValue,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "restaurant_id,user_id" },

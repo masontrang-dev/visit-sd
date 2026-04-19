@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import {
   supabase,
   type Restaurant,
-  type PageView,
   type RestaurantVisit,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
@@ -16,7 +15,6 @@ import FilterBar, {
 import AddModal from "@/components/AddModal";
 import OrderModal from "@/components/OrderModal";
 import MapView from "@/components/MapView";
-import Link from "next/link";
 import AdminButton from "@/components/AdminButton";
 import ThemeToggle from "@/components/ThemeToggle";
 import AdminViewToggle from "@/components/AdminViewToggle";
@@ -84,7 +82,7 @@ function StatPill({
 }
 
 export default function AdminPage() {
-  const { isAdmin, isSuperuser, isLoading: authLoading, user } = useAuth();
+  const { isAdmin, isLoading: authLoading } = useAuth();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeCuisines, setActiveCuisines] = useState<string[]>([]);
@@ -98,22 +96,6 @@ export default function AdminPage() {
   const [opError, setOpError] = useState("");
   const [mustTryFilter, setMustTryFilter] = useState(false);
   const [activeNeighborhoods, setActiveNeighborhoods] = useState<string[]>([]);
-  const [showStats, setShowStats] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [totalViews, setTotalViews] = useState(0);
-  const [viewsByDay, setViewsByDay] = useState<
-    { date: string; count: number }[]
-  >([]);
-  const [topReferrers, setTopReferrers] = useState<
-    { referrer: string; count: number }[]
-  >([]);
-  const [geoData, setGeoData] = useState<{ location: string; count: number }[]>(
-    [],
-  );
-  const [deviceData, setDeviceData] = useState<
-    { device: string; count: number }[]
-  >([]);
-  const [lastCleanup, setLastCleanup] = useState<string | null>(null);
   const [visits, setVisits] = useState<Record<number, RestaurantVisit[]>>({});
   const [visitingId, setVisitingId] = useState<number | null>(null);
   const [imageDisplayMode, setImageDisplayMode] = useState<ImageDisplayMode>(
@@ -140,78 +122,6 @@ export default function AdminPage() {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 200);
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
-  async function loadStats() {
-    setStatsLoading(true);
-    const { data, error } = await supabase
-      .from("page_views")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (!error && data) {
-      setTotalViews(data.length);
-
-      // Views per day (last 30 days)
-      const dayCounts: Record<string, number> = {};
-      data.forEach((row: PageView) => {
-        const day = row.created_at.slice(0, 10);
-        dayCounts[day] = (dayCounts[day] || 0) + 1;
-      });
-      const sorted = Object.entries(dayCounts)
-        .map(([date, count]) => ({ date, count }))
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .slice(-30);
-      setViewsByDay(sorted);
-
-      // Top referrers
-      const refCounts: Record<string, number> = {};
-      data.forEach((row: PageView) => {
-        const ref = row.referrer || "(direct)";
-        refCounts[ref] = (refCounts[ref] || 0) + 1;
-      });
-      const topRefs = Object.entries(refCounts)
-        .map(([referrer, count]) => ({ referrer, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-      setTopReferrers(topRefs);
-
-      // Geographic distribution
-      const geoCounts: Record<string, number> = {};
-      data.forEach((row: PageView) => {
-        if (row.city && row.region && row.country) {
-          const location = `${row.city}, ${row.region}, ${row.country}`;
-          geoCounts[location] = (geoCounts[location] || 0) + 1;
-        } else if (row.city && row.country) {
-          const location = `${row.city}, ${row.country}`;
-          geoCounts[location] = (geoCounts[location] || 0) + 1;
-        } else if (row.country) {
-          geoCounts[row.country] = (geoCounts[row.country] || 0) + 1;
-        }
-      });
-      const topGeo = Object.entries(geoCounts)
-        .map(([location, count]) => ({ location, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-      setGeoData(topGeo);
-
-      // Device type breakdown
-      const deviceCounts: Record<string, number> = {};
-      data.forEach((row: PageView) => {
-        const device = row.device_type || "unknown";
-        deviceCounts[device] = (deviceCounts[device] || 0) + 1;
-      });
-      const devices = Object.entries(deviceCounts)
-        .map(([device, count]) => ({ device, count }))
-        .sort((a, b) => b.count - a.count);
-      setDeviceData(devices);
-
-      // Fetch last cleanup run time from cleanup_log
-      const { data: cronData } = await supabase.rpc("get_last_cleanup_run");
-      if (cronData && cronData.length > 0) {
-        setLastCleanup(cronData[0].executed_at);
-      }
-    }
-    setStatsLoading(false);
-  }
 
   useEffect(() => {
     if (!authLoading && isAdmin) {
@@ -436,169 +346,7 @@ export default function AdminPage() {
         />
       )}
 
-      {/* Stats Section */}
-      <section className="border-t-2 border-txt p-6">
-        <button
-          onClick={() => {
-            setShowStats(!showStats);
-            if (!showStats) loadStats();
-          }}
-          className="font-display text-xl bg-none border-none cursor-pointer text-txt p-0 tracking-tight"
-        >
-          {showStats ? "▾ STATS" : "▸ STATS"}
-        </button>
-
-        {showStats && (
-          <div className="mt-4">
-            {statsLoading ? (
-              <p className="text-txt2 text-sm">Loading stats...</p>
-            ) : (
-              <>
-                <div className="flex gap-4 mb-6 flex-wrap">
-                  <div className="p-4 pr-5 border-[1.5px] border-brd min-w-[140px]">
-                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1">
-                      Total views
-                    </p>
-                    <p className="font-display text-4xl">{totalViews}</p>
-                  </div>
-                  <div className="p-4 pr-5 border-[1.5px] border-brd min-w-[140px]">
-                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1">
-                      Today
-                    </p>
-                    <p className="font-display text-4xl">
-                      {viewsByDay.length > 0
-                        ? viewsByDay[viewsByDay.length - 1].date ===
-                          new Date().toISOString().slice(0, 10)
-                          ? viewsByDay[viewsByDay.length - 1].count
-                          : 0
-                        : 0}
-                    </p>
-                  </div>
-                  <div className="p-4 pr-5 border-[1.5px] border-brd min-w-[200px]">
-                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1">
-                      Cleanup last run
-                    </p>
-                    <p className="text-sm text-txt">
-                      {lastCleanup
-                        ? new Date(lastCleanup).toLocaleString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })
-                        : "Not yet run"}
-                    </p>
-                  </div>
-                  <Link
-                    href="/admin/boba"
-                    className="p-4 pr-5 border-[1.5px] border-brd min-w-[140px] no-underline block hover:bg-bg2 transition-colors duration-[0.12s]"
-                  >
-                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1">
-                      🧋 Boba Analytics
-                    </p>
-                    <p className="font-display text-2xl text-accent">View</p>
-                  </Link>
-                </div>
-
-                {/* Views per day bar chart */}
-                {viewsByDay.length > 0 && (
-                  <div className="mb-6">
-                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-2">
-                      Views per day (last 30 days)
-                    </p>
-                    <div className="flex items-end gap-0.5 h-20 border-b border-brd pb-1">
-                      {viewsByDay.map((d) => {
-                        const max = Math.max(...viewsByDay.map((v) => v.count));
-                        const h = max > 0 ? (d.count / max) * 70 : 0;
-                        return (
-                          <div
-                            key={d.date}
-                            title={`${d.date}: ${d.count}`}
-                            className="flex-1 bg-accent rounded-t-sm min-w-[4px]"
-                            style={{ height: Math.max(h, 2) }}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Top referrers */}
-                {topReferrers.length > 0 && (
-                  <div className="mb-6">
-                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-2">
-                      Top referrers
-                    </p>
-                    {topReferrers.map((ref) => (
-                      <div
-                        key={ref.referrer}
-                        className="flex justify-between py-1.5 border-b border-brd text-sm"
-                      >
-                        <span className="text-txt2 overflow-hidden text-ellipsis whitespace-nowrap max-w-[80%]">
-                          {ref.referrer}
-                        </span>
-                        <span className="font-medium">{ref.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Geographic distribution */}
-                {geoData.length > 0 && (
-                  <div className="mb-6">
-                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-2">
-                      Geographic distribution
-                    </p>
-                    {geoData.map((geo) => (
-                      <div
-                        key={geo.location}
-                        className="flex justify-between py-1.5 border-b border-brd text-sm"
-                      >
-                        <span className="text-txt2 overflow-hidden text-ellipsis whitespace-nowrap max-w-[80%]">
-                          {geo.location}
-                        </span>
-                        <span className="font-medium">{geo.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Device breakdown */}
-                {deviceData.length > 0 && (
-                  <div className="mb-6">
-                    <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-2">
-                      Device type breakdown
-                    </p>
-                    <div className="flex gap-4 flex-wrap">
-                      {deviceData.map((device) => (
-                        <div
-                          key={device.device}
-                          className="p-3 border-[1.5px] border-brd min-w-[100px]"
-                        >
-                          <p className="text-xs text-txt2 mb-1 capitalize">
-                            {device.device}
-                          </p>
-                          <p className="font-display text-2xl">
-                            {device.count}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <p className="text-xs text-txt2 mt-4">
-                  Analytics data older than 90 days is automatically deleted
-                  daily.
-                </p>
-              </>
-            )}
-          </div>
-        )}
-      </section>
-
-      <footer className="p-6 flex justify-end">
+      <footer className="p-6 flex justify-end border-t-2 border-txt">
         <span className="text-xs font-medium text-txt2 opacity-50 tracking-tight font-body">
           v{process.env.NEXT_PUBLIC_APP_VERSION}
         </span>
