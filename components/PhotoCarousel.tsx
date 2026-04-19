@@ -18,6 +18,7 @@ type Props = {
   openNow?: boolean | null;
   mustTry?: boolean;
   aspectClass?: string;
+  heroName?: string;
 };
 
 export default function PhotoCarousel({
@@ -27,6 +28,7 @@ export default function PhotoCarousel({
   openNow = null,
   mustTry = false,
   aspectClass = "aspect-[3/2]",
+  heroName,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -71,6 +73,11 @@ export default function PhotoCarousel({
           <div
             key={`${photo.url}-${i}`}
             className="relative h-full basis-full grow-0 shrink-0 min-w-full snap-start [scroll-snap-stop:always]"
+            style={
+              heroName && i === 0
+                ? { viewTransitionName: heroName }
+                : undefined
+            }
           >
             {photo.isStorefront ? (
               <Image

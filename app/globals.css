@@ -235,6 +235,15 @@
   opacity: 0.06;
 }
 
+/* ── View Transitions: crossfade non-shared content on nav ── */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 220ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
 /* ── Hide scrollbars for horizontal carousels ── */
 .scrollbar-hide {
   -ms-overflow-style: none;

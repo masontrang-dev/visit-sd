@@ -13,7 +13,9 @@ import IllustrationEmpty from "@/components/IllustrationEmpty";
 import { formatRecencyTag, formatDisplayName } from "@/lib/utils";
 import { isCurrentlyOpen } from "@/lib/google-types";
 import { type ImageDisplayMode } from "@/components/FilterBar";
-import PhotoCarousel, { type RestaurantPhoto } from "@/components/PhotoCarousel";
+import PhotoCarousel, {
+  type RestaurantPhoto,
+} from "@/components/PhotoCarousel";
 
 export type { RestaurantPhoto };
 
@@ -71,6 +73,7 @@ function Card({
   imageDisplayMode = "full",
   onNavigate,
   priority = false,
+  heroName,
 }: {
   r: Restaurant;
   cuisineColor: string;
@@ -84,6 +87,7 @@ function Card({
   imageDisplayMode?: ImageDisplayMode;
   onNavigate?: () => void;
   priority?: boolean;
+  heroName?: string;
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const isAdmin = !!(onEdit || onOrder);
@@ -105,7 +109,7 @@ function Card({
     <Link
       href={`/restaurant/${r.id}`}
       onClick={() => onNavigate?.()}
-      className="group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-all duration-150 hover:bg-bg2 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] active:scale-[0.98]"
+      className="group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-colors duration-150 hover:bg-bg2 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
       style={{
         borderLeft: `3px solid ${cuisineColor}`,
       }}
@@ -190,6 +194,7 @@ function Card({
               recencyTag={recencyTag}
               openNow={openNow}
               mustTry={!!r.must_try}
+              heroName={heroName}
             />
           );
         })()}
@@ -341,7 +346,8 @@ function Card({
               <div className="mt-2 space-y-1">
                 {restaurantVisits.map((visit) => (
                   <p key={visit.id} className="text-xs text-txt2">
-                    • {formatDate(visit.visited_at)} by {formatDisplayName(visit.visited_by)}
+                    • {formatDate(visit.visited_at)} by{" "}
+                    {formatDisplayName(visit.visited_by)}
                   </p>
                 ))}
               </div>
@@ -435,6 +441,7 @@ function InfiniteCardGrid({
     return BATCH_SIZE;
   });
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [activeHeroId, setActiveHeroId] = useState<number | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const prevRestaurantIdsRef = useRef<string>("");
   const restoredRef = useRef(false);
@@ -502,12 +509,16 @@ function InfiniteCardGrid({
   const visible = restaurants.slice(0, visibleCount);
   const hasMore = visibleCount < restaurants.length;
 
-  const handleNavigate = useCallback(() => {
-    try {
-      sessionStorage.setItem(SCROLL_STORAGE_KEY, String(visibleCount));
-      sessionStorage.setItem(SCROLL_POS_KEY, String(window.scrollY));
-    } catch {}
-  }, [visibleCount]);
+  const handleNavigate = useCallback(
+    (id: number) => {
+      setActiveHeroId(id);
+      try {
+        sessionStorage.setItem(SCROLL_STORAGE_KEY, String(visibleCount));
+        sessionStorage.setItem(SCROLL_POS_KEY, String(window.scrollY));
+      } catch {}
+    },
+    [visibleCount],
+  );
 
   return (
     <>
@@ -527,8 +538,13 @@ function InfiniteCardGrid({
               recommendedItems={recommendedItems?.[r.id]}
               restaurantPhotos={restaurantPhotos?.[r.id]}
               imageDisplayMode={imageDisplayMode}
-              onNavigate={handleNavigate}
+              onNavigate={() => handleNavigate(r.id)}
               priority={i === 0}
+              heroName={
+                activeHeroId === r.id && imageDisplayMode === "full"
+                  ? `hero-${r.id}`
+                  : undefined
+              }
             />
           );
           return isRestoring ? (
@@ -574,6 +590,9 @@ export default function RestaurantGrid({
   const cuisineColorMap = useMemo(
     () => buildCuisineColorMap(restaurants),
     [restaurants],
+  );
+  const [groupedActiveHeroId, setGroupedActiveHeroId] = useState<number | null>(
+    null,
   );
 
   if (restaurants.length === 0) {
@@ -655,7 +674,13 @@ export default function RestaurantGrid({
                   recommendedItems={recommendedItems?.[r.id]}
                   restaurantPhotos={restaurantPhotos?.[r.id]}
                   imageDisplayMode={imageDisplayMode}
+                  onNavigate={() => setGroupedActiveHeroId(r.id)}
                   priority={i === 0 && j === 0}
+                  heroName={
+                    groupedActiveHeroId === r.id && imageDisplayMode === "full"
+                      ? `hero-${r.id}`
+                      : undefined
+                  }
                 />
               ))}
             </div>

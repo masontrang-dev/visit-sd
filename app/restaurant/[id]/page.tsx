@@ -812,6 +812,7 @@ export default function RestaurantDetailPage({ params }: Props) {
             photos={heroPhotos}
             priority
             aspectClass="aspect-[16/9] max-h-[320px]"
+            heroName={`hero-${restaurant.id}`}
           />
         )}
         <div className="px-6 pt-5 pb-4">

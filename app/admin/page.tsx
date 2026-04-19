@@ -34,7 +34,7 @@ function StatPill({
   const [display, setDisplay] = useState(countFromZero ? 0 : value);
   const prevRef = useRef(countFromZero ? 0 : value);
   const initialRef = useRef(true);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (initialRef.current) {
