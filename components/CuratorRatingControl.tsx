@@ -24,6 +24,7 @@ export default function CuratorRatingControl({
   const [profiles, setProfiles] = useState<Record<string, CuratorProfile>>({});
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const load = useCallback(async () => {
     const { data: ratingsData } = await supabase
@@ -94,7 +95,7 @@ export default function CuratorRatingControl({
 
   if (!loaded) {
     return (
-      <div className="flex-1 text-center py-4 px-3">
+      <div className="flex-1 text-center py-3 px-3">
         <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-accent mb-1">
           —
         </div>
@@ -105,21 +106,50 @@ export default function CuratorRatingControl({
     );
   }
 
+  const hasDetails = ratings.length > 0 || (isAdmin && !!user);
+
   return (
-    <div className="flex-1 py-4 px-3">
-      <div className="text-center">
+    <div className="flex-1 py-3 px-3">
+      <button
+        type="button"
+        onClick={() => hasDetails && setExpanded((e) => !e)}
+        disabled={!hasDetails}
+        className={`w-full text-center bg-transparent border-none p-0 ${
+          hasDetails ? "cursor-pointer" : "cursor-default"
+        }`}
+        aria-expanded={expanded}
+      >
         <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-accent mb-1">
           {avg !== null ? `${avg}/5` : "—"}
         </div>
         <div className="text-2xs uppercase tracking-wide text-txt2 mb-0.5">
           Curators&rsquo; rating
         </div>
-        <div className="text-2xs text-txt2 opacity-60">
-          {ratings.length} curator{ratings.length !== 1 ? "s" : ""}
+        <div className="text-2xs text-txt2 opacity-60 flex items-center justify-center gap-1">
+          <span>
+            {ratings.length} curator{ratings.length !== 1 ? "s" : ""}
+          </span>
+          {hasDetails && (
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 16 16"
+              fill="none"
+              className={`transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+            >
+              <path
+                d="M4 6l4 4 4-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
         </div>
-      </div>
+      </button>
 
-      {ratings.length > 0 && (
+      {expanded && ratings.length > 0 && (
         <div className="mt-3 space-y-1">
           {ratings.map((r) => {
             const p = profiles[r.user_id];
@@ -140,7 +170,7 @@ export default function CuratorRatingControl({
         </div>
       )}
 
-      {isAdmin && user && (
+      {expanded && isAdmin && user && (
         <div className="mt-3 pt-3 border-t border-brd">
           <div className="text-2xs uppercase tracking-wide text-txt2 mb-1 text-center">
             Your rating

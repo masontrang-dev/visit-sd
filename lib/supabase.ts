@@ -1,4 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { createClient as createBrowserSupabaseClient } from "./supabase-client";
 
 export type Restaurant = {
   id: number;
@@ -111,4 +112,7 @@ export type PageView = {
   device_type: string | null;
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase =
+  typeof window === "undefined"
+    ? createSupabaseClient(supabaseUrl, supabaseAnonKey)
+    : createBrowserSupabaseClient();

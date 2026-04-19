@@ -760,7 +760,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       {/* Restaurant Header */}
       <div className="border-b-2 border-txt">
         {(restaurant.photo_url || restaurant.storefront_photo_url) && (
-          <div className="relative overflow-hidden aspect-[16/9] max-h-[400px]">
+          <div className="relative overflow-hidden aspect-[16/9] max-h-[320px]">
             <Image
               key={restaurant.photo_url || restaurant.storefront_photo_url}
               src={(restaurant.photo_url || restaurant.storefront_photo_url)!}
@@ -779,8 +779,8 @@ export default function RestaurantDetailPage({ params }: Props) {
             <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-bg to-transparent pointer-events-none" />
           </div>
         )}
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <div className="px-6 pt-5 pb-4">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <p className="text-xs tracking-wide uppercase font-medium text-accent">
               {restaurant.cuisine}
             </p>
@@ -800,22 +800,54 @@ export default function RestaurantDetailPage({ params }: Props) {
               );
             })()}
           </div>
-          <h1 className="font-display text-[clamp(48px,8vw,72px)] leading-[0.9] tracking-tight mb-3">
+          <h1 className="font-display text-[clamp(44px,7.5vw,64px)] leading-[0.9] tracking-tight mb-2">
             {restaurant.name}
           </h1>
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <div className="flex items-center gap-3 flex-wrap text-base text-txt2">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block w-2 h-2 rounded-full bg-accent2 shrink-0" />
-                {restaurant.neighborhood}
-              </span>
-              <span className="text-brd">·</span>
-              <span className="font-medium">{restaurant.price}</span>
+          <div className="flex items-center gap-3 flex-wrap text-base text-txt2 mb-1">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-accent2 shrink-0" />
+              {restaurant.neighborhood}
+            </span>
+            <span className="text-brd">·</span>
+            <span className="font-medium">{restaurant.price}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              {restaurant.address && (
+                <>
+                  {restaurant.google_maps_url ? (
+                    <a
+                      href={restaurant.google_maps_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-txt2 no-underline hover:text-accent2 transition-colors inline-flex items-center gap-1"
+                    >
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0"
+                      >
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                      {restaurant.address}
+                    </a>
+                  ) : (
+                    <p className="text-xs text-txt2">{restaurant.address}</p>
+                  )}
+                </>
+              )}
             </div>
             {isAdmin && (
               <button
                 onClick={handleEdit}
-                className="btn-outline btn-pill !py-1.5 !px-3 !text-xs !border-txt !text-txt shrink-0"
+                className="btn-outline btn-pill !py-1 !px-2.5 !text-2xs !border-txt !text-txt shrink-0"
               >
                 Edit
               </button>
@@ -823,7 +855,7 @@ export default function RestaurantDetailPage({ params }: Props) {
           </div>
           {(restaurant.must_try ||
             (restaurant.occasions && restaurant.occasions.length > 0)) && (
-            <div className="flex items-center gap-2 flex-wrap mt-2">
+            <div className="flex items-center gap-2 flex-wrap mt-3">
               {restaurant.must_try && (
                 <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase">
                   Must-Try
@@ -844,29 +876,31 @@ export default function RestaurantDetailPage({ params }: Props) {
 
       {/* Ratings Section - Always show 3 columns: Google, My Rating, Check-ins */}
       <div className="flex items-stretch border-b border-brd">
-        {restaurant.google_rating && (
-          <div className="flex-1 text-center py-4 px-3">
-            <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-txt mb-1">
-              {restaurant.google_rating.toFixed(1)}
-            </div>
-            <div className="text-2xs uppercase tracking-wide text-txt2 mb-0.5">
-              Google rating
-            </div>
-            {restaurant.google_review_count && (
-              <div className="text-2xs text-txt2 opacity-60">
-                {restaurant.google_review_count.toLocaleString()} reviews
-              </div>
-            )}
+        <div className="flex-1 text-center py-3 px-3">
+          <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-txt mb-1">
+            {restaurant.google_rating
+              ? restaurant.google_rating.toFixed(1)
+              : "—"}
           </div>
-        )}
-        {restaurant.google_rating && <div className="w-px bg-brd" />}
+          <div className="text-2xs uppercase tracking-wide text-txt2 mb-0.5">
+            Google rating
+          </div>
+          {restaurant.google_rating && restaurant.google_review_count ? (
+            <div className="text-2xs text-txt2 opacity-60">
+              {restaurant.google_review_count.toLocaleString()} reviews
+            </div>
+          ) : (
+            <div className="text-2xs text-txt2 opacity-60">—</div>
+          )}
+        </div>
+        <div className="w-px bg-brd" />
         <CuratorRatingControl
           key={`curator-${restaurant.id}-${ratingRefresh}`}
           restaurantId={restaurant.id}
           onChange={() => setRatingRefresh((n) => n + 1)}
         />
         <div className="w-px bg-brd" />
-        <div className="flex-1 text-center py-4 px-3">
+        <div className="flex-1 text-center py-3 px-3">
           <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-txt mb-1">
             {visits.length}
           </div>
@@ -897,15 +931,22 @@ export default function RestaurantDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* My Take Section */}
+      {/* Curator Take Section */}
       {restaurant.note && (
         <div className="p-6 border-b border-brd scroll-fade-in">
           <h2 className="text-2xs uppercase tracking-wide text-txt2 mb-3 font-medium">
-            My take
+            Why we love it
           </h2>
-          <p className="text-base text-txt leading-relaxed italic border-l-2 border-accent pl-3">
-            &ldquo;{restaurant.note}&rdquo;
-          </p>
+          <blockquote className="border-l-2 border-accent pl-3">
+            <p className="text-base text-txt leading-relaxed italic">
+              &ldquo;{restaurant.note}&rdquo;
+            </p>
+            {restaurant.added_by && (
+              <footer className="text-2xs uppercase tracking-wide text-txt2 mt-2 not-italic">
+                — {restaurant.added_by}
+              </footer>
+            )}
+          </blockquote>
         </div>
       )}
 
@@ -990,123 +1031,6 @@ export default function RestaurantDetailPage({ params }: Props) {
           </div>
         </div>
       )}
-
-      {/* Visit History */}
-      <div className="p-6 border-b border-brd scroll-fade-in">
-        <button
-          onClick={() => setShowVisitHistory(!showVisitHistory)}
-          className="w-full flex items-center justify-between bg-transparent border-none cursor-pointer p-0 mb-3 text-left"
-        >
-          <h2 className="font-display text-xl tracking-tight">Visit History</h2>
-          <Chevron open={showVisitHistory} className="text-txt2" />
-        </button>
-
-        {!showVisitHistory && (
-          <div className="space-y-1.5">
-            <p className="text-sm text-txt2">
-              <span className="font-medium">Total visits:</span> {visits.length}
-            </p>
-            {restaurant.last_visited && (
-              <p className="text-sm text-txt2">
-                <span className="font-medium">Last visited:</span>{" "}
-                {formatDate(restaurant.last_visited)}
-              </p>
-            )}
-          </div>
-        )}
-
-        {showVisitHistory && (
-          <div>
-            <div className="mb-3 space-y-1.5">
-              <p className="text-sm text-txt2">
-                <span className="font-medium">Total visits:</span>{" "}
-                {visits.length}
-              </p>
-              {restaurant.last_visited && (
-                <p className="text-sm text-txt2">
-                  <span className="font-medium">Last visited:</span>{" "}
-                  {formatDate(restaurant.last_visited)}
-                </p>
-              )}
-            </div>
-            {visits.length === 0 ? (
-              <div className="py-4 text-center">
-                <IllustrationNoVisits className="mx-auto mb-1" />
-                <p className="text-sm text-txt2">No visits recorded yet</p>
-              </div>
-            ) : (
-              <div className="space-y-3 mt-4">
-                {visits.map((visit) => (
-                  <div
-                    key={visit.id}
-                    className="flex items-start justify-between gap-3 pb-3 border-b border-brd last:border-0"
-                  >
-                    <div className="flex items-start gap-3 flex-1">
-                      <div className="w-2 h-2 rounded-full bg-accent2 shrink-0 mt-1.5" />
-                      <div className="flex-1">
-                        <p className="text-sm text-txt font-medium">
-                          {formatDate(visit.visited_at)} at{" "}
-                          {formatTime(visit.visited_at)}
-                        </p>
-                        <p className="text-xs text-txt2">
-                          by {visit.visited_by}
-                        </p>
-                        {visit.note && (
-                          <p className="text-xs text-txt2 mt-1.5 italic">
-                            &ldquo;{visit.note}&rdquo;
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    {(isSuperuser ||
-                      (isAdmin && visit.visited_by === displayName) ||
-                      (isAdmin &&
-                        !superuserNames.includes(visit.visited_by) &&
-                        !adminNames.includes(visit.visited_by))) && (
-                      <button
-                        onClick={() => setShowDeleteVisitConfirm(visit.id)}
-                        disabled={deletingVisitId === visit.id}
-                        className="text-xs text-txt2 hover:text-error transition-colors shrink-0"
-                      >
-                        {deletingVisitId === visit.id
-                          ? "Deleting..."
-                          : "Delete"}
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Address */}
-      {restaurant.address && (
-        <div className="p-6 border-b border-brd scroll-fade-in">
-          <h2 className="font-display text-xl mb-3 tracking-tight">Address</h2>
-          <p className="text-sm text-txt2">{restaurant.address}</p>
-        </div>
-      )}
-
-      {/* Metadata */}
-      <div className="p-6 border-b border-brd scroll-fade-in">
-        <h2 className="font-display text-xl mb-3 tracking-tight">Details</h2>
-        <div className="space-y-2">
-          {restaurant.added_by && (
-            <p className="text-sm text-txt2">
-              <span className="font-medium">Added by:</span>{" "}
-              {restaurant.added_by}
-            </p>
-          )}
-          {restaurant.date_added && (
-            <p className="text-sm text-txt2">
-              <span className="font-medium">Date added:</span>{" "}
-              {formatDate(restaurant.date_added)}
-            </p>
-          )}
-        </div>
-      </div>
 
       {/* Action Buttons - Sticky at bottom */}
       <div className="fixed bottom-0 left-0 right-0 bg-bg border-t-2 border-txt p-4 z-40">
@@ -1207,41 +1131,27 @@ export default function RestaurantDetailPage({ params }: Props) {
             <h2 className="font-display text-xl tracking-tight">
               Curators&rsquo; order history
             </h2>
-            <div className="flex items-center gap-2">
-              <div className="flex border-[1.5px] border-brd rounded-none overflow-hidden">
-                <button
-                  onClick={() => setHistoryView("by-dish")}
-                  className={`py-1 px-3 text-2xs font-medium uppercase tracking-wide transition-colors ${
-                    historyView === "by-dish"
-                      ? "bg-txt text-bg"
-                      : "bg-transparent text-txt2"
-                  }`}
-                >
-                  By dish
-                </button>
-                <button
-                  onClick={() => setHistoryView("timeline")}
-                  className={`py-1 px-3 text-2xs font-medium uppercase tracking-wide transition-colors ${
-                    historyView === "timeline"
-                      ? "bg-txt text-bg"
-                      : "bg-transparent text-txt2"
-                  }`}
-                >
-                  Timeline
-                </button>
-              </div>
-              {isAdmin && (
-                <button
-                  onClick={() => {
-                    setEditingOrder(null);
-                    setEditingMenuItem(null);
-                    setShowOrderModal(true);
-                  }}
-                  className="py-1.5 px-3 bg-accent text-white text-xs font-medium border-[1.5px] border-accent rounded-pill transition-all hover:opacity-90"
-                >
-                  + Log Order
-                </button>
-              )}
+            <div className="flex border-[1.5px] border-brd rounded-none overflow-hidden">
+              <button
+                onClick={() => setHistoryView("by-dish")}
+                className={`py-1 px-3 text-2xs font-medium uppercase tracking-wide transition-colors ${
+                  historyView === "by-dish"
+                    ? "bg-txt text-bg"
+                    : "bg-transparent text-txt2"
+                }`}
+              >
+                By dish
+              </button>
+              <button
+                onClick={() => setHistoryView("timeline")}
+                className={`py-1 px-3 text-2xs font-medium uppercase tracking-wide transition-colors ${
+                  historyView === "timeline"
+                    ? "bg-txt text-bg"
+                    : "bg-transparent text-txt2"
+                }`}
+              >
+                Timeline
+              </button>
             </div>
           </div>
 
@@ -1293,15 +1203,17 @@ export default function RestaurantDetailPage({ params }: Props) {
                             Latest: &ldquo;{group.latestNote}&rdquo;
                           </p>
                         )}
-                        <MenuItemRecommendToggle
-                          menuItemId={group.menuItem.id}
-                          recommendedUserIds={group.recommenderIds}
-                          recommenderNames={recommenderNames}
-                          onChange={reloadOrders}
-                        />
                       </div>
                       <Chevron open={expanded} className="text-txt2 mt-1" />
                     </button>
+                    <div className="px-3 pb-3 -mt-1">
+                      <MenuItemRecommendToggle
+                        menuItemId={group.menuItem.id}
+                        recommendedUserIds={group.recommenderIds}
+                        recommenderNames={recommenderNames}
+                        onChange={reloadOrders}
+                      />
+                    </div>
                     {expanded && (
                       <div className="border-t border-brd p-3 space-y-3 bg-bg2">
                         {group.orders.map((order) => (
@@ -1457,6 +1369,90 @@ export default function RestaurantDetailPage({ params }: Props) {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Visit History */}
+      <div className="p-6 border-t border-brd scroll-fade-in">
+        <button
+          onClick={() => setShowVisitHistory(!showVisitHistory)}
+          className="w-full flex items-center justify-between gap-3 bg-transparent border-none cursor-pointer p-0 text-left"
+        >
+          <div className="flex items-baseline gap-2 flex-wrap min-w-0">
+            <h2 className="font-display text-xl tracking-tight">
+              Visit History
+            </h2>
+            <span className="text-sm text-txt2">
+              {visits.length} {visits.length === 1 ? "visit" : "visits"}
+              {restaurant.last_visited &&
+                ` · last ${formatDate(restaurant.last_visited)}`}
+            </span>
+          </div>
+          <Chevron open={showVisitHistory} className="text-txt2 shrink-0" />
+        </button>
+
+        {showVisitHistory && (
+          <div className="mt-4">
+            {visits.length === 0 ? (
+              <div className="py-4 text-center">
+                <IllustrationNoVisits className="mx-auto mb-1" />
+                <p className="text-sm text-txt2">No visits recorded yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {visits.map((visit) => (
+                  <div
+                    key={visit.id}
+                    className="flex items-start justify-between gap-3 pb-3 border-b border-brd last:border-0"
+                  >
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="w-2 h-2 rounded-full bg-accent2 shrink-0 mt-1.5" />
+                      <div className="flex-1">
+                        <p className="text-sm text-txt font-medium">
+                          {formatDate(visit.visited_at)} at{" "}
+                          {formatTime(visit.visited_at)}
+                        </p>
+                        <p className="text-xs text-txt2">
+                          by {visit.visited_by}
+                        </p>
+                        {visit.note && (
+                          <p className="text-xs text-txt2 mt-1.5 italic">
+                            &ldquo;{visit.note}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {(isSuperuser ||
+                      (isAdmin && visit.visited_by === displayName) ||
+                      (isAdmin &&
+                        !superuserNames.includes(visit.visited_by) &&
+                        !adminNames.includes(visit.visited_by))) && (
+                      <button
+                        onClick={() => setShowDeleteVisitConfirm(visit.id)}
+                        disabled={deletingVisitId === visit.id}
+                        className="text-xs text-txt2 hover:text-error transition-colors shrink-0"
+                      >
+                        {deletingVisitId === visit.id
+                          ? "Deleting..."
+                          : "Delete"}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Footer Metadata */}
+      {(restaurant.added_by || restaurant.date_added) && (
+        <div className="px-6 py-4 border-t border-brd">
+          <p className="text-2xs text-txt2 opacity-70">
+            {restaurant.added_by && <>Added by {restaurant.added_by}</>}
+            {restaurant.added_by && restaurant.date_added && " · "}
+            {restaurant.date_added && formatDate(restaurant.date_added)}
+          </p>
         </div>
       )}
 
