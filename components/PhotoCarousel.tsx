@@ -66,7 +66,7 @@ export default function PhotoCarousel({
 
   return (
     <div
-      className={`relative overflow-hidden ${aspectClass} bg-bg2`}
+      className={`relative overflow-hidden ${aspectClass} bg-bg2 touch-pan-y`}
       style={
         cuisineColor
           ? {

@@ -158,9 +158,18 @@ export const DEFAULT_CUISINE_OPTIONS = [
   "Vietnamese",
 ];
 
+type OpeningHoursTime = {
+  day: number;
+  hour?: number;
+  minute?: number;
+  hours?: number;
+  minutes?: number;
+  time?: string;
+};
+
 type OpeningHoursPeriod = {
-  open: { day: number; hour: number; minute: number };
-  close?: { day: number; hour: number; minute: number };
+  open: OpeningHoursTime;
+  close?: OpeningHoursTime;
 };
 
 type OpeningHours = {
@@ -168,37 +177,60 @@ type OpeningHours = {
   periods?: OpeningHoursPeriod[];
 } | null;
 
+// Periods come from two sources with different shapes:
+// - Places API (New) via refresh-google-data cron: { day, hour, minute }
+// - Legacy JS SDK via AddModal: { day, hours, minutes, time: "HHMM" }
+function readMinutes(t: OpeningHoursTime): number {
+  const h = t.hour ?? t.hours;
+  const m = t.minute ?? t.minutes;
+  if (typeof h === "number" && typeof m === "number") return h * 60 + m;
+  if (typeof t.time === "string" && /^\d{4}$/.test(t.time)) {
+    return parseInt(t.time.slice(0, 2), 10) * 60 + parseInt(t.time.slice(2), 10);
+  }
+  return NaN;
+}
+
 /**
  * Checks if a restaurant is currently open based on its stored opening_hours periods.
- * Uses the user's local time. Returns null if no hours data is available.
+ * "Now" is evaluated in America/Los_Angeles since periods are in the restaurant's
+ * (San Diego) local time regardless of viewer timezone.
+ * Returns null if no hours data is available.
  */
 export function isCurrentlyOpen(openingHours: OpeningHours): boolean | null {
   if (!openingHours?.periods || openingHours.periods.length === 0) return null;
 
-  const now = new Date();
-  const day = now.getDay(); // 0 = Sunday
-  const hour = now.getHours();
-  const minute = now.getMinutes();
-  const currentMinutes = hour * 60 + minute;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "Sun";
+  const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(weekday);
+  const hour = parseInt(
+    parts.find((p) => p.type === "hour")?.value ?? "0",
+    10,
+  );
+  const minute = parseInt(
+    parts.find((p) => p.type === "minute")?.value ?? "0",
+    10,
+  );
+  const currentMinutes = (hour % 24) * 60 + minute;
 
   for (const period of openingHours.periods) {
-    // 24-hour place: open with no close
-    if (!period.close) {
-      if (period.open.day === day) return true;
-      continue;
-    }
+    // 24-hour place: single period with no close is "always open" per Google.
+    if (!period.close) return true;
 
-    const openMin = period.open.hour * 60 + period.open.minute;
-    const closeMin = period.close.hour * 60 + period.close.minute;
+    const openMin = readMinutes(period.open);
+    const closeMin = readMinutes(period.close);
+    if (Number.isNaN(openMin) || Number.isNaN(closeMin)) continue;
 
     if (period.open.day === day && period.close.day === day) {
-      // Same-day period
       if (currentMinutes >= openMin && currentMinutes < closeMin) return true;
     } else if (period.open.day === day && period.close.day !== day) {
-      // Opens today, closes tomorrow (e.g. late night)
       if (currentMinutes >= openMin) return true;
     } else if (period.close.day === day && period.open.day !== day) {
-      // Opened yesterday, closes today
       if (currentMinutes < closeMin) return true;
     }
   }

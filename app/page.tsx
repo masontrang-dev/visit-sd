@@ -285,114 +285,122 @@ function HomeContent() {
   }
 
   const load = useCallback(async () => {
-      let query = supabase
-        .from("restaurants")
-        .select("*")
-        .order("cuisine")
-        .order("name");
-      if (!isAdmin) {
-        query = query.eq("visibility", "public");
-      }
-      const { data } = (await query) as { data: Restaurant[] | null };
-      setRestaurants(data ?? []);
+    // Phase 1: fetch restaurants and render the grid immediately
+    let query = supabase
+      .from("restaurants")
+      .select("*")
+      .order("cuisine")
+      .order("name");
+    if (!isAdmin) {
+      query = query.eq("visibility", "public");
+    }
+    const { data } = (await query) as { data: Restaurant[] | null };
+    const rows = data ?? [];
+    setRestaurants(rows);
+    setLoading(false); // show grid now — photos/recommendations load in background
 
-      // Fetch recommended menu items, scoped to restaurants the viewer can see
-      if (data && data.length > 0) {
-        const visibleRestaurantIds = data.map((r) => r.id);
-        const { data: recRows } = (await supabase
-          .from("menu_item_recommendations")
-          .select("menu_item_id")) as {
-          data: { menu_item_id: number }[] | null;
-        };
+    if (rows.length === 0) return;
+    const visibleRestaurantIds = rows.map((r) => r.id);
 
-        const recommendedIds = Array.from(
-          new Set((recRows ?? []).map((r) => r.menu_item_id)),
-        );
-        const recommendedSet = new Set(recommendedIds);
+    // Phase 2: recommendations + order photos in parallel (both only need Phase 1)
+    const [recResult, orderResult] = await Promise.all([
+      supabase
+        .from("menu_item_recommendations")
+        .select("menu_item_id") as Promise<{
+        data: { menu_item_id: number }[] | null;
+      }>,
+      supabase
+        .from("item_orders")
+        .select("restaurant_id, menu_item_id, photo_url, ordered_at")
+        .in("restaurant_id", visibleRestaurantIds)
+        .not("photo_url", "is", null)
+        .order("ordered_at", { ascending: false })
+        .limit(500) as Promise<{
+        data:
+          | {
+              restaurant_id: number;
+              menu_item_id: number;
+              photo_url: string;
+              ordered_at: string;
+            }[]
+          | null;
+      }>,
+    ]);
 
-        if (recommendedIds.length > 0) {
-          const { data: menuData } = (await supabase
+    const recRows = recResult.data ?? [];
+    const orderRows = orderResult.data ?? [];
+
+    const recommendedIds = Array.from(
+      new Set(recRows.map((r) => r.menu_item_id)),
+    );
+    const recommendedSet = new Set(recommendedIds);
+    const orderMenuIds = Array.from(
+      new Set(orderRows.map((o) => o.menu_item_id)),
+    );
+
+    // Phase 3: menu item details + order item names in parallel
+    const [menuResult, nameResult] = await Promise.all([
+      recommendedIds.length > 0
+        ? (supabase
             .from("menu_items")
             .select("*")
             .in("id", recommendedIds)
             .in("restaurant_id", visibleRestaurantIds)
-            .order("name")) as { data: MenuItem[] | null };
-
-          if (menuData) {
-            const itemsByRestaurant: Record<number, MenuItem[]> = {};
-            menuData.forEach((item) => {
-              if (!itemsByRestaurant[item.restaurant_id]) {
-                itemsByRestaurant[item.restaurant_id] = [];
-              }
-              itemsByRestaurant[item.restaurant_id].push(item);
-            });
-            setRecommendedItems(itemsByRestaurant);
-          }
-        }
-
-        // Fetch order photos for the carousel: recommended items first, then others
-        const { data: orderRows } = (await supabase
-          .from("item_orders")
-          .select("restaurant_id, menu_item_id, photo_url, ordered_at")
-          .in("restaurant_id", visibleRestaurantIds)
-          .not("photo_url", "is", null)
-          .order("ordered_at", { ascending: false })) as {
-          data:
-            | {
-                restaurant_id: number;
-                menu_item_id: number;
-                photo_url: string;
-                ordered_at: string;
-              }[]
-            | null;
-        };
-
-        if (orderRows && orderRows.length > 0) {
-          const orderMenuIds = Array.from(
-            new Set(orderRows.map((o) => o.menu_item_id)),
-          );
-          const { data: namedItems } = (await supabase
+            .order("name") as Promise<{ data: MenuItem[] | null }>)
+        : Promise.resolve({ data: [] as MenuItem[] }),
+      orderMenuIds.length > 0
+        ? (supabase
             .from("menu_items")
             .select("id, name")
-            .in("id", orderMenuIds)) as {
+            .in("id", orderMenuIds) as Promise<{
             data: { id: number; name: string }[] | null;
-          };
-          const nameById = new Map<number, string>();
-          (namedItems ?? []).forEach((m) => nameById.set(m.id, m.name));
+          }>)
+        : Promise.resolve({ data: [] as { id: number; name: string }[] }),
+    ]);
 
-          const PHOTOS_PER_RESTAURANT = 8;
-          const buckets: Record<number, RestaurantPhoto[]> = {};
-          const seen: Record<number, Set<string>> = {};
-          orderRows.forEach((o) => {
-            const photo: RestaurantPhoto = {
-              url: o.photo_url,
-              itemName: nameById.get(o.menu_item_id) ?? null,
-              isStorefront: false,
-              isRecommended: recommendedSet.has(o.menu_item_id),
-            };
-            if (!buckets[o.restaurant_id]) {
-              buckets[o.restaurant_id] = [];
-              seen[o.restaurant_id] = new Set();
-            }
-            if (seen[o.restaurant_id].has(photo.url)) return;
-            seen[o.restaurant_id].add(photo.url);
-            buckets[o.restaurant_id].push(photo);
-          });
+    // Recommended items by restaurant
+    const menuData = menuResult.data ?? [];
+    if (menuData.length > 0) {
+      const itemsByRestaurant: Record<number, MenuItem[]> = {};
+      menuData.forEach((item) => {
+        if (!itemsByRestaurant[item.restaurant_id])
+          itemsByRestaurant[item.restaurant_id] = [];
+        itemsByRestaurant[item.restaurant_id].push(item);
+      });
+      setRecommendedItems(itemsByRestaurant);
+    }
 
-          // Sort each bucket: recommended first, then chronological order preserved
-          Object.keys(buckets).forEach((key) => {
-            const id = Number(key);
-            buckets[id].sort(
-              (a, b) => Number(b.isRecommended) - Number(a.isRecommended),
-            );
-            buckets[id] = buckets[id].slice(0, PHOTOS_PER_RESTAURANT);
-          });
-          setRestaurantPhotos(buckets);
+    // Order photos by restaurant
+    if (orderRows.length > 0) {
+      const nameById = new Map<number, string>();
+      (nameResult.data ?? []).forEach((m) => nameById.set(m.id, m.name));
+
+      const buckets: Record<number, RestaurantPhoto[]> = {};
+      const seen: Record<number, Set<string>> = {};
+      orderRows.forEach((o) => {
+        if (!buckets[o.restaurant_id]) {
+          buckets[o.restaurant_id] = [];
+          seen[o.restaurant_id] = new Set();
         }
-      }
+        if (seen[o.restaurant_id].has(o.photo_url)) return;
+        seen[o.restaurant_id].add(o.photo_url);
+        buckets[o.restaurant_id].push({
+          url: o.photo_url,
+          itemName: nameById.get(o.menu_item_id) ?? null,
+          isStorefront: false,
+          isRecommended: recommendedSet.has(o.menu_item_id),
+        });
+      });
 
-      setLoading(false);
-    }, [isAdmin]);
+      Object.keys(buckets).forEach((key) => {
+        const id = Number(key);
+        buckets[id].sort(
+          (a, b) => Number(b.isRecommended) - Number(a.isRecommended),
+        );
+      });
+      setRestaurantPhotos(buckets);
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
     if (viewMode === "map") setMapEverMounted(true);
@@ -551,17 +559,13 @@ function HomeContent() {
           className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center pointer-events-none"
           style={{
             height: refreshing ? threshold : pullDistance,
-            opacity: refreshing
-              ? 1
-              : Math.min(pullDistance / threshold, 1),
+            opacity: refreshing ? 1 : Math.min(pullDistance / threshold, 1),
           }}
           aria-hidden="true"
         >
           <div
             className={`w-6 h-6 border-[2px] border-accent border-t-transparent rounded-full ${
-              refreshing
-                ? "animate-spin"
-                : "motion-safe:transition-transform"
+              refreshing ? "animate-spin" : "motion-safe:transition-transform"
             }`}
             style={
               refreshing
