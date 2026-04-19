@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   supabase,
@@ -20,8 +20,10 @@ import ConfirmModal from "@/components/ConfirmModal";
 import CheckInModal from "@/components/CheckInModal";
 import CuratorRatingControl from "@/components/CuratorRatingControl";
 import MenuItemRecommendToggle from "@/components/MenuItemRecommendToggle";
+import PhotoCarousel, {
+  type RestaurantPhoto,
+} from "@/components/PhotoCarousel";
 import Link from "next/link";
-import Image from "next/image";
 import { isCurrentlyOpen } from "@/lib/google-types";
 import { trackEvent } from "@/lib/analytics";
 import { formatDisplayName } from "@/lib/utils";
@@ -664,6 +666,46 @@ export default function RestaurantDetailPage({ params }: Props) {
     });
   }
 
+  const heroPhotos: RestaurantPhoto[] = useMemo(() => {
+    if (!restaurant) return [];
+    const slides: RestaurantPhoto[] = [];
+    const seen = new Set<string>();
+
+    const storefrontUrl =
+      restaurant.photo_url || restaurant.storefront_photo_url;
+    if (storefrontUrl) {
+      seen.add(storefrontUrl);
+      slides.push({
+        url: storefrontUrl,
+        itemName: null,
+        isStorefront: true,
+        isRecommended: false,
+      });
+    }
+
+    const recommendedSet = new Set(recommendations.map((r) => r.menu_item_id));
+    const nameById = new Map<number, string>();
+    menuItems.forEach((m) => nameById.set(m.id, m.name));
+
+    const orderPhotos: RestaurantPhoto[] = [];
+    itemOrders.forEach((o) => {
+      if (!o.photo_url) return;
+      if (seen.has(o.photo_url)) return;
+      seen.add(o.photo_url);
+      orderPhotos.push({
+        url: o.photo_url,
+        itemName: nameById.get(o.menu_item_id) ?? null,
+        isStorefront: false,
+        isRecommended: recommendedSet.has(o.menu_item_id),
+      });
+    });
+    orderPhotos.sort(
+      (a, b) => Number(b.isRecommended) - Number(a.isRecommended),
+    );
+
+    return [...slides, ...orderPhotos];
+  }, [restaurant, itemOrders, menuItems, recommendations]);
+
   if (loading) {
     return (
       <main className="min-h-screen">
@@ -765,25 +807,12 @@ export default function RestaurantDetailPage({ params }: Props) {
 
       {/* Restaurant Header */}
       <div className="border-b-2 border-txt">
-        {(restaurant.photo_url || restaurant.storefront_photo_url) && (
-          <div className="relative overflow-hidden aspect-[16/9] max-h-[320px]">
-            <Image
-              key={restaurant.photo_url || restaurant.storefront_photo_url}
-              src={(restaurant.photo_url || restaurant.storefront_photo_url)!}
-              alt={restaurant.name}
-              fill
-              sizes="100vw"
-              priority
-              className="object-cover"
-              onError={(e) => {
-                (
-                  e.target as HTMLImageElement
-                ).parentElement!.parentElement!.style.display = "none";
-              }}
-              unoptimized
-            />
-            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-bg to-transparent pointer-events-none" />
-          </div>
+        {heroPhotos.length > 0 && (
+          <PhotoCarousel
+            photos={heroPhotos}
+            priority
+            aspectClass="aspect-[16/9] max-h-[320px]"
+          />
         )}
         <div className="px-6 pt-5 pb-4">
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
