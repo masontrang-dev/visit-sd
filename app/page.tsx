@@ -28,6 +28,8 @@ import AdminButton from "@/components/AdminButton";
 import AdminViewToggle from "@/components/AdminViewToggle";
 import { useAuth } from "@/lib/auth-context";
 import { trackEvent } from "@/lib/analytics";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { success } from "@/lib/haptics";
 
 function SkeletonCard() {
   return (
@@ -281,8 +283,7 @@ function HomeContent() {
     }
   }
 
-  useEffect(() => {
-    async function load() {
+  const load = useCallback(async () => {
       let query = supabase
         .from("restaurants")
         .select("*")
@@ -390,7 +391,9 @@ function HomeContent() {
       }
 
       setLoading(false);
-    }
+    }, [isAdmin]);
+
+  useEffect(() => {
     load();
     setMounted(true);
 
@@ -429,7 +432,14 @@ function HomeContent() {
       window.removeEventListener("scroll", handleScroll);
       clearTimeout(scrollTimeout);
     };
-  }, [viewMode, isAdmin]);
+  }, [viewMode, load]);
+
+  const { pullDistance, refreshing, threshold } = usePullToRefresh({
+    onRefresh: async () => {
+      await load();
+      success();
+    },
+  });
 
   const cuisines = Array.from(
     new Set(restaurants.map((r) => r.cuisine).filter(Boolean)),
@@ -498,6 +508,34 @@ function HomeContent() {
 
   return (
     <main className="min-h-screen">
+      {/* Pull-to-refresh indicator */}
+      {(pullDistance > 0 || refreshing) && (
+        <div
+          className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center pointer-events-none"
+          style={{
+            height: refreshing ? threshold : pullDistance,
+            opacity: refreshing
+              ? 1
+              : Math.min(pullDistance / threshold, 1),
+          }}
+          aria-hidden="true"
+        >
+          <div
+            className={`w-6 h-6 border-[2px] border-accent border-t-transparent rounded-full ${
+              refreshing
+                ? "animate-spin"
+                : "motion-safe:transition-transform"
+            }`}
+            style={
+              refreshing
+                ? undefined
+                : {
+                    transform: `rotate(${Math.min((pullDistance / threshold) * 360, 360)}deg)`,
+                  }
+            }
+          />
+        </div>
+      )}
       {/* Hero or Context Header */}
       {!isFiltered ? (
         <header

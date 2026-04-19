@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase, type CuratorRating } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { formatDisplayName } from "@/lib/utils";
+import { tap } from "@/lib/haptics";
 
 type CuratorProfile = {
   user_id: string;
@@ -69,6 +70,7 @@ export default function CuratorRatingControl({
 
   async function setRating(next: number | null) {
     if (!user || saving) return;
+    tap();
     setSaving(true);
 
     if (next === null) {

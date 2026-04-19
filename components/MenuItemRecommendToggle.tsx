@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { tap } from "@/lib/haptics";
 
 type Props = {
   menuItemId: number;
@@ -27,6 +28,7 @@ export default function MenuItemRecommendToggle({
 
   async function toggle() {
     if (!user || busy) return;
+    tap();
     setBusy(true);
     if (iRecommend) {
       await supabase

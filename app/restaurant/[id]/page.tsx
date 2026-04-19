@@ -27,6 +27,21 @@ import Link from "next/link";
 import { isCurrentlyOpen } from "@/lib/google-types";
 import { trackEvent } from "@/lib/analytics";
 import { formatDisplayName } from "@/lib/utils";
+import { success } from "@/lib/haptics";
+import SwipeableRow from "@/components/SwipeableRow";
+
+const CUISINE_COLORS = [
+  "var(--cuisine-1)",
+  "var(--cuisine-2)",
+  "var(--cuisine-3)",
+  "var(--cuisine-4)",
+  "var(--cuisine-5)",
+  "var(--cuisine-6)",
+  "var(--cuisine-7)",
+  "var(--cuisine-8)",
+  "var(--cuisine-9)",
+  "var(--cuisine-10)",
+];
 
 function Chevron({
   open,
@@ -104,6 +119,16 @@ export default function RestaurantDetailPage({ params }: Props) {
   const [ratingRefresh, setRatingRefresh] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const hasScrolled = useRef(false);
+  const stickySentinelRef = useRef<HTMLDivElement>(null);
+
+  const cuisineColor = useMemo(() => {
+    if (!restaurant?.cuisine || cuisines.length === 0)
+      return CUISINE_COLORS[0];
+    const idx = cuisines.indexOf(restaurant.cuisine);
+    return idx >= 0
+      ? CUISINE_COLORS[idx % CUISINE_COLORS.length]
+      : CUISINE_COLORS[0];
+  }, [restaurant?.cuisine, cuisines]);
 
   // Check if user has checked in within last 24 hours
   const hasRecentCheckIn = visits.some((visit) => {
@@ -129,19 +154,18 @@ export default function RestaurantDetailPage({ params }: Props) {
   }
 
   useEffect(() => {
-    const handleScroll = () => {
-      hasScrolled.current = true;
-      setIsScrolled(window.scrollY > 100);
-    };
-    // Delay listener to skip the browser's initial scroll-to-top on navigation
-    const timer = setTimeout(() => {
-      window.addEventListener("scroll", handleScroll);
-    }, 100);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
+    const el = stickySentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        hasScrolled.current = true;
+        setIsScrolled(!entry.isIntersecting);
+      },
+      { threshold: 0, rootMargin: "0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [restaurant?.id]);
 
   // Redirect non-admin visitors away from private / archived restaurants
   useEffect(() => {
@@ -364,6 +388,7 @@ export default function RestaurantDetailPage({ params }: Props) {
     if (restaurantData) setRestaurant(restaurantData);
     setVisitingId(null);
 
+    success();
     toast("Check-in logged", "success");
 
     // Open order modal if user chose to log order
@@ -751,11 +776,16 @@ export default function RestaurantDetailPage({ params }: Props) {
     <main className={`min-h-screen pb-24`}>
       {/* Sticky Compact Header - Shows on scroll */}
       <div
-        className={`fixed top-0 left-0 right-0 z-50 bg-bg border-b-2 border-txt transition-transform duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-30 bg-bg border-b-2 border-txt transition-transform duration-300 motion-reduce:transition-none ${
           isScrolled ? "translate-y-0" : "-translate-y-full"
         }`}
         style={{ visibility: hasScrolled.current ? "visible" : "hidden" }}
       >
+        <div
+          aria-hidden="true"
+          className="h-1 w-full"
+          style={{ backgroundColor: cuisineColor }}
+        />
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <Link
@@ -766,8 +796,17 @@ export default function RestaurantDetailPage({ params }: Props) {
               ←
             </Link>
             <div className="min-w-0 flex-1">
-              <h2 className="font-display text-2xl leading-tight truncate">
-                {restaurant.name}
+              <h2 className="font-display text-2xl leading-tight truncate flex items-center gap-2">
+                <span className="truncate">{restaurant.name}</span>
+                {restaurant.must_try && (
+                  <span
+                    className="text-accent shrink-0 text-lg"
+                    aria-label="Must-try"
+                    title="Must-try"
+                  >
+                    ★
+                  </span>
+                )}
               </h2>
               <p className="text-xs text-txt2 truncate">
                 {restaurant.cuisine} · {restaurant.neighborhood}
@@ -910,6 +949,9 @@ export default function RestaurantDetailPage({ params }: Props) {
           )}
         </div>
       </div>
+
+      {/* Sentinel for sticky header IntersectionObserver */}
+      <div ref={stickySentinelRef} aria-hidden="true" className="h-px" />
 
       {/* Ratings Section - Always show 3 columns: Google, My Rating, Check-ins */}
       <div className="flex items-stretch border-b border-brd">
@@ -1305,8 +1347,8 @@ export default function RestaurantDetailPage({ params }: Props) {
                 const menuItem = menuItems.find(
                   (mi) => mi.id === order.menu_item_id,
                 );
-                return (
-                  <div key={order.id} className="border-[1.5px] border-brd p-3">
+                const rowContent = (
+                  <div className="border-[1.5px] border-brd p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -1368,6 +1410,15 @@ export default function RestaurantDetailPage({ params }: Props) {
                       </div>
                     )}
                   </div>
+                );
+                return (
+                  <SwipeableRow
+                    key={order.id}
+                    enabled={isAdmin}
+                    onDelete={() => handleDeleteOrderClick(order.id)}
+                  >
+                    {rowContent}
+                  </SwipeableRow>
                 );
               })}
             </div>
