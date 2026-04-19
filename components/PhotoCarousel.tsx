@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
+import useEmblaCarousel from "embla-carousel-react";
 import { formatRecencyTag } from "@/lib/utils";
 
 export type RestaurantPhoto = {
@@ -32,41 +33,36 @@ export default function PhotoCarousel({
   heroName,
   cuisineColor,
 }: Props) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align: "start",
+    loop: false,
+    containScroll: "trimSnaps",
+    skipSnaps: false,
+  });
   const [activeIndex, setActiveIndex] = useState(0);
-  const rafRef = useRef<number | null>(null);
-
-  const handleScroll = useCallback(() => {
-    if (rafRef.current !== null) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      const el = scrollerRef.current;
-      if (!el) return;
-      const idx = Math.round(el.scrollLeft / el.clientWidth);
-      setActiveIndex((prev) => {
-        const clamped = Math.max(0, Math.min(photos.length - 1, idx));
-        return clamped === prev ? prev : clamped;
-      });
-    });
-  }, [photos.length]);
 
   useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setActiveIndex(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    emblaApi.on("reInit", onSelect);
+    onSelect();
     return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      emblaApi.off("select", onSelect);
+      emblaApi.off("reInit", onSelect);
     };
-  }, []);
+  }, [emblaApi]);
 
-  const scrollToIndex = useCallback((i: number) => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
-  }, []);
+  const scrollToIndex = useCallback(
+    (i: number) => emblaApi?.scrollTo(i),
+    [emblaApi],
+  );
 
   const multiple = photos.length > 1;
 
   return (
     <div
-      className={`relative overflow-hidden ${aspectClass} bg-bg2 touch-pan-y`}
+      className={`relative overflow-hidden ${aspectClass} bg-bg2`}
       style={
         cuisineColor
           ? {
@@ -76,58 +72,62 @@ export default function PhotoCarousel({
       }
     >
       <div
-        ref={scrollerRef}
-        onScroll={handleScroll}
-        className="flex h-full w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide touch-pan-x overscroll-x-contain"
+        ref={emblaRef}
+        className="h-full w-full overflow-hidden"
+        style={{ touchAction: "pan-y" }}
       >
-        {photos.map((photo, i) => (
-          <div
-            key={`${photo.url}-${i}`}
-            className="relative h-full basis-full grow-0 shrink-0 min-w-full snap-start [scroll-snap-stop:always]"
-            style={
-              heroName && i === 0 ? { viewTransitionName: heroName } : undefined
-            }
-          >
-            {Math.abs(i - activeIndex) <= 1 &&
-              (photo.isStorefront ? (
-                <Image
-                  src={photo.url}
-                  alt={photo.itemName ?? ""}
-                  fill
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-                  priority={priority && i === 0}
-                  className="object-cover"
-                  unoptimized
-                />
-              ) : (
-                <img
-                  src={photo.url}
-                  alt={photo.itemName ?? ""}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.visibility = "hidden";
-                  }}
-                />
-              ))}
+        <div className="flex h-full w-full">
+          {photos.map((photo, i) => (
+            <div
+              key={`${photo.url}-${i}`}
+              className="relative h-full flex-[0_0_100%] min-w-0"
+              style={
+                heroName && i === 0 ? { viewTransitionName: heroName } : undefined
+              }
+            >
+              {Math.abs(i - activeIndex) <= 1 &&
+                (photo.isStorefront ? (
+                  <Image
+                    src={photo.url}
+                    alt={photo.itemName ?? ""}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                    priority={priority && i === 0}
+                    className="object-cover"
+                    unoptimized
+                    draggable={false}
+                  />
+                ) : (
+                  <img
+                    src={photo.url}
+                    alt={photo.itemName ?? ""}
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.visibility = "hidden";
+                    }}
+                  />
+                ))}
 
-            {/* Bottom-left: item name caption */}
-            {photo.itemName && (
-              <span className="absolute bottom-2 left-2 max-w-[55%] text-2xs font-medium tracking-tight text-white px-2.5 py-1 rounded-pill bg-black/55 backdrop-blur-md truncate z-[1]">
-                {photo.itemName}
-              </span>
-            )}
+              {/* Bottom-left: item name caption */}
+              {photo.itemName && (
+                <span className="absolute bottom-2 left-2 max-w-[55%] text-2xs font-medium tracking-tight text-white px-2.5 py-1 rounded-pill bg-black/55 backdrop-blur-md truncate z-[1]">
+                  {photo.itemName}
+                </span>
+              )}
 
-            {/* Bottom-right: recommended badge */}
-            {photo.isRecommended && (
-              <span className="absolute bottom-2 right-2 text-2xs font-semibold tracking-tight uppercase px-2 py-1 rounded-pill bg-white/95 text-accent shadow-sm border-2 border-white/80 flex items-center gap-1 z-[1]">
-                <span aria-hidden>★</span>
-                <span>Pick</span>
-              </span>
-            )}
-          </div>
-        ))}
+              {/* Bottom-right: recommended badge */}
+              {photo.isRecommended && (
+                <span className="absolute bottom-2 right-2 text-2xs font-semibold tracking-tight uppercase px-2 py-1 rounded-pill bg-white/95 text-accent shadow-sm border-2 border-white/80 flex items-center gap-1 z-[1]">
+                  <span aria-hidden>★</span>
+                  <span>Pick</span>
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg/40 to-transparent pointer-events-none" />
