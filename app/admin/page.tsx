@@ -9,7 +9,10 @@ import {
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import RestaurantGrid from "@/components/RestaurantGrid";
-import FilterBar, { type ImageDisplayMode } from "@/components/FilterBar";
+import FilterBar, {
+  type ImageDisplayMode,
+  type VisibilityFilter,
+} from "@/components/FilterBar";
 import AddModal from "@/components/AddModal";
 import OrderModal from "@/components/OrderModal";
 import MapView from "@/components/MapView";
@@ -126,6 +129,8 @@ export default function AdminPage() {
   );
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [activePrices, setActivePrices] = useState<string[]>([]);
+  const [activeVisibility, setActiveVisibility] =
+    useState<VisibilityFilter>("public");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -302,6 +307,9 @@ export default function AdminPage() {
     new Set(restaurants.map((r) => r.neighborhood).filter(Boolean)),
   ).sort();
   const filtered = restaurants.filter((r) => {
+    if (activeVisibility !== "all") {
+      if ((r.visibility ?? "public") !== activeVisibility) return false;
+    }
     if (activeCuisines.length > 0 && !activeCuisines.includes(r.cuisine || ""))
       return false;
     if (
@@ -399,6 +407,8 @@ export default function AdminPage() {
         activePrices={activePrices}
         onPriceChange={setActivePrices}
         isAdminView
+        activeVisibility={activeVisibility}
+        onVisibilityChange={setActiveVisibility}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         imageDisplayMode={imageDisplayMode}

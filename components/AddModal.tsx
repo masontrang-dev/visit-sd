@@ -23,6 +23,24 @@ type Props = {
 
 const PRICES = ["$", "$$", "$$$", "$$$$"];
 
+const VISIBILITIES: ("public" | "private" | "archived")[] = [
+  "public",
+  "private",
+  "archived",
+];
+
+const VISIBILITY_LABELS: Record<"public" | "private" | "archived", string> = {
+  public: "Public",
+  private: "🔒 Private",
+  archived: "📦 Archived",
+};
+
+const VISIBILITY_HINTS: Record<"public" | "private" | "archived", string> = {
+  public: "Shown in the guide to everyone.",
+  private: "Your journal only — hidden from the public guide.",
+  archived: "Kept for history — hidden from the public guide.",
+};
+
 const OCCASION_SUGGESTIONS = [
   "casual",
   "date-friendly",
@@ -65,10 +83,10 @@ export default function AddModal({
     editData?.added_by ?? displayName ?? "",
   );
   const [mustTry, setMustTry] = useState(editData?.must_try ?? false);
-  const [myRating, setMyRating] = useState<number | null>(
-    editData?.my_rating ?? null,
-  );
-  const [ratingNotes, setRatingNotes] = useState("");
+  const [visibility, setVisibility] = useState<
+    "public" | "private" | "archived"
+  >(editData?.visibility ?? "public");
+  const isPublic = visibility === "public";
   const [googleRating, setGoogleRating] = useState<number | null>(
     editData?.google_rating ?? null,
   );
@@ -311,10 +329,6 @@ export default function AddModal({
 
     console.log("Saving restaurant with photo_url:", finalPhotoUrl);
 
-    // Track rating change for history
-    const ratingChanged =
-      editData && myRating !== null && myRating !== editData.my_rating;
-
     const ok = await onSave({
       name: name.trim(),
       neighborhood: neighborhood.trim(),
@@ -329,25 +343,17 @@ export default function AddModal({
       lng,
       photo_url: finalPhotoUrl.trim() || null,
       storefront_photo_url: storefrontPhotoUrl,
-      must_try: mustTry,
+      must_try: isPublic ? mustTry : false,
       date_added: editData?.date_added ?? null,
       last_visited: editData?.last_visited ?? null,
       google_rating: googleRating,
       google_review_count: googleReviewCount,
-      my_rating: myRating,
+      my_rating: editData?.my_rating ?? null,
       occasions: occasions.length > 0 ? occasions : null,
       opening_hours: openingHours,
+      visibility,
     });
 
-    // Save rating history if rating changed
-    if (ok && ratingChanged && editData && myRating !== null) {
-      await supabase.from("rating_history").insert({
-        restaurant_id: editData.id,
-        rating: myRating,
-        changed_by: displayName || "Unknown",
-        notes: ratingNotes.trim() || null,
-      });
-    }
     setSaving(false);
     if (ok) {
       setSuccess(true);
@@ -421,6 +427,30 @@ export default function AddModal({
             />
           </div>
         )}
+
+        <div className="mb-4">
+          <label className={labelCls}>Visibility</label>
+          <div className="flex gap-2">
+            {VISIBILITIES.map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setVisibility(v)}
+                className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                  visibility === v
+                    ? "bg-txt text-bg border-txt"
+                    : "bg-transparent text-txt2 border-brd"
+                }`}
+              >
+                {VISIBILITY_LABELS[v]}
+              </button>
+            ))}
+          </div>
+          <p className="text-2xs text-txt2 mt-1.5">
+            {VISIBILITY_HINTS[visibility]}
+          </p>
+        </div>
+
 
         {[
           {
@@ -621,51 +651,19 @@ export default function AddModal({
           <label className={labelCls}>Must-Try</label>
           <button
             type="button"
-            onClick={() => setMustTry(!mustTry)}
+            onClick={() => isPublic && setMustTry(!mustTry)}
+            disabled={!isPublic}
             className={`chip ${
-              mustTry ? "!bg-accent !text-white !border-accent" : ""
-            }`}
+              mustTry && isPublic ? "!bg-accent !text-white !border-accent" : ""
+            } ${!isPublic ? "opacity-40 cursor-not-allowed" : ""}`}
+            title={
+              isPublic
+                ? undefined
+                : "Must-Try only applies to public restaurants"
+            }
           >
-            {mustTry ? "★ Must-Try" : "☆ Mark as Must-Try"}
+            {mustTry && isPublic ? "★ Must-Try" : "☆ Mark as Must-Try"}
           </button>
-        </div>
-
-        <div className="mb-4">
-          <label className={labelCls}>My Rating</label>
-          <div className="flex gap-2 mb-2">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                type="button"
-                onClick={() => setMyRating(myRating === star ? null : star)}
-                className="text-3xl cursor-pointer bg-transparent border-none p-0 transition-all duration-100 hover:scale-110"
-                style={{
-                  color: myRating && star <= myRating ? "#D85A30" : "#D3D1C7",
-                }}
-              >
-                ★
-              </button>
-            ))}
-            {myRating !== null && (
-              <button
-                type="button"
-                onClick={() => setMyRating(null)}
-                className="text-xs text-txt2 ml-2 bg-transparent border-none cursor-pointer hover:text-accent"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-          {editData && myRating !== null && myRating !== editData.my_rating && (
-            <div>
-              <input
-                value={ratingNotes}
-                onChange={(e) => setRatingNotes(e.target.value)}
-                placeholder="Why did your rating change? (optional)"
-                className="input-base text-xs"
-              />
-            </div>
-          )}
         </div>
 
         {googleRating !== null && (

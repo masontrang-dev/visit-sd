@@ -7,6 +7,7 @@ import {
   type ItemOrder,
   type DrinkDetails,
 } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth-context";
 import imageCompression from "browser-image-compression";
 
 type Props = {
@@ -15,6 +16,8 @@ type Props = {
   onSaved: () => void;
   editOrder?: ItemOrder | null;
   editMenuItem?: MenuItem | null;
+  prefillFromOrder?: ItemOrder | null;
+  prefillMenuItem?: MenuItem | null;
 };
 
 const CATEGORIES = ["food", "drink", "dessert", "boba"];
@@ -61,15 +64,21 @@ export default function OrderModal({
   onSaved,
   editOrder = null,
   editMenuItem = null,
+  prefillFromOrder = null,
+  prefillMenuItem = null,
 }: Props) {
+  const { user } = useAuth();
   const isEditing = !!editOrder;
-  const editDrink = (editOrder?.drink_details as DrinkDetails) ?? null;
+  // Seed initial form values from either the order being edited or a prefill source.
+  const sourceOrder = editOrder ?? prefillFromOrder;
+  const sourceItem = editMenuItem ?? prefillMenuItem;
+  const sourceDrink = (sourceOrder?.drink_details as DrinkDetails) ?? null;
 
   // Menu item state
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [menuSearch, setMenuSearch] = useState(editMenuItem?.name ?? "");
+  const [menuSearch, setMenuSearch] = useState(sourceItem?.name ?? "");
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(
-    editMenuItem ?? null,
+    sourceItem ?? null,
   );
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(-1);
@@ -77,10 +86,10 @@ export default function OrderModal({
 
   // Order fields
   const [selectedCategory, setSelectedCategory] = useState(
-    editMenuItem?.category ?? "food",
+    sourceItem?.category ?? "food",
   );
-  const [rating, setRating] = useState<number | null>(
-    editOrder?.rating ?? null,
+  const [liked, setLiked] = useState<boolean | null>(
+    sourceOrder?.liked ?? null,
   );
 
   // Determine form type based on current category selection
@@ -90,38 +99,49 @@ export default function OrderModal({
       : selectedCategory === "drink"
         ? "cafe"
         : "standard";
-  const [notes, setNotes] = useState(editOrder?.notes ?? "");
+  const [notes, setNotes] = useState(sourceOrder?.notes ?? "");
   const [orderedAt, setOrderedAt] = useState(
+    // Edits keep the original date; prefills default to today.
     editOrder?.ordered_at ?? new Date().toISOString().slice(0, 10),
   );
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoUrl, setPhotoUrl] = useState(editOrder?.photo_url ?? "");
+  // Photos are per-visit and do not carry over from a prefill source.
+  const [photoUrl, setPhotoUrl] = useState(
+    isEditing ? (editOrder?.photo_url ?? "") : "",
+  );
 
   // Boba fields
   const [sweetnessStyle, setSweetnessStyle] = useState<
     "descriptive" | "percentage"
-  >(editDrink?.sweetness?.style ?? "descriptive");
+  >(sourceDrink?.sweetness?.style ?? "descriptive");
   const [sweetnessValue, setSweetnessValue] = useState(
-    editDrink?.sweetness?.value ?? 75,
+    sourceDrink?.sweetness?.value ?? 75,
   );
   const [iceStyle, setIceStyle] = useState<"descriptive" | "percentage">(
-    editDrink?.ice?.style ?? "descriptive",
+    sourceDrink?.ice?.style ?? "descriptive",
   );
-  const [iceValue, setIceValue] = useState(editDrink?.ice?.value ?? 50);
-  const [toppings, setToppings] = useState<string[]>(editDrink?.toppings ?? []);
+  const [iceValue, setIceValue] = useState(sourceDrink?.ice?.value ?? 50);
+  const [toppings, setToppings] = useState<string[]>(
+    sourceDrink?.toppings ?? [],
+  );
   const [customTopping, setCustomTopping] = useState("");
 
   // Shared cafe/boba fields
-  const [size, setSize] = useState<string | null>(editDrink?.size ?? null);
+  const [size, setSize] = useState<string | null>(sourceDrink?.size ?? null);
   const [temperature, setTemperature] = useState<string | null>(
-    editDrink?.temperature ?? null,
+    sourceDrink?.temperature ?? null,
   );
 
   // Cafe-only fields
   const [milkType, setMilkType] = useState<string | null>(
-    editDrink?.milk_type ?? null,
+    sourceDrink?.milk_type ?? null,
   );
-  const [shots, setShots] = useState<number | null>(editDrink?.shots ?? null);
+  const [shots, setShots] = useState<number | null>(sourceDrink?.shots ?? null);
+
+  // Past orders (for one-tap repeat logging)
+  const [pastOrders, setPastOrders] = useState<ItemOrder[]>([]);
+  const [pastOrdersDismissed, setPastOrdersDismissed] = useState(false);
+  const [showAllPast, setShowAllPast] = useState(false);
 
   // UI state
   const [saving, setSaving] = useState(false);
@@ -139,6 +159,18 @@ export default function OrderModal({
       setMenuItems(data ?? []);
     }
     loadMenuItems();
+  }, [restaurantId]);
+
+  useEffect(() => {
+    async function loadPastOrders() {
+      const { data } = await supabase
+        .from("item_orders")
+        .select("*")
+        .eq("restaurant_id", restaurantId)
+        .order("ordered_at", { ascending: false });
+      setPastOrders((data ?? []) as ItemOrder[]);
+    }
+    loadPastOrders();
   }, [restaurantId]);
 
   useEffect(() => {
@@ -298,11 +330,11 @@ export default function OrderModal({
 
     // Insert or update order
     const drinkDetails = buildDrinkDetails();
-    const orderPayload = {
+    const basePayload = {
       menu_item_id: menuItemId,
       restaurant_id: restaurantId,
       ordered_at: orderedAt,
-      rating,
+      liked,
       notes: notes.trim() || null,
       photo_url: finalPhotoUrl,
       drink_details: drinkDetails,
@@ -311,7 +343,7 @@ export default function OrderModal({
     if (isEditing) {
       const { error: orderError } = await supabase
         .from("item_orders")
-        .update(orderPayload)
+        .update(basePayload)
         .eq("id", editOrder!.id);
       if (orderError) {
         setError("Failed to update order.");
@@ -319,9 +351,14 @@ export default function OrderModal({
         return;
       }
     } else {
+      if (!user) {
+        setError("You must be signed in to log an order.");
+        setSaving(false);
+        return;
+      }
       const { error: orderError } = await supabase
         .from("item_orders")
-        .insert([orderPayload]);
+        .insert([{ ...basePayload, ordered_by: user.id }]);
       if (orderError) {
         setError("Failed to save order.");
         setSaving(false);
@@ -336,6 +373,109 @@ export default function OrderModal({
       onClose();
     }, 800);
   }
+
+  async function handleLogAgainPastOrder(past: ItemOrder) {
+    if (saving) return;
+    if (!user) {
+      setError("You must be signed in to log an order.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const { error: insertError } = await supabase.from("item_orders").insert([
+      {
+        menu_item_id: past.menu_item_id,
+        restaurant_id: past.restaurant_id,
+        ordered_at: new Date().toISOString().slice(0, 10),
+        liked: past.liked,
+        notes: past.notes,
+        drink_details: past.drink_details,
+        photo_url: null,
+        ordered_by: user.id,
+      },
+    ]);
+    setSaving(false);
+    if (insertError) {
+      setError("Failed to log order.");
+      return;
+    }
+    setSuccess(true);
+    setTimeout(() => {
+      onSaved();
+      onClose();
+    }, 800);
+  }
+
+  function handleAdjustAndLogPastOrder(past: ItemOrder) {
+    const item = menuItems.find((m) => m.id === past.menu_item_id) ?? null;
+    if (item) {
+      setSelectedItem(item);
+      setMenuSearch(item.name);
+      if (item.category) setSelectedCategory(item.category);
+    }
+    setLiked(past.liked);
+    setNotes(past.notes ?? "");
+    setOrderedAt(new Date().toISOString().slice(0, 10));
+    setPhotoFile(null);
+    setPhotoUrl("");
+
+    const drink = (past.drink_details as DrinkDetails) ?? null;
+    if (drink) {
+      if (drink.sweetness) {
+        setSweetnessStyle(drink.sweetness.style);
+        setSweetnessValue(drink.sweetness.value);
+      }
+      if (drink.ice) {
+        setIceStyle(drink.ice.style);
+        setIceValue(drink.ice.value);
+      }
+      setToppings(drink.toppings ?? []);
+      setSize(drink.size ?? null);
+      setTemperature(drink.temperature ?? null);
+      setMilkType(drink.milk_type ?? null);
+      setShots(drink.shots ?? null);
+    }
+    setPastOrdersDismissed(true);
+    setTimeout(() => {
+      dropdownRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 50);
+  }
+
+  function formatDrinkSummary(details: DrinkDetails | null): string {
+    if (!details) return "";
+    const parts: string[] = [];
+    if (details.sweetness) parts.push(details.sweetness.label);
+    if (details.ice) parts.push(details.ice.label);
+    if (details.toppings && details.toppings.length > 0)
+      parts.push(details.toppings.join(" + "));
+    if (details.size) parts.push(details.size);
+    if (details.temperature) parts.push(details.temperature);
+    if (details.milk_type) parts.push(details.milk_type + " milk");
+    if (details.shots) parts.push(`${details.shots} shot${details.shots > 1 ? "s" : ""}`);
+    return parts.join(" · ");
+  }
+
+  // Most recent order per menu item, sorted by recency (pastOrders is pre-sorted desc).
+  const groupedPast: ItemOrder[] = (() => {
+    const seen = new Set<number>();
+    const result: ItemOrder[] = [];
+    for (const o of pastOrders) {
+      if (!seen.has(o.menu_item_id)) {
+        seen.add(o.menu_item_id);
+        result.push(o);
+      }
+    }
+    return result;
+  })();
+  const visiblePast = showAllPast ? groupedPast : groupedPast.slice(0, 5);
+  const showPastOrdersSection =
+    !isEditing &&
+    !prefillFromOrder &&
+    !pastOrdersDismissed &&
+    groupedPast.length > 0;
 
   function toggleTopping(topping: string) {
     setToppings((prev) =>
@@ -380,6 +520,82 @@ export default function OrderModal({
               ? "Order updated successfully."
               : "Order saved successfully."}
           </p>
+        )}
+
+        {/* Past orders — one-tap repeat logging */}
+        {showPastOrdersSection && (
+          <div className="mb-5 border-[1.5px] border-brd p-3">
+            <p className="text-xs tracking-wide uppercase font-medium text-txt2 mb-2">
+              Your past orders here
+            </p>
+            <div className="space-y-2">
+              {visiblePast.map((past) => {
+                const item = menuItems.find((m) => m.id === past.menu_item_id);
+                if (!item) return null;
+                const drinkSummary = formatDrinkSummary(
+                  past.drink_details as DrinkDetails | null,
+                );
+                return (
+                  <div
+                    key={past.id}
+                    className="flex items-start gap-2 p-2 bg-bg2 border border-brd"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-txt leading-tight">
+                        {item.name}
+                      </p>
+                      {drinkSummary && (
+                        <p className="text-2xs text-txt2 leading-snug mt-0.5">
+                          {drinkSummary}
+                        </p>
+                      )}
+                      <p className="text-2xs text-txt2 opacity-70 mt-0.5">
+                        {past.liked === true
+                          ? "👍"
+                          : past.liked === false
+                            ? "👎"
+                            : "—"}
+                        {" · "}
+                        last {new Date(past.ordered_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button
+                        onClick={() => handleLogAgainPastOrder(past)}
+                        disabled={saving || success}
+                        className="py-1 px-2 text-2xs font-medium bg-accent text-white border-[1.5px] border-accent cursor-pointer disabled:opacity-50"
+                      >
+                        Log again
+                      </button>
+                      <button
+                        onClick={() => handleAdjustAndLogPastOrder(past)}
+                        disabled={saving || success}
+                        className="py-1 px-2 text-2xs font-medium bg-transparent text-txt2 border-[1.5px] border-brd cursor-pointer disabled:opacity-50"
+                      >
+                        Adjust & log
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {groupedPast.length > 5 && (
+              <button
+                onClick={() => setShowAllPast((v) => !v)}
+                className="mt-2 text-xs text-accent2 bg-transparent border-none cursor-pointer"
+              >
+                {showAllPast
+                  ? "Show less"
+                  : `Show ${groupedPast.length - 5} more`}
+              </button>
+            )}
+            <button
+              onClick={() => setPastOrdersDismissed(true)}
+              className="mt-2 text-xs text-txt2 bg-transparent border-none cursor-pointer block"
+            >
+              Or log a brand new item ↓
+            </button>
+          </div>
         )}
 
         {/* Menu item search/select */}
@@ -480,26 +696,30 @@ export default function OrderModal({
           </div>
         </div>
 
-        {/* Rating */}
+        {/* Verdict — thumbs up/down (nullable) */}
         <div className="mb-4">
-          <label className={labelCls}>Rating</label>
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                onClick={() => setRating(rating === star ? null : star)}
-                className={`text-xl bg-transparent border-none cursor-pointer p-1 transition-colors duration-[0.12s] ${
-                  rating !== null && star <= rating ? "text-accent" : "text-brd"
-                }`}
-              >
-                ★
-              </button>
-            ))}
-            {rating && (
-              <span className="text-sm text-txt2 self-center ml-2">
-                {rating}/5
-              </span>
-            )}
+          <label className={labelCls}>Verdict</label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setLiked(liked === true ? null : true)}
+              className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                liked === true
+                  ? "bg-accent2 text-white border-accent2"
+                  : "bg-transparent text-txt2 border-brd"
+              }`}
+            >
+              👍 Liked
+            </button>
+            <button
+              onClick={() => setLiked(liked === false ? null : false)}
+              className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                liked === false
+                  ? "bg-txt text-bg border-txt"
+                  : "bg-transparent text-txt2 border-brd"
+              }`}
+            >
+              👎 Didn&rsquo;t like
+            </button>
           </div>
         </div>
 

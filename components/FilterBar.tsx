@@ -3,6 +3,14 @@
 import { useState, useEffect, useRef } from "react";
 
 export type ImageDisplayMode = "full" | "compact" | "none";
+export type VisibilityFilter = "public" | "private" | "archived" | "all";
+
+const VISIBILITY_OPTIONS: VisibilityFilter[] = [
+  "public",
+  "private",
+  "archived",
+  "all",
+];
 
 type Props = {
   cuisines: string[];
@@ -19,6 +27,8 @@ type Props = {
   activePrices?: string[];
   onPriceChange?: (prices: string[]) => void;
   isAdminView?: boolean;
+  activeVisibility?: VisibilityFilter;
+  onVisibilityChange?: (v: VisibilityFilter) => void;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
   imageDisplayMode?: ImageDisplayMode;
@@ -50,6 +60,8 @@ export default function FilterBar({
   activePrices,
   onPriceChange,
   isAdminView,
+  activeVisibility,
+  onVisibilityChange,
   searchQuery,
   onSearchChange,
   imageDisplayMode,
@@ -204,6 +216,41 @@ export default function FilterBar({
           </button>
         )}
       </div>
+
+      {/* Row 2.5: Visibility toggle (admin only) */}
+      {isAdminView && onVisibilityChange && (
+        <div className="flex gap-2 pb-2 px-6 items-center flex-wrap">
+          <span className="text-2xs font-medium text-txt2 uppercase tracking-wide">
+            Visibility:
+          </span>
+          <div className="flex gap-1 flex-wrap">
+            {VISIBILITY_OPTIONS.map((v) => (
+              <button
+                key={v}
+                className={activeVisibility === v ? "chip-active" : "chip"}
+                onClick={() => onVisibilityChange(v)}
+                title={
+                  v === "public"
+                    ? "Shown to everyone"
+                    : v === "private"
+                      ? "Curator journal only — hidden from public"
+                      : v === "archived"
+                        ? "Kept for history — hidden from public"
+                        : "All visibilities"
+                }
+              >
+                {v === "public"
+                  ? "Public"
+                  : v === "private"
+                    ? "🔒 Private"
+                    : v === "archived"
+                      ? "📦 Archived"
+                      : "All"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Row 3: Filter buttons and active filter pills */}
       <div className="flex gap-2 pb-3 px-6 items-center flex-wrap">

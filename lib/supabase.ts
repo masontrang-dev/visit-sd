@@ -24,6 +24,7 @@ export type Restaurant = {
   my_rating: number | null;
   occasions: string[] | null;
   opening_hours: any | null;
+  visibility: "public" | "private" | "archived";
 };
 
 export type RestaurantVisit = {
@@ -31,18 +32,18 @@ export type RestaurantVisit = {
   restaurant_id: number;
   visited_by: string;
   visited_at: string;
-  rating?: number | null;
   note?: string | null;
   photo_url?: string | null;
 };
 
-export type RatingHistory = {
+export type CuratorRating = {
   id: number;
   restaurant_id: number;
+  user_id: string;
   rating: number;
-  changed_by: string;
-  notes: string | null;
+  note: string | null;
   created_at: string;
+  updated_at: string;
 };
 
 export type MenuItem = {
@@ -51,7 +52,13 @@ export type MenuItem = {
   name: string;
   category: string | null;
   description: string | null;
-  is_recommended: boolean;
+  created_at: string;
+};
+
+export type MenuItemRecommendation = {
+  id: number;
+  menu_item_id: number;
+  user_id: string;
   created_at: string;
 };
 
@@ -78,7 +85,8 @@ export type ItemOrder = {
   menu_item_id: number;
   restaurant_id: number;
   ordered_at: string;
-  rating: number | null;
+  liked: boolean | null;
+  ordered_by: string;
   notes: string | null;
   photo_url: string | null;
   drink_details: DrinkDetails | null;

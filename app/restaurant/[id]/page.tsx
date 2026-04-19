@@ -9,7 +9,7 @@ import {
   type MenuItem,
   type ItemOrder,
   type DrinkDetails,
-  type RatingHistory,
+  type MenuItemRecommendation,
 } from "@/lib/supabase";
 import IllustrationNoVisits from "@/components/IllustrationNoVisits";
 import { useAuth } from "@/lib/auth-context";
@@ -18,6 +18,8 @@ import AddModal from "@/components/AddModal";
 import OrderModal from "@/components/OrderModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import CheckInModal from "@/components/CheckInModal";
+import CuratorRatingControl from "@/components/CuratorRatingControl";
+import MenuItemRecommendToggle from "@/components/MenuItemRecommendToggle";
 import Link from "next/link";
 import Image from "next/image";
 import { isCurrentlyOpen } from "@/lib/google-types";
@@ -54,7 +56,8 @@ type Props = {
 
 export default function RestaurantDetailPage({ params }: Props) {
   const router = useRouter();
-  const { isAdmin, isSuperuser, displayName } = useAuth();
+  const { isAdmin, isSuperuser, displayName, user, isLoading: authLoading } =
+    useAuth();
   const { toast } = useToast();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [visits, setVisits] = useState<RestaurantVisit[]>([]);
@@ -83,9 +86,18 @@ export default function RestaurantDetailPage({ params }: Props) {
   >(null);
   const [superuserNames, setSuperuserNames] = useState<string[]>([]);
   const [adminNames, setAdminNames] = useState<string[]>([]);
-  const [togglingRecommended, setTogglingRecommended] = useState<number | null>(
-    null,
+  const [recommendations, setRecommendations] = useState<
+    MenuItemRecommendation[]
+  >([]);
+  const [recommenderNames, setRecommenderNames] = useState<
+    Record<string, string>
+  >({});
+  const [ordererNames, setOrdererNames] = useState<Record<string, string>>({});
+  const [historyView, setHistoryView] = useState<"by-dish" | "timeline">(
+    "by-dish",
   );
+  const [expandedDishId, setExpandedDishId] = useState<number | null>(null);
+  const [ratingRefresh, setRatingRefresh] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const hasScrolled = useRef(false);
 
@@ -126,6 +138,15 @@ export default function RestaurantDetailPage({ params }: Props) {
       window.removeEventListener("scroll", handleScroll);
     };
   }, []);
+
+  // Redirect non-admin visitors away from private / archived restaurants
+  useEffect(() => {
+    if (authLoading || !restaurant) return;
+    const vis = restaurant.visibility ?? "public";
+    if (vis !== "public" && !isAdmin) {
+      router.replace("/");
+    }
+  }, [authLoading, isAdmin, restaurant, router]);
 
   useEffect(() => {
     async function fetchData() {
@@ -222,14 +243,62 @@ export default function RestaurantDetailPage({ params }: Props) {
         ).sort();
         setCuisines(uniqueCuisines as string[]);
       }
+
+      await loadRecommendationsAndNames(
+        menuResult.data ?? [],
+        ordersResult.data ?? [],
+      );
     }
     fetchData();
   }, [params]);
 
+  async function loadRecommendationsAndNames(
+    items: MenuItem[],
+    orders: ItemOrder[],
+  ) {
+    const itemIds = items.map((m) => m.id);
+    let recs: MenuItemRecommendation[] = [];
+    if (itemIds.length > 0) {
+      const { data } = await supabase
+        .from("menu_item_recommendations")
+        .select("*")
+        .in("menu_item_id", itemIds);
+      recs = (data ?? []) as MenuItemRecommendation[];
+    }
+    setRecommendations(recs);
+
+    const userIds = Array.from(
+      new Set([
+        ...recs.map((r) => r.user_id),
+        ...orders.map((o) => o.ordered_by).filter(Boolean),
+      ]),
+    );
+
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("user_profiles")
+        .select("user_id, display_name")
+        .in("user_id", userIds);
+
+      const recNames: Record<string, string> = {};
+      const ordNames: Record<string, string> = {};
+      (profiles ?? []).forEach(
+        (p: { user_id: string; display_name: string | null }) => {
+          recNames[p.user_id] = p.display_name || "Curator";
+          ordNames[p.user_id] = p.display_name || "Curator";
+        },
+      );
+      setRecommenderNames(recNames);
+      setOrdererNames(ordNames);
+    } else {
+      setRecommenderNames({});
+      setOrdererNames({});
+    }
+  }
+
   async function handleCheckIn(
     visitDate: string,
     shouldLogOrder: boolean,
-    rating?: number | null,
     note?: string,
   ) {
     if (!restaurant || !displayName) return;
@@ -246,7 +315,6 @@ export default function RestaurantDetailPage({ params }: Props) {
           restaurant_id: restaurant.id,
           visited_by: visitedBy,
           visited_at: visitDate,
-          rating: rating,
           note: note || null,
         },
       ]);
@@ -374,34 +442,40 @@ export default function RestaurantDetailPage({ params }: Props) {
       .select("*")
       .eq("restaurant_id", restaurant.id)
       .order("name");
-    setMenuItems(menuData ?? []);
+    const items = menuData ?? [];
+    setMenuItems(items);
 
     const { data: ordersData } = await supabase
       .from("item_orders")
       .select("*")
       .eq("restaurant_id", restaurant.id)
       .order("ordered_at", { ascending: false });
-    setItemOrders(ordersData ?? []);
+    const orders = ordersData ?? [];
+    setItemOrders(orders);
+
+    await loadRecommendationsAndNames(items, orders);
   }
 
-  async function toggleRecommended(menuItemId: number, currentValue: boolean) {
-    setTogglingRecommended(menuItemId);
-    const { error } = await supabase
-      .from("menu_items")
-      .update({ is_recommended: !currentValue })
-      .eq("id", menuItemId);
-
-    if (error) {
-      toast("Failed to update recommendation", "error");
-    } else {
-      // Reload menu items to reflect change
-      await reloadOrders();
-      toast(
-        !currentValue ? "Added to recommended" : "Removed from recommended",
-        "success",
-      );
+  async function handleLogAgain(source: ItemOrder) {
+    if (!user || !restaurant) return;
+    const { error: insertError } = await supabase.from("item_orders").insert([
+      {
+        menu_item_id: source.menu_item_id,
+        restaurant_id: source.restaurant_id,
+        ordered_at: new Date().toISOString().slice(0, 10),
+        liked: source.liked,
+        notes: source.notes,
+        drink_details: source.drink_details,
+        photo_url: null,
+        ordered_by: user.id,
+      },
+    ]);
+    if (insertError) {
+      toast("Failed to log order", "error");
+      return;
     }
-    setTogglingRecommended(null);
+    toast("Logged again", "success");
+    await reloadOrders();
   }
 
   async function handleEditOrder(order: ItemOrder) {
@@ -477,56 +551,81 @@ export default function RestaurantDetailPage({ params }: Props) {
     toast("Visit deleted", "success");
   }
 
-  // Compute highlighted menu items (is_recommended or has orders)
-  const highlightedItems = menuItems
-    .filter((mi) => mi.is_recommended)
-    .map((mi) => {
-      const orders = itemOrders.filter((o) => o.menu_item_id === mi.id);
-      const avgRating =
-        orders.length > 0
-          ? orders.reduce((sum, o) => sum + (o.rating ?? 0), 0) /
-            orders.filter((o) => o.rating !== null).length
-          : null;
-      const latestOrder = orders[0] ?? null;
-      return {
-        menuItem: mi,
-        orders,
-        avgRating,
-        latestOrder,
-        orderCount: orders.length,
-      };
-    });
+  // Build one group per menu item with aggregated thumb / order / recommender data
+  type DishGroup = {
+    menuItem: MenuItem;
+    orders: ItemOrder[];
+    likedCount: number;
+    dislikedCount: number;
+    noVerdictCount: number;
+    latestOrder: ItemOrder | null;
+    latestNote: string | null;
+    orderCount: number;
+    recommenderIds: string[];
+  };
 
-  // All items with orders (for showing even non-recommended items with history)
-  const itemsWithOrders = menuItems
-    .map((mi) => {
-      const orders = itemOrders.filter((o) => o.menu_item_id === mi.id);
-      const avgRating =
-        orders.filter((o) => o.rating !== null).length > 0
-          ? orders.reduce((sum, o) => sum + (o.rating ?? 0), 0) /
-            orders.filter((o) => o.rating !== null).length
-          : null;
-      const latestOrder = orders[0] ?? null;
-      return {
-        menuItem: mi,
-        orders,
-        avgRating,
-        latestOrder,
-        orderCount: orders.length,
-      };
-    })
-    .filter((item) => item.orderCount > 0)
+  const dishGroups: DishGroup[] = menuItems.map((mi) => {
+    const orders = itemOrders.filter((o) => o.menu_item_id === mi.id);
+    const likedCount = orders.filter((o) => o.liked === true).length;
+    const dislikedCount = orders.filter((o) => o.liked === false).length;
+    const noVerdictCount = orders.filter((o) => o.liked === null).length;
+    const latestOrder = orders[0] ?? null;
+    const latestNote =
+      orders.find((o) => (o.notes ?? "").trim().length > 0)?.notes ?? null;
+    const recommenderIds = recommendations
+      .filter((r) => r.menu_item_id === mi.id)
+      .map((r) => r.user_id);
+    return {
+      menuItem: mi,
+      orders,
+      likedCount,
+      dislikedCount,
+      noVerdictCount,
+      latestOrder,
+      latestNote,
+      orderCount: orders.length,
+      recommenderIds,
+    };
+  });
+
+  // Public "What to order here": at least one curator recommends it.
+  const publicDishes = dishGroups
+    .filter((g) => g.recommenderIds.length > 0)
     .sort((a, b) => {
-      // Sort by rating desc, then order count desc
-      if ((b.avgRating ?? 0) !== (a.avgRating ?? 0))
-        return (b.avgRating ?? 0) - (a.avgRating ?? 0);
+      if (b.recommenderIds.length !== a.recommenderIds.length)
+        return b.recommenderIds.length - a.recommenderIds.length;
+      if (b.likedCount !== a.likedCount) return b.likedCount - a.likedCount;
       return b.orderCount - a.orderCount;
     });
 
-  // Usual order for boba shops (check if any menu items have category 'boba')
-  const hasBobaItems = menuItems.some((mi) => mi.category === "boba");
-  const usualOrder =
-    hasBobaItems && itemsWithOrders.length > 0 ? itemsWithOrders[0] : null;
+  // Curator "My history here": every dish with at least one order, sorted by order count.
+  const curatorDishes = dishGroups
+    .filter((g) => g.orderCount > 0)
+    .sort((a, b) => {
+      if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount;
+      const aLatest = a.latestOrder?.ordered_at ?? "";
+      const bLatest = b.latestOrder?.ordered_at ?? "";
+      return bLatest.localeCompare(aLatest);
+    });
+
+  // Usual-order badge: boba drink with >=3 orders that is >50% of boba orders at this shop.
+  const bobaOrders = itemOrders.filter((o) => {
+    const mi = menuItems.find((m) => m.id === o.menu_item_id);
+    return mi?.category === "boba";
+  });
+  const usualBadgeDishId = (() => {
+    if (bobaOrders.length === 0) return null;
+    const counts: Record<number, number> = {};
+    bobaOrders.forEach((o) => {
+      counts[o.menu_item_id] = (counts[o.menu_item_id] || 0) + 1;
+    });
+    const [topId, topCount] = Object.entries(counts).sort(
+      (a, b) => b[1] - a[1],
+    )[0] ?? [null, 0];
+    if (!topId || topCount < 3) return null;
+    if (topCount / bobaOrders.length <= 0.5) return null;
+    return parseInt(topId);
+  })();
 
   function formatDrinkSummary(details: DrinkDetails | null): string {
     if (!details) return "";
@@ -641,6 +740,23 @@ export default function RestaurantDetailPage({ params }: Props) {
         </Link>
       </div>
 
+      {/* Visibility banner (admin-only view of non-public restaurants) */}
+      {isAdmin &&
+        restaurant.visibility &&
+        restaurant.visibility !== "public" && (
+          <div
+            className={`p-4 text-sm font-medium border-b-2 border-txt ${
+              restaurant.visibility === "private"
+                ? "bg-bg2 text-txt"
+                : "bg-bg2 text-txt2"
+            }`}
+          >
+            {restaurant.visibility === "private"
+              ? "🔒 Private — not shown in the public guide"
+              : "📦 Archived — kept for history, hidden from the public guide"}
+          </div>
+        )}
+
       {/* Restaurant Header */}
       <div className="border-b-2 border-txt">
         {(restaurant.photo_url || restaurant.storefront_photo_url) && (
@@ -744,17 +860,11 @@ export default function RestaurantDetailPage({ params }: Props) {
           </div>
         )}
         {restaurant.google_rating && <div className="w-px bg-brd" />}
-        <div className="flex-1 text-center py-4 px-3">
-          <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-accent mb-1">
-            {restaurant.my_rating ? `${restaurant.my_rating}/5` : "—"}
-          </div>
-          <div className="text-2xs uppercase tracking-wide text-txt2 mb-0.5">
-            My rating
-          </div>
-          <div className="text-2xs text-txt2 opacity-60">
-            {visits.length} visit{visits.length !== 1 ? "s" : ""}
-          </div>
-        </div>
+        <CuratorRatingControl
+          key={`curator-${restaurant.id}-${ratingRefresh}`}
+          restaurantId={restaurant.id}
+          onChange={() => setRatingRefresh((n) => n + 1)}
+        />
         <div className="w-px bg-brd" />
         <div className="flex-1 text-center py-4 px-3">
           <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-txt mb-1">
@@ -799,121 +909,84 @@ export default function RestaurantDetailPage({ params }: Props) {
         </div>
       )}
 
-      {/* Usual Order — boba shops only */}
-      {usualOrder && (
-        <div className="p-6 border-b border-brd bg-bg2 scroll-fade-in">
-          <h2 className="font-display text-xl mb-3 tracking-tight">
-            Usual Order
-          </h2>
-          <div className="border-[1.5px] border-txt p-4">
-            <p className="font-display text-xl leading-tight mb-1">
-              {usualOrder.menuItem.name}
-            </p>
-            {usualOrder.latestOrder?.drink_details && (
-              <p className="text-sm text-txt2 mb-2">
-                {formatDrinkSummary(
-                  usualOrder.latestOrder.drink_details as DrinkDetails,
-                )}
-              </p>
-            )}
-            <div className="flex items-center gap-3 text-xs text-txt2">
-              {usualOrder.avgRating !== null &&
-                !isNaN(usualOrder.avgRating) && (
-                  <span className="text-accent font-medium">
-                    ★ {usualOrder.avgRating.toFixed(1)}
-                  </span>
-                )}
-              <span>
-                ordered {usualOrder.orderCount} time
-                {usualOrder.orderCount !== 1 ? "s" : ""}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Menu Items I've Tried */}
-      {(highlightedItems.length > 0 || itemsWithOrders.length > 0) && (
+      {/* What to order here — public-facing, recommended dishes only */}
+      {publicDishes.length > 0 && (
         <div className="p-6 border-b border-brd scroll-fade-in">
-          <h2 className="text-2xs uppercase tracking-wide text-txt2 mb-3 font-medium">
-            Menu items I&rsquo;ve tried
+          <h2 className="font-display text-xl mb-3 tracking-tight">
+            What to order here
           </h2>
-          <div className="space-y-0">
-            {(highlightedItems.length > 0
-              ? highlightedItems
-              : itemsWithOrders
-            ).map((item, idx, arr) => (
-              <div
-                key={item.menuItem.id}
-                className={`flex items-center gap-3 py-3 ${idx < arr.length - 1 ? "border-b border-brd/40" : ""}`}
-              >
-                <div className="w-11 h-11 rounded-lg bg-bg2 border border-brd shrink-0 overflow-hidden">
-                  {item.latestOrder?.photo_url ? (
-                    <img
-                      src={item.latestOrder.photo_url}
-                      alt={item.menuItem.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-bg2 to-brd" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-medium text-txt">
-                      {item.menuItem.name}
-                    </p>
-                    {isAdmin && (
+          <div className="space-y-3">
+            {publicDishes.map((item) => {
+              const isUsual = item.menuItem.id === usualBadgeDishId;
+              const liked = item.likedCount;
+              const disliked = item.dislikedCount;
+              const verdict =
+                disliked === 0 && liked >= 3
+                  ? "👍 always"
+                  : liked + disliked === 0
+                    ? null
+                    : `👍 ${liked} · 👎 ${disliked}`;
+              return (
+                <div
+                  key={item.menuItem.id}
+                  className="flex items-start gap-3 border-[1.5px] border-brd p-3"
+                >
+                  <div className="w-16 h-16 rounded-lg bg-bg2 border border-brd shrink-0 overflow-hidden">
+                    {item.latestOrder?.photo_url ? (
+                      <img
+                        src={item.latestOrder.photo_url}
+                        alt={item.menuItem.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-bg2 to-brd" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <p className="font-display text-lg leading-tight">
+                        {item.menuItem.name}
+                      </p>
+                      {isUsual && (
+                        <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase">
+                          Usual order
+                        </span>
+                      )}
+                    </div>
+                    {item.latestNote && (
+                      <p className="text-xs text-txt leading-snug italic mb-1">
+                        &ldquo;{item.latestNote}&rdquo;
+                      </p>
+                    )}
+                    <div className="flex items-center gap-3 text-2xs text-txt2 flex-wrap">
+                      {verdict && (
+                        <span className="text-accent font-medium">
+                          {verdict}
+                        </span>
+                      )}
+                      <span>
+                        {item.orderCount} order
+                        {item.orderCount !== 1 ? "s" : ""}
+                      </span>
+                      <span>
+                        Recommended by{" "}
+                        {item.recommenderIds
+                          .map((id) => recommenderNames[id] || "curator")
+                          .join(", ")}
+                      </span>
+                    </div>
+                    {isUsual && isAdmin && item.latestOrder && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleRecommended(
-                            item.menuItem.id,
-                            item.menuItem.is_recommended,
-                          );
-                        }}
-                        disabled={togglingRecommended === item.menuItem.id}
-                        className={`text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight uppercase shrink-0 border-[1.5px] transition-all duration-150 ${
-                          item.menuItem.is_recommended
-                            ? "bg-accent text-white border-accent"
-                            : "bg-transparent text-txt2 border-brd hover:border-accent hover:text-accent"
-                        }`}
+                        onClick={() => handleLogAgain(item.latestOrder!)}
+                        className="mt-2 py-1.5 px-3 text-2xs font-medium bg-accent text-white border-[1.5px] border-accent rounded-pill transition-all hover:opacity-90"
                       >
-                        {togglingRecommended === item.menuItem.id
-                          ? "..."
-                          : item.menuItem.is_recommended
-                            ? "★ Remove"
-                            : "☆ Add"}
+                        Log this again
                       </button>
                     )}
                   </div>
-                  <p className="text-2xs text-txt2 mb-1">
-                    Ordered {item.orderCount} time
-                    {item.orderCount !== 1 ? "s" : ""}
-                    {item.latestOrder?.drink_details &&
-                      ` · ${formatDrinkSummary(item.latestOrder.drink_details as DrinkDetails)}`}
-                  </p>
-                  {item.avgRating !== null && !isNaN(item.avgRating) && (
-                    <div className="flex gap-0.5 mt-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <div
-                          key={star}
-                          className={`w-2.5 h-2.5 ${
-                            star <= Math.round(item.avgRating!)
-                              ? "bg-accent"
-                              : "bg-brd"
-                          }`}
-                          style={{
-                            clipPath:
-                              "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
-                          }}
-                        />
-                      ))}
-                    </div>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -970,41 +1043,18 @@ export default function RestaurantDetailPage({ params }: Props) {
                   >
                     <div className="flex items-start gap-3 flex-1">
                       <div className="w-2 h-2 rounded-full bg-accent2 shrink-0 mt-1.5" />
-                      <div className="flex-1 flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm text-txt font-medium">
-                            {formatDate(visit.visited_at)} at{" "}
-                            {formatTime(visit.visited_at)}
+                      <div className="flex-1">
+                        <p className="text-sm text-txt font-medium">
+                          {formatDate(visit.visited_at)} at{" "}
+                          {formatTime(visit.visited_at)}
+                        </p>
+                        <p className="text-xs text-txt2">
+                          by {visit.visited_by}
+                        </p>
+                        {visit.note && (
+                          <p className="text-xs text-txt2 mt-1.5 italic">
+                            &ldquo;{visit.note}&rdquo;
                           </p>
-                          <p className="text-xs text-txt2">
-                            by {visit.visited_by}
-                          </p>
-                          {visit.note && (
-                            <p className="text-xs text-txt2 mt-1.5 italic">
-                              "{visit.note}"
-                            </p>
-                          )}
-                        </div>
-                        {visit.rating && (
-                          <div className="flex flex-col items-end shrink-0">
-                            <div className="flex items-center gap-0.5">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <span
-                                  key={star}
-                                  className={`text-sm ${
-                                    star <= visit.rating!
-                                      ? "text-accent"
-                                      : "text-brd"
-                                  }`}
-                                >
-                                  ★
-                                </span>
-                              ))}
-                            </div>
-                            <span className="text-xs text-txt2 mt-0.5">
-                              {visit.rating}/5
-                            </span>
-                          </div>
                         )}
                       </div>
                     </div>
@@ -1080,15 +1130,7 @@ export default function RestaurantDetailPage({ params }: Props) {
           )}
           {displayName && (
             <button
-              onClick={() => {
-                if ((isAdmin || isSuperuser) && hasRecentCheckIn) {
-                  setEditingOrder(null);
-                  setEditingMenuItem(null);
-                  setShowOrderModal(true);
-                } else if (canCheckIn) {
-                  setShowCheckInModal(true);
-                }
-              }}
+              onClick={() => setShowCheckInModal(true)}
               disabled={visitingId === restaurant.id || !canCheckIn}
               className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium text-center transition-opacity ${
                 visitingId === restaurant.id || !canCheckIn
@@ -1098,11 +1140,21 @@ export default function RestaurantDetailPage({ params }: Props) {
             >
               {visitingId === restaurant.id
                 ? "Checking in..."
-                : (isAdmin || isSuperuser) && hasRecentCheckIn
-                  ? "Log Order"
-                  : !canCheckIn
-                    ? "✓ Checked In"
-                    : "✓ Check In"}
+                : !canCheckIn
+                  ? "✓ Checked In"
+                  : "Check in"}
+            </button>
+          )}
+          {(isAdmin || isSuperuser) && (
+            <button
+              onClick={() => {
+                setEditingOrder(null);
+                setEditingMenuItem(null);
+                setShowOrderModal(true);
+              }}
+              className="flex-1 py-3 px-4 rounded-lg text-sm font-medium text-center bg-accent text-white transition-opacity hover:opacity-90"
+            >
+              Log order
             </button>
           )}
           <button
@@ -1148,70 +1200,232 @@ export default function RestaurantDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Order History - Admin Only */}
-      {isAdmin && itemOrders.length > 0 && (
+      {/* Curator order history — read-only for non-admins */}
+      {itemOrders.length > 0 && (
         <div className="p-6 border-t border-brd scroll-fade-in">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-2xs uppercase tracking-wide text-txt2 font-medium">
-              Full order history (Admin)
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h2 className="font-display text-xl tracking-tight">
+              Curators&rsquo; order history
             </h2>
-            <button
-              onClick={() => {
-                setEditingOrder(null);
-                setEditingMenuItem(null);
-                setShowOrderModal(true);
-              }}
-              className="py-1.5 px-3 bg-accent text-white text-xs font-medium border-[1.5px] border-accent rounded-pill transition-all hover:opacity-90"
-            >
-              + Log Order
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="flex border-[1.5px] border-brd rounded-none overflow-hidden">
+                <button
+                  onClick={() => setHistoryView("by-dish")}
+                  className={`py-1 px-3 text-2xs font-medium uppercase tracking-wide transition-colors ${
+                    historyView === "by-dish"
+                      ? "bg-txt text-bg"
+                      : "bg-transparent text-txt2"
+                  }`}
+                >
+                  By dish
+                </button>
+                <button
+                  onClick={() => setHistoryView("timeline")}
+                  className={`py-1 px-3 text-2xs font-medium uppercase tracking-wide transition-colors ${
+                    historyView === "timeline"
+                      ? "bg-txt text-bg"
+                      : "bg-transparent text-txt2"
+                  }`}
+                >
+                  Timeline
+                </button>
+              </div>
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setEditingOrder(null);
+                    setEditingMenuItem(null);
+                    setShowOrderModal(true);
+                  }}
+                  className="py-1.5 px-3 bg-accent text-white text-xs font-medium border-[1.5px] border-accent rounded-pill transition-all hover:opacity-90"
+                >
+                  + Log Order
+                </button>
+              )}
+            </div>
           </div>
-          <div className="space-y-3">
-            {itemOrders.map((order) => {
-              const menuItem = menuItems.find(
-                (mi) => mi.id === order.menu_item_id,
-              );
-              return (
-                <div key={order.id} className="border-[1.5px] border-brd p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-display text-lg leading-tight">
-                          {menuItem?.name || "Unknown item"}
+
+          {historyView === "by-dish" ? (
+            <div className="space-y-3">
+              {curatorDishes.map((group) => {
+                const expanded = expandedDishId === group.menuItem.id;
+                const mixedVerdict =
+                  group.likedCount > 0 && group.dislikedCount > 0;
+                return (
+                  <div
+                    key={group.menuItem.id}
+                    className="border-[1.5px] border-brd"
+                  >
+                    <button
+                      onClick={() =>
+                        setExpandedDishId(
+                          expanded ? null : group.menuItem.id,
+                        )
+                      }
+                      className="w-full text-left p-3 flex items-start justify-between gap-3 bg-transparent cursor-pointer"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <p className="font-display text-lg leading-tight">
+                            {group.menuItem.name}
+                          </p>
+                          {group.menuItem.category && (
+                            <span className="text-2xs text-txt2 capitalize">
+                              {group.menuItem.category}
+                            </span>
+                          )}
+                          {mixedVerdict && (
+                            <span className="text-2xs font-medium px-2 py-0.5 rounded-pill border border-brd text-txt2 uppercase tracking-tight">
+                              Split opinion
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-2xs text-txt2 mb-1">
+                          👍 {group.likedCount} · 👎 {group.dislikedCount}
+                          {group.noVerdictCount > 0 &&
+                            ` · no verdict ${group.noVerdictCount}`}
+                          {" · "}
+                          {group.orderCount} order
+                          {group.orderCount !== 1 ? "s" : ""}
                         </p>
-                        {order.rating && (
-                          <span className="text-accent font-medium text-sm">
-                            ★ {order.rating}
-                          </span>
+                        {group.latestNote && (
+                          <p className="text-xs text-txt italic mb-2">
+                            Latest: &ldquo;{group.latestNote}&rdquo;
+                          </p>
                         )}
-                        {menuItem?.category && (
-                          <span className="text-xs text-txt2 capitalize">
-                            {menuItem.category}
+                        <MenuItemRecommendToggle
+                          menuItemId={group.menuItem.id}
+                          recommendedUserIds={group.recommenderIds}
+                          recommenderNames={recommenderNames}
+                          onChange={reloadOrders}
+                        />
+                      </div>
+                      <Chevron open={expanded} className="text-txt2 mt-1" />
+                    </button>
+                    {expanded && (
+                      <div className="border-t border-brd p-3 space-y-3 bg-bg2">
+                        {group.orders.map((order) => (
+                          <div
+                            key={order.id}
+                            className="flex items-start gap-3 pb-3 border-b border-brd/40 last:border-0 last:pb-0"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className="text-sm">
+                                  {order.liked === true
+                                    ? "👍"
+                                    : order.liked === false
+                                      ? "👎"
+                                      : "—"}
+                                </span>
+                                <p className="text-xs text-txt2">
+                                  {formatDate(order.ordered_at)} · by{" "}
+                                  {ordererNames[order.ordered_by] || "curator"}
+                                </p>
+                              </div>
+                              {order.notes && (
+                                <p className="text-sm text-txt italic mb-1">
+                                  {order.notes}
+                                </p>
+                              )}
+                              {order.drink_details && (
+                                <p className="text-2xs text-txt2">
+                                  {formatDrinkSummary(
+                                    order.drink_details as DrinkDetails,
+                                  )}
+                                </p>
+                              )}
+                              {isAdmin && (
+                                <div className="flex gap-2 mt-2">
+                                  <button
+                                    onClick={() => handleEditOrder(order)}
+                                    className="btn-outline !py-1 !px-2 !text-2xs !border-txt !text-txt"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      handleDeleteOrderClick(order.id)
+                                    }
+                                    disabled={deletingOrderId === order.id}
+                                    className="btn-outline !py-1 !px-2 !text-2xs !border-accent !text-accent hover:!bg-accent hover:!text-white"
+                                  >
+                                    {deletingOrderId === order.id
+                                      ? "Deleting..."
+                                      : "Delete"}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            {order.photo_url && (
+                              <img
+                                src={order.photo_url}
+                                alt={group.menuItem.name}
+                                className="w-16 h-16 object-cover border border-brd shrink-0"
+                                onError={(e) => {
+                                  (
+                                    e.target as HTMLImageElement
+                                  ).style.display = "none";
+                                }}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {itemOrders.map((order) => {
+                const menuItem = menuItems.find(
+                  (mi) => mi.id === order.menu_item_id,
+                );
+                return (
+                  <div key={order.id} className="border-[1.5px] border-brd p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <p className="font-display text-lg leading-tight">
+                            {menuItem?.name || "Unknown item"}
+                          </p>
+                          <span className="text-sm">
+                            {order.liked === true
+                              ? "👍"
+                              : order.liked === false
+                                ? "👎"
+                                : "—"}
                           </span>
+                          {menuItem?.category && (
+                            <span className="text-2xs text-txt2 capitalize">
+                              {menuItem.category}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-2xs text-txt2 mb-2">
+                          {formatDate(order.ordered_at)} · by{" "}
+                          {ordererNames[order.ordered_by] || "curator"}
+                        </p>
+                        {order.notes && (
+                          <p className="text-sm text-txt italic mb-1">
+                            {order.notes}
+                          </p>
+                        )}
+                        {order.drink_details && (
+                          <p className="text-2xs text-txt2">
+                            {formatDrinkSummary(
+                              order.drink_details as DrinkDetails,
+                            )}
+                          </p>
                         )}
                       </div>
-                      <p className="text-xs text-txt2 mb-2">
-                        {formatDate(order.ordered_at)}
-                      </p>
-                      {order.notes && (
-                        <p className="text-sm text-txt leading-relaxed italic mb-2">
-                          {order.notes}
-                        </p>
-                      )}
-                      {order.drink_details && (
-                        <p className="text-xs text-txt2">
-                          {formatDrinkSummary(
-                            order.drink_details as DrinkDetails,
-                          )}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-1 shrink-0">
                       {order.photo_url && (
                         <img
                           src={order.photo_url}
                           alt={menuItem?.name}
-                          className="w-16 h-16 object-cover border border-brd"
+                          className="w-16 h-16 object-cover border border-brd shrink-0"
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display =
                               "none";
@@ -1219,26 +1433,30 @@ export default function RestaurantDetailPage({ params }: Props) {
                         />
                       )}
                     </div>
+                    {isAdmin && (
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => handleEditOrder(order)}
+                          className="btn-outline !py-1 !px-3 !text-xs !border-txt !text-txt"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteOrderClick(order.id)}
+                          disabled={deletingOrderId === order.id}
+                          className="btn-outline !py-1 !px-3 !text-xs !border-accent !text-accent hover:!bg-accent hover:!text-white"
+                        >
+                          {deletingOrderId === order.id
+                            ? "Deleting..."
+                            : "Delete"}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex gap-2 mt-3">
-                    <button
-                      onClick={() => handleEditOrder(order)}
-                      className="btn-outline !py-1 !px-3 !text-xs !border-txt !text-txt"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteOrderClick(order.id)}
-                      disabled={deletingOrderId === order.id}
-                      className="btn-outline !py-1 !px-3 !text-xs !border-accent !text-accent hover:!bg-accent hover:!text-white"
-                    >
-                      {deletingOrderId === order.id ? "Deleting..." : "Delete"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

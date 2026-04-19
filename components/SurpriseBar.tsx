@@ -12,19 +12,23 @@ export default function SurpriseBar({ restaurants }: Props) {
   const router = useRouter();
   const [isAnimating, setIsAnimating] = useState(false);
 
+  const publicPool = restaurants.filter(
+    (r) => (r.visibility ?? "public") === "public",
+  );
+
   function handleSurprise() {
-    if (restaurants.length === 0 || isAnimating) return;
+    if (publicPool.length === 0 || isAnimating) return;
 
     setIsAnimating(true);
-    const randomIndex = Math.floor(Math.random() * restaurants.length);
-    const randomRestaurant = restaurants[randomIndex];
+    const randomIndex = Math.floor(Math.random() * publicPool.length);
+    const randomRestaurant = publicPool[randomIndex];
 
     setTimeout(() => {
       router.push(`/restaurant/${randomRestaurant.id}`);
     }, 300);
   }
 
-  if (restaurants.length === 0) return null;
+  if (publicPool.length === 0) return null;
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-20">
@@ -34,7 +38,7 @@ export default function SurpriseBar({ restaurants }: Props) {
           disabled={isAnimating}
           className={`text-xs font-medium px-3 py-1.5 rounded-pill bg-txt text-bg border-[1.5px] border-txt shadow-lg transition-all duration-150 hover:opacity-90 active:scale-95 ${isAnimating ? "opacity-50" : ""}`}
         >
-          Surprise me from these {restaurants.length} ✦
+          Surprise me from these {publicPool.length} ✦
         </button>
         <button
           onClick={() => {

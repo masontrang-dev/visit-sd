@@ -16,7 +16,7 @@ type ShopSummary = {
   totalVisits: number;
   lastVisit: string | null;
   mostOrderedDrink: string | null;
-  mostOrderedDrinkRating: number | null;
+  mostOrderedDrinkLikeRate: number | null;
   commonCustomization: string | null;
   daysSinceLastVisit: number;
 };
@@ -210,18 +210,26 @@ export default function BobaDashboardPage() {
           )
         : 999;
 
+      const topDrinkVerdicts = topDrink
+        ? shopOrders.filter(
+            (o) => o.menu_item_id === topDrink.id && o.liked !== null,
+          )
+        : [];
+      const topDrinkLikeRate =
+        topDrinkVerdicts.length > 0
+          ? Math.round(
+              (topDrinkVerdicts.filter((o) => o.liked === true).length /
+                topDrinkVerdicts.length) *
+                100,
+            )
+          : null;
+
       return {
         restaurant: r,
         totalVisits: shopOrders.length,
         lastVisit,
         mostOrderedDrink: topDrink?.name ?? null,
-        mostOrderedDrinkRating: topDrink
-          ? shopOrders
-              .filter((o) => o.menu_item_id === topDrink.id && o.rating)
-              .reduce((sum, o) => sum + (o.rating ?? 0), 0) /
-            shopOrders.filter((o) => o.menu_item_id === topDrink.id && o.rating)
-              .length
-          : null,
+        mostOrderedDrinkLikeRate: topDrinkLikeRate,
         commonCustomization,
         daysSinceLastVisit,
       };
@@ -449,9 +457,9 @@ export default function BobaDashboardPage() {
                       <span className="font-medium">
                         {shop.mostOrderedDrink}
                       </span>
-                      {shop.mostOrderedDrinkRating && (
+                      {shop.mostOrderedDrinkLikeRate !== null && (
                         <span className="text-accent ml-1">
-                          ★ {shop.mostOrderedDrinkRating.toFixed(1)}
+                          👍 {shop.mostOrderedDrinkLikeRate}%
                         </span>
                       )}
                     </p>
@@ -610,9 +618,9 @@ export default function BobaDashboardPage() {
                             <h3 className="font-display text-lg leading-tight">
                               {menuItem?.name || "Unknown drink"}
                             </h3>
-                            {visit.rating && (
+                            {visit.liked !== null && (
                               <span className="text-accent font-medium text-sm">
-                                ★ {visit.rating}
+                                {visit.liked ? "👍" : "👎"}
                               </span>
                             )}
                           </div>

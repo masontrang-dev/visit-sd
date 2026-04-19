@@ -11,7 +11,10 @@ import {
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase, type Restaurant, type MenuItem } from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
-import FilterBar, { type ImageDisplayMode } from "@/components/FilterBar";
+import FilterBar, {
+  type ImageDisplayMode,
+  type VisibilityFilter,
+} from "@/components/FilterBar";
 import MapView from "@/components/MapView";
 import ContextHeader from "@/components/ContextHeader";
 import SurpriseBar from "@/components/SurpriseBar";
@@ -118,7 +121,7 @@ function StatPill({
 function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkInRestaurant, setCheckInRestaurant] = useState<Restaurant | null>(
@@ -160,6 +163,8 @@ function HomeContent() {
     const param = searchParams.get("price");
     return param ? param.split(",") : [];
   });
+  const [activeVisibility, setActiveVisibility] =
+    useState<VisibilityFilter>("public");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -262,30 +267,46 @@ function HomeContent() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      let query = supabase
         .from("restaurants")
         .select("*")
         .order("cuisine")
         .order("name");
+      if (!isAdmin) {
+        query = query.eq("visibility", "public");
+      }
+      const { data } = await query;
       setRestaurants(data ?? []);
 
-      // Fetch recommended menu items for all restaurants
+      // Fetch recommended menu items, scoped to restaurants the viewer can see
       if (data && data.length > 0) {
-        const { data: menuData } = await supabase
-          .from("menu_items")
-          .select("*")
-          .eq("is_recommended", true)
-          .order("name");
+        const visibleRestaurantIds = data.map((r) => r.id);
+        const { data: recRows } = await supabase
+          .from("menu_item_recommendations")
+          .select("menu_item_id");
 
-        if (menuData) {
-          const itemsByRestaurant: Record<number, MenuItem[]> = {};
-          menuData.forEach((item) => {
-            if (!itemsByRestaurant[item.restaurant_id]) {
-              itemsByRestaurant[item.restaurant_id] = [];
-            }
-            itemsByRestaurant[item.restaurant_id].push(item);
-          });
-          setRecommendedItems(itemsByRestaurant);
+        const recommendedIds = Array.from(
+          new Set((recRows ?? []).map((r) => r.menu_item_id)),
+        );
+
+        if (recommendedIds.length > 0) {
+          const { data: menuData } = await supabase
+            .from("menu_items")
+            .select("*")
+            .in("id", recommendedIds)
+            .in("restaurant_id", visibleRestaurantIds)
+            .order("name");
+
+          if (menuData) {
+            const itemsByRestaurant: Record<number, MenuItem[]> = {};
+            menuData.forEach((item) => {
+              if (!itemsByRestaurant[item.restaurant_id]) {
+                itemsByRestaurant[item.restaurant_id] = [];
+              }
+              itemsByRestaurant[item.restaurant_id].push(item);
+            });
+            setRecommendedItems(itemsByRestaurant);
+          }
         }
       }
 
@@ -340,7 +361,7 @@ function HomeContent() {
       window.removeEventListener("scroll", handleScroll);
       clearTimeout(scrollTimeout);
     };
-  }, [viewMode]);
+  }, [viewMode, isAdmin]);
 
   const cuisines = Array.from(
     new Set(restaurants.map((r) => r.cuisine).filter(Boolean)),
@@ -351,6 +372,9 @@ function HomeContent() {
   const filtered = useMemo(
     () =>
       restaurants.filter((r) => {
+        if (isAdmin && activeVisibility !== "all") {
+          if ((r.visibility ?? "public") !== activeVisibility) return false;
+        }
         if (
           activeCuisines.length > 0 &&
           !activeCuisines.includes(r.cuisine || "")
@@ -376,6 +400,8 @@ function HomeContent() {
       }),
     [
       restaurants,
+      isAdmin,
+      activeVisibility,
       activeCuisines,
       activeNeighborhoods,
       mustTryFilter,
@@ -500,6 +526,9 @@ function HomeContent() {
         onMustTryFilterChange={handleMustTryChange}
         activePrices={activePrices}
         onPriceChange={handlePriceChange}
+        isAdminView={isAdmin}
+        activeVisibility={activeVisibility}
+        onVisibilityChange={setActiveVisibility}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         imageDisplayMode={imageDisplayMode}
@@ -529,11 +558,12 @@ function HomeContent() {
               <button
                 ref={surpriseBtnRef}
                 onClick={() => {
-                  if (filtered.length === 0) return;
-                  const randomIndex = Math.floor(
-                    Math.random() * filtered.length,
+                  const pool = filtered.filter(
+                    (r) => (r.visibility ?? "public") === "public",
                   );
-                  const randomRestaurant = filtered[randomIndex];
+                  if (pool.length === 0) return;
+                  const randomIndex = Math.floor(Math.random() * pool.length);
+                  const randomRestaurant = pool[randomIndex];
                   router.push(`/restaurant/${randomRestaurant.id}`);
                 }}
                 className="fixed bottom-6 left-1/2 -translate-x-1/2 text-xs font-medium px-3 py-1.5 rounded-pill bg-txt text-bg border-[1.5px] border-txt shadow-lg z-20 transition-opacity duration-200 hover:opacity-90 active:scale-95"

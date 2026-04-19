@@ -7,7 +7,6 @@ type CheckInModalProps = {
   onConfirm: (
     visitDate: string,
     shouldLogOrder: boolean,
-    rating?: number | null,
     note?: string,
   ) => void;
   onClose: () => void;
@@ -28,14 +27,11 @@ export default function CheckInModal({
     .slice(0, 16);
 
   const [visitDateTime, setVisitDateTime] = useState(localDateTime);
-  const [showRating, setShowRating] = useState(false);
-  const [rating, setRating] = useState<number | null>(null);
   const [note, setNote] = useState("");
 
   function handleConfirm(logOrder: boolean) {
-    // Convert local datetime back to ISO string
     const selectedDate = new Date(visitDateTime);
-    onConfirm(selectedDate.toISOString(), logOrder, rating, note);
+    onConfirm(selectedDate.toISOString(), logOrder, note);
   }
 
   return (
@@ -53,7 +49,6 @@ export default function CheckInModal({
           <span className="font-medium text-txt">{restaurantName}</span>
         </p>
 
-        {/* Date/Time Picker - Always visible with default value */}
         <div className="mb-6">
           <label
             htmlFor="visit-datetime"
@@ -73,66 +68,39 @@ export default function CheckInModal({
           </p>
         </div>
 
-        {/* Rating Section */}
         <div className="mb-6">
-          {!showRating ? (
-            <button
-              onClick={() => setShowRating(true)}
-              className="w-full py-2 px-4 bg-transparent text-txt2 text-sm transition-opacity hover:opacity-70"
-            >
-              + Add rating/notes
-            </button>
-          ) : (
-            <div>
-              <label className="block text-xs uppercase tracking-wide text-txt2 mb-2 font-medium">
-                Rating (Optional)
-              </label>
-              <div className="flex gap-1 items-center mb-4">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    onClick={() => setRating(rating === star ? null : star)}
-                    className={`text-2xl bg-transparent border-none cursor-pointer p-1 transition-colors duration-[0.12s] ${
-                      rating !== null && star <= rating
-                        ? "text-accent"
-                        : "text-brd"
-                    }`}
-                  >
-                    ★
-                  </button>
-                ))}
-                {rating && (
-                  <span className="text-sm text-txt2 ml-2">{rating}/5</span>
-                )}
-              </div>
-              <div>
-                <label
-                  htmlFor="visit-note"
-                  className="block text-xs uppercase tracking-wide text-txt2 mb-2 font-medium"
-                >
-                  Note (Optional)
-                </label>
-                <input
-                  id="visit-note"
-                  type="text"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Add a quick note about your visit..."
-                  className="w-full px-3 py-2 border-[1.5px] border-brd bg-bg text-txt text-sm focus:outline-none focus:border-accent transition-colors"
-                />
-              </div>
-              <p className="text-2xs text-txt2 mt-1.5 opacity-60">
-                You can skip rating and check in
-              </p>
-            </div>
-          )}
+          <label
+            htmlFor="visit-note"
+            className="block text-xs uppercase tracking-wide text-txt2 mb-2 font-medium"
+          >
+            Note (Optional)
+          </label>
+          <input
+            id="visit-note"
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Add a quick note about your visit..."
+            className="w-full px-3 py-2 border-[1.5px] border-brd bg-bg text-txt text-sm focus:outline-none focus:border-accent transition-colors"
+          />
         </div>
 
-        {/* Action Buttons */}
         <div className="space-y-2">
+          {isAdmin && (
+            <button
+              onClick={() => handleConfirm(true)}
+              className="w-full py-3 px-4 bg-accent text-white text-sm font-medium border-2 border-accent transition-all hover:opacity-90"
+            >
+              Check in & log order →
+            </button>
+          )}
           <button
             onClick={() => handleConfirm(false)}
-            className="w-full py-3 px-4 bg-accent text-white text-sm font-medium border-2 border-accent transition-all hover:opacity-90"
+            className={`w-full py-3 px-4 text-sm font-medium border-2 transition-all hover:opacity-90 ${
+              isAdmin
+                ? "bg-transparent text-txt border-txt"
+                : "bg-accent text-white border-accent"
+            }`}
           >
             Check In
           </button>
