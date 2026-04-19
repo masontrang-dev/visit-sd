@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase, type CuratorRating } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { formatDisplayName } from "@/lib/utils";
 
 type CuratorProfile = {
   user_id: string;
@@ -154,7 +155,7 @@ export default function CuratorRatingControl({
         <div className="mt-3 space-y-1">
           {ratings.map((r) => {
             const p = profiles[r.user_id];
-            const name = p?.display_name || "Curator";
+            const name = formatDisplayName(p?.display_name) || "Curator";
             return (
               <div
                 key={r.id}

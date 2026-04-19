@@ -18,6 +18,7 @@ import MapView from "@/components/MapView";
 import AdminButton from "@/components/AdminButton";
 import ThemeToggle from "@/components/ThemeToggle";
 import AdminViewToggle from "@/components/AdminViewToggle";
+import ActivityFeed from "@/components/ActivityFeed";
 
 function StatPill({
   value,
@@ -266,6 +267,7 @@ export default function AdminPage() {
         <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
           <div className="flex gap-2">
             <ThemeToggle />
+            <ActivityFeed />
             <AdminButton />
           </div>
           <AdminViewToggle />

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { formatDisplayName } from "@/lib/utils";
 
 const LAST_SEEN_KEY = "feed_last_seen_at";
 const WINDOW_DAYS = 7;
@@ -490,7 +491,7 @@ export default function ActivityFeed() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-txt leading-snug">
                       {e.actorLabel && (
-                        <span className="font-medium">{e.actorLabel} </span>
+                        <span className="font-medium">{formatDisplayName(e.actorLabel)} </span>
                       )}
                       {e.primary}
                     </p>

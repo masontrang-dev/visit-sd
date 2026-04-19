@@ -24,6 +24,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { isCurrentlyOpen } from "@/lib/google-types";
 import { trackEvent } from "@/lib/analytics";
+import { formatDisplayName } from "@/lib/utils";
 
 function Chevron({
   open,
@@ -294,8 +295,9 @@ export default function RestaurantDetailPage({ params }: Props) {
       const ordNames: Record<string, string> = {};
       (profiles ?? []).forEach(
         (p: { user_id: string; display_name: string | null }) => {
-          recNames[p.user_id] = p.display_name || "Curator";
-          ordNames[p.user_id] = p.display_name || "Curator";
+          const label = formatDisplayName(p.display_name) || "Curator";
+          recNames[p.user_id] = label;
+          ordNames[p.user_id] = label;
         },
       );
       setRecommenderNames(recNames);
@@ -943,7 +945,7 @@ export default function RestaurantDetailPage({ params }: Props) {
             </p>
             {restaurant.added_by && (
               <footer className="text-2xs uppercase tracking-wide text-txt2 mt-2 not-italic">
-                — {restaurant.added_by}
+                — {formatDisplayName(restaurant.added_by)}
               </footer>
             )}
           </blockquote>
@@ -1376,7 +1378,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                           {formatTime(visit.visited_at)}
                         </p>
                         <p className="text-xs text-txt2">
-                          by {visit.visited_by}
+                          by {formatDisplayName(visit.visited_by)}
                         </p>
                         {visit.note && (
                           <p className="text-xs text-txt2 mt-1.5 italic">
@@ -1412,7 +1414,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       {(restaurant.added_by || restaurant.date_added) && (
         <div className="px-6 py-4 border-t border-brd">
           <p className="text-2xs text-txt2 opacity-70">
-            {restaurant.added_by && <>Added by {restaurant.added_by}</>}
+            {restaurant.added_by && <>Added by {formatDisplayName(restaurant.added_by)}</>}
             {restaurant.added_by && restaurant.date_added && " · "}
             {restaurant.date_added && formatDate(restaurant.date_added)}
           </p>

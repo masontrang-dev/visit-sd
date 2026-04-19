@@ -10,7 +10,7 @@ import {
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import IllustrationEmpty from "@/components/IllustrationEmpty";
-import { formatRecencyTag } from "@/lib/utils";
+import { formatRecencyTag, formatDisplayName } from "@/lib/utils";
 import { isCurrentlyOpen } from "@/lib/google-types";
 import { type ImageDisplayMode } from "@/components/FilterBar";
 
@@ -65,6 +65,7 @@ function Card({
   recommendedItems,
   imageDisplayMode = "full",
   onNavigate,
+  priority = false,
 }: {
   r: Restaurant;
   cuisineColor: string;
@@ -76,6 +77,7 @@ function Card({
   recommendedItems?: MenuItem[];
   imageDisplayMode?: ImageDisplayMode;
   onNavigate?: () => void;
+  priority?: boolean;
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const isAdmin = !!(onEdit || onOrder);
@@ -114,6 +116,7 @@ function Card({
               alt={r.name}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+              priority={priority}
               className="object-cover transition-transform duration-300 group-hover:scale-105"
               onError={(e) => {
                 (
@@ -265,7 +268,7 @@ function Card({
           <div className="mt-2 flex items-center justify-between gap-2">
             {isAdmin && r.added_by && (
               <p className="text-2xs text-txt2 opacity-50 tracking-tight">
-                Added by {r.added_by}
+                Added by {formatDisplayName(r.added_by)}
               </p>
             )}
             {r.google_maps_url && (
@@ -314,7 +317,7 @@ function Card({
               <div className="mt-2 space-y-1">
                 {restaurantVisits.map((visit) => (
                   <p key={visit.id} className="text-xs text-txt2">
-                    • {formatDate(visit.visited_at)} by {visit.visited_by}
+                    • {formatDate(visit.visited_at)} by {formatDisplayName(visit.visited_by)}
                   </p>
                 ))}
               </div>
@@ -498,6 +501,7 @@ function InfiniteCardGrid({
               recommendedItems={recommendedItems?.[r.id]}
               imageDisplayMode={imageDisplayMode}
               onNavigate={handleNavigate}
+              priority={i === 0}
             />
           );
           return isRestoring ? (
@@ -607,7 +611,7 @@ export default function RestaurantGrid({
               </span>
             </div>
             <div className={gridClass}>
-              {byCuisine[cuisine].map((r) => (
+              {byCuisine[cuisine].map((r, j) => (
                 <Card
                   key={r.id}
                   r={r}
@@ -621,6 +625,7 @@ export default function RestaurantGrid({
                   visits={visits}
                   recommendedItems={recommendedItems?.[r.id]}
                   imageDisplayMode={imageDisplayMode}
+                  priority={i === 0 && j === 0}
                 />
               ))}
             </div>

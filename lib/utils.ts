@@ -11,6 +11,14 @@ export function getVisitRecency(lastVisited: string | null): string | null {
   return null;
 }
 
+export function formatDisplayName(name: string | null | undefined): string {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+}
+
 export function formatRecencyTag(lastVisited: string | null): { text: string; style: "week" | "month" } | null {
   if (!lastVisited) return null;
   
