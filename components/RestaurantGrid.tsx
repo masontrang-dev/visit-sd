@@ -77,13 +77,27 @@ function PhotoCarousel({
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const rafRef = useRef<number | null>(null);
 
   const handleScroll = useCallback(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const idx = Math.round(el.scrollLeft / el.clientWidth);
-    setActiveIndex(Math.max(0, Math.min(photos.length - 1, idx)));
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const el = scrollerRef.current;
+      if (!el) return;
+      const idx = Math.round(el.scrollLeft / el.clientWidth);
+      setActiveIndex((prev) => {
+        const clamped = Math.max(0, Math.min(photos.length - 1, idx));
+        return clamped === prev ? prev : clamped;
+      });
+    });
   }, [photos.length]);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   const scrollToIndex = useCallback((i: number) => {
     const el = scrollerRef.current;
@@ -98,12 +112,12 @@ function PhotoCarousel({
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex h-full w-full overflow-x-auto snap-x snap-mandatory scrollbar-hide [-webkit-overflow-scrolling:touch]"
+        className="flex h-full w-full overflow-x-auto snap-x snap-mandatory scrollbar-hide touch-pan-x overscroll-x-contain"
       >
         {photos.map((photo, i) => (
           <div
             key={`${photo.url}-${i}`}
-            className="relative w-full h-full shrink-0 snap-start"
+            className="relative w-full h-full shrink-0 snap-start [scroll-snap-stop:always]"
           >
             {photo.isStorefront ? (
               <Image
