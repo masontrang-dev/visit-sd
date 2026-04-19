@@ -9,7 +9,12 @@ import {
   useMemo,
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { supabase, type Restaurant, type MenuItem } from "@/lib/supabase";
+import {
+  supabase,
+  type Restaurant,
+  type MenuItem,
+  type RestaurantVisit,
+} from "@/lib/supabase";
 import RestaurantGrid, {
   type RestaurantPhoto,
 } from "@/components/RestaurantGrid";
@@ -21,11 +26,11 @@ import MapView from "@/components/MapView";
 import ContextHeader from "@/components/ContextHeader";
 import SurpriseBar from "@/components/SurpriseBar";
 import CheckInModal from "@/components/CheckInModal";
+import AddModal from "@/components/AddModal";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import ActivityFeed from "@/components/ActivityFeed";
 import AdminButton from "@/components/AdminButton";
-import AdminViewToggle from "@/components/AdminViewToggle";
 import { useAuth } from "@/lib/auth-context";
 import { trackEvent } from "@/lib/analytics";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -182,11 +187,28 @@ function HomeContent() {
   const [restaurantPhotos, setRestaurantPhotos] = useState<
     Record<number, RestaurantPhoto[]>
   >({});
+  const [visits, setVisits] = useState<Record<number, RestaurantVisit[]>>({});
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addOpError, setAddOpError] = useState("");
   const surpriseBtnRef = useRef<HTMLButtonElement>(null);
 
   function handleCheckInClick(restaurant: Restaurant) {
     setCheckInRestaurant(restaurant);
   }
+
+  const loadVisits = useCallback(async () => {
+    const { data } = await supabase
+      .from("restaurant_visits")
+      .select("*")
+      .order("visited_at", { ascending: false });
+    if (!data) return;
+    const grouped: Record<number, RestaurantVisit[]> = {};
+    data.forEach((visit: RestaurantVisit) => {
+      if (!grouped[visit.restaurant_id]) grouped[visit.restaurant_id] = [];
+      grouped[visit.restaurant_id].push(visit);
+    });
+    setVisits(grouped);
+  }, []);
 
   async function handleCheckIn(visitDate: string, shouldLogOrder: boolean) {
     if (!checkInRestaurant || !user) return;
@@ -222,9 +244,21 @@ function HomeContent() {
     }
 
     setVisitingId(null);
+    loadVisits();
+  }
 
-    // Optionally reload data to show updated visit info
-    // For now, we'll just clear the visiting state
+  async function handleAddRestaurant(
+    entry: Omit<Restaurant, "id" | "created_at">,
+  ): Promise<boolean> {
+    setAddOpError("");
+    const { error } = await supabase.from("restaurants").insert([entry]);
+    if (error) {
+      console.error("Insert error:", error);
+      setAddOpError("Failed to add restaurant.");
+      return false;
+    }
+    await load();
+    return true;
   }
 
   // Debounce search input
@@ -405,6 +439,14 @@ function HomeContent() {
   useEffect(() => {
     if (viewMode === "map") setMapEverMounted(true);
   }, [viewMode]);
+
+  useEffect(() => {
+    if (user) {
+      loadVisits();
+    } else {
+      setVisits({});
+    }
+  }, [user, loadVisits]);
 
   useEffect(() => {
     load();
@@ -590,7 +632,6 @@ function HomeContent() {
               <ActivityFeed />
               <AdminButton />
             </div>
-            <AdminViewToggle />
           </div>
           <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
             Local Picks · San Diego
@@ -650,7 +691,6 @@ function HomeContent() {
               <ActivityFeed />
               <AdminButton />
             </div>
-            <AdminViewToggle />
           </div>
           <ContextHeader
             activeCuisines={activeCuisines}
@@ -672,6 +712,7 @@ function HomeContent() {
         onNeighborhoodChange={handleNeighborhoodChange}
         neighborhoodCounts={neighborhoodCounts}
         priceCounts={priceCounts}
+        onAdd={isAdmin ? () => setShowAddModal(true) : undefined}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         mustTryFilter={mustTryFilter}
@@ -686,6 +727,10 @@ function HomeContent() {
         imageDisplayMode={imageDisplayMode}
         onImageDisplayModeChange={handleImageDisplayModeChange}
       />
+
+      {addOpError && (
+        <p className="py-3 px-6 text-error text-sm">{addOpError}</p>
+      )}
 
       <div className="relative z-0">
         {loading ? (
@@ -709,6 +754,7 @@ function HomeContent() {
                 imageDisplayMode={imageDisplayMode}
                 onCheckIn={handleCheckInClick}
                 visitingId={visitingId}
+                visits={user ? visits : undefined}
               />
               {isFiltered && <SurpriseBar restaurants={filtered} />}
             </div>
@@ -763,6 +809,15 @@ function HomeContent() {
           restaurantName={checkInRestaurant.name}
           onConfirm={handleCheckIn}
           onClose={() => setCheckInRestaurant(null)}
+        />
+      )}
+
+      {/* Add Restaurant Modal (admin only) */}
+      {showAddModal && isAdmin && (
+        <AddModal
+          onSave={handleAddRestaurant}
+          onClose={() => setShowAddModal(false)}
+          existingCuisines={cuisines}
         />
       )}
     </main>

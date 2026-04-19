@@ -89,10 +89,8 @@ function Card({
   priority?: boolean;
   heroName?: string;
 }) {
-  const [showHistory, setShowHistory] = useState(false);
   const isAdmin = !!(onEdit || onOrder);
-  const restaurantVisits = visits?.[r.id] || [];
-  const visitCount = restaurantVisits.length;
+  const visitCount = visits?.[r.id]?.length ?? 0;
   const recencyTag = formatRecencyTag(r.last_visited);
   const topDishes = recommendedItems?.slice(0, 3) || [];
 
@@ -327,8 +325,8 @@ function Card({
           </div>
         ) : null}
 
-        {/* Admin: visit history */}
-        {isAdmin && visitCount > 0 && (
+        {/* Visit summary (shown to any logged-in user who has visits loaded) */}
+        {visitCount > 0 && (
           <div className="mt-2 pt-2 border-t border-brd">
             <p className="text-xs text-txt2 tracking-tight">
               Visited {visitCount} time{visitCount !== 1 ? "s" : ""}
@@ -336,28 +334,6 @@ function Card({
                 <span>, last on {formatDate(r.last_visited)}</span>
               )}
             </p>
-            {visitCount > 0 && (
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShowHistory(!showHistory);
-                }}
-                className="mt-1 text-xs text-accent2 font-medium bg-transparent border-none cursor-pointer p-0 tracking-tight"
-              >
-                {showHistory ? "Hide" : "Show"} history
-              </button>
-            )}
-            {showHistory && (
-              <div className="mt-2 space-y-1">
-                {restaurantVisits.map((visit) => (
-                  <p key={visit.id} className="text-xs text-txt2">
-                    • {formatDate(visit.visited_at)} by{" "}
-                    {formatDisplayName(visit.visited_by)}
-                  </p>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
