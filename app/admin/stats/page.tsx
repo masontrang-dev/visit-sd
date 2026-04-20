@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase, type PageView } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 import AdminButton from "@/components/AdminButton";
@@ -38,11 +38,6 @@ export default function StatsPage() {
   >([]);
   const [lastCleanup, setLastCleanup] = useState<string | null>(null);
 
-  function restaurantLabel(path: string): string {
-    const match = path.match(/^\/restaurant\/(\d+)/);
-    return match ? `/restaurant/${match[1]}` : path;
-  }
-
   useEffect(() => {
     if (!authLoading && isSuperuser) {
       loadStats();
@@ -52,124 +47,93 @@ export default function StatsPage() {
 
   async function loadStats() {
     setStatsLoading(true);
-    const { data, error } = await supabase
-      .from("page_views")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (!error && data) {
-      const pageViews = (data as PageView[]).filter((r) => !r.event_type);
-      const events = (data as PageView[]).filter((r) => r.event_type);
 
-      setTotalViews(pageViews.length);
+    const [
+      totalsRes,
+      viewsByDayRes,
+      topPathsRes,
+      topReferrersRes,
+      geoRes,
+      devicesRes,
+      topSearchesRes,
+      outboundByTypeRes,
+      outboundByRestaurantRes,
+      cleanupRes,
+    ] = await Promise.all([
+      supabase.rpc("stats_totals"),
+      supabase.rpc("stats_views_by_day", { days: 30 }),
+      supabase.rpc("stats_top_paths", { limit_n: 10 }),
+      supabase.rpc("stats_top_referrers", { limit_n: 10 }),
+      supabase.rpc("stats_geo", { limit_n: 10 }),
+      supabase.rpc("stats_devices"),
+      supabase.rpc("stats_top_searches", { limit_n: 10 }),
+      supabase.rpc("stats_outbound_by_type"),
+      supabase.rpc("stats_outbound_by_restaurant", { limit_n: 10 }),
+      supabase.rpc("get_last_cleanup_run"),
+    ]);
 
-      const sessions = new Set(
-        pageViews.map((r) => r.session_id).filter((id): id is string => !!id),
-      );
-      setUniqueSessions(sessions.size);
-
-      const dayCounts: Record<string, number> = {};
-      pageViews.forEach((row) => {
-        const day = row.created_at.slice(0, 10);
-        dayCounts[day] = (dayCounts[day] || 0) + 1;
-      });
-      const sorted = Object.entries(dayCounts)
-        .map(([date, count]) => ({ date, count }))
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .slice(-30);
-      setViewsByDay(sorted);
-
-      const pathCounts: Record<string, number> = {};
-      pageViews.forEach((row) => {
-        const label = restaurantLabel(row.path || "(unknown)");
-        pathCounts[label] = (pathCounts[label] || 0) + 1;
-      });
-      const topPaths = Object.entries(pathCounts)
-        .map(([path, count]) => ({ path, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-      setTopPages(topPaths);
-
-      const refCounts: Record<string, number> = {};
-      pageViews.forEach((row) => {
-        const ref = row.referrer || "(direct)";
-        refCounts[ref] = (refCounts[ref] || 0) + 1;
-      });
-      const topRefs = Object.entries(refCounts)
-        .map(([referrer, count]) => ({ referrer, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-      setTopReferrers(topRefs);
-
-      const geoCounts: Record<string, number> = {};
-      pageViews.forEach((row) => {
-        if (row.city && row.region && row.country) {
-          const location = `${row.city}, ${row.region}, ${row.country}`;
-          geoCounts[location] = (geoCounts[location] || 0) + 1;
-        } else if (row.city && row.country) {
-          const location = `${row.city}, ${row.country}`;
-          geoCounts[location] = (geoCounts[location] || 0) + 1;
-        } else if (row.country) {
-          geoCounts[row.country] = (geoCounts[row.country] || 0) + 1;
-        }
-      });
-      const topGeo = Object.entries(geoCounts)
-        .map(([location, count]) => ({ location, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-      setGeoData(topGeo);
-
-      const deviceCounts: Record<string, number> = {};
-      pageViews.forEach((row) => {
-        const device = row.device_type || "unknown";
-        deviceCounts[device] = (deviceCounts[device] || 0) + 1;
-      });
-      const devices = Object.entries(deviceCounts)
-        .map(([device, count]) => ({ device, count }))
-        .sort((a, b) => b.count - a.count);
-      setDeviceData(devices);
-
-      const searchCounts: Record<string, number> = {};
-      events
-        .filter((e) => e.event_type === "search" && e.event_label)
-        .forEach((e) => {
-          const q = (e.event_label as string).trim().toLowerCase();
-          if (!q) return;
-          searchCounts[q] = (searchCounts[q] || 0) + 1;
-        });
-      const topQueries = Object.entries(searchCounts)
-        .map(([query, count]) => ({ query, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-      setTopSearches(topQueries);
-
-      const outboundEvents = events.filter(
-        (e) => e.event_type === "outbound_click",
-      );
-      const outboundTypeCounts: Record<string, number> = {};
-      const outboundPathCounts: Record<string, number> = {};
-      outboundEvents.forEach((e) => {
-        const label = e.event_label || "unknown";
-        outboundTypeCounts[label] = (outboundTypeCounts[label] || 0) + 1;
-        const path = restaurantLabel(e.path || "(unknown)");
-        outboundPathCounts[path] = (outboundPathCounts[path] || 0) + 1;
-      });
-      setOutboundByType(
-        Object.entries(outboundTypeCounts)
-          .map(([label, count]) => ({ label, count }))
-          .sort((a, b) => b.count - a.count),
-      );
-      setOutboundByRestaurant(
-        Object.entries(outboundPathCounts)
-          .map(([path, count]) => ({ path, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 10),
-      );
-
-      const { data: cronData } = await supabase.rpc("get_last_cleanup_run");
-      if (cronData && cronData.length > 0) {
-        setLastCleanup(cronData[0].executed_at);
-      }
+    if (totalsRes.data && totalsRes.data.length > 0) {
+      const row = totalsRes.data[0] as {
+        total_views: number;
+        unique_sessions: number;
+      };
+      setTotalViews(Number(row.total_views) || 0);
+      setUniqueSessions(Number(row.unique_sessions) || 0);
     }
+
+    setViewsByDay(
+      ((viewsByDayRes.data ?? []) as { day: string; count: number }[]).map(
+        (r) => ({ date: r.day, count: Number(r.count) }),
+      ),
+    );
+
+    setTopPages(
+      ((topPathsRes.data ?? []) as { path: string; count: number }[]).map(
+        (r) => ({ path: r.path, count: Number(r.count) }),
+      ),
+    );
+
+    setTopReferrers(
+      ((topReferrersRes.data ?? []) as { referrer: string; count: number }[]).map(
+        (r) => ({ referrer: r.referrer, count: Number(r.count) }),
+      ),
+    );
+
+    setGeoData(
+      ((geoRes.data ?? []) as { location: string; count: number }[]).map(
+        (r) => ({ location: r.location, count: Number(r.count) }),
+      ),
+    );
+
+    setDeviceData(
+      ((devicesRes.data ?? []) as { device: string; count: number }[]).map(
+        (r) => ({ device: r.device, count: Number(r.count) }),
+      ),
+    );
+
+    setTopSearches(
+      ((topSearchesRes.data ?? []) as { query: string; count: number }[]).map(
+        (r) => ({ query: r.query, count: Number(r.count) }),
+      ),
+    );
+
+    setOutboundByType(
+      ((outboundByTypeRes.data ?? []) as { label: string; count: number }[]).map(
+        (r) => ({ label: r.label, count: Number(r.count) }),
+      ),
+    );
+
+    setOutboundByRestaurant(
+      ((outboundByRestaurantRes.data ?? []) as {
+        path: string;
+        count: number;
+      }[]).map((r) => ({ path: r.path, count: Number(r.count) })),
+    );
+
+    if (cleanupRes.data && cleanupRes.data.length > 0) {
+      setLastCleanup(cleanupRes.data[0].executed_at);
+    }
+
     setStatsLoading(false);
   }
 
@@ -426,6 +390,11 @@ export default function StatsPage() {
 
             <p className="text-xs text-txt2 mt-4">
               Analytics data older than 90 days is automatically deleted daily.
+            </p>
+            <p className="text-2xs text-txt2 opacity-60 mt-1">
+              Stats aggregated server-side via{" "}
+              <code className="font-mono">stats_*</code> RPCs — see{" "}
+              <code className="font-mono">MIGRATION_STEP_36_STATS_RPCS.sql</code>.
             </p>
           </>
         )}

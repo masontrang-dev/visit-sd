@@ -1,5 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient as createBrowserSupabaseClient } from "./supabase-client";
+import { type OpeningHours } from "./google-types";
 
 export type Restaurant = {
   id: number;
@@ -25,7 +26,7 @@ export type Restaurant = {
   google_review_count: number | null;
   my_rating: number | null;
   occasions: string[] | null;
-  opening_hours: any | null;
+  opening_hours: OpeningHours;
   visibility: "public" | "private" | "archived";
   visibility_changed_at: string | null;
   previous_visibility: string | null;

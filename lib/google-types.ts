@@ -158,7 +158,7 @@ export const DEFAULT_CUISINE_OPTIONS = [
   "Vietnamese",
 ];
 
-type OpeningHoursTime = {
+export type OpeningHoursTime = {
   day: number;
   hour?: number;
   minute?: number;
@@ -167,12 +167,12 @@ type OpeningHoursTime = {
   time?: string;
 };
 
-type OpeningHoursPeriod = {
+export type OpeningHoursPeriod = {
   open: OpeningHoursTime;
   close?: OpeningHoursTime;
 };
 
-type OpeningHours = {
+export type OpeningHours = {
   weekday_text?: string[];
   periods?: OpeningHoursPeriod[];
 } | null;

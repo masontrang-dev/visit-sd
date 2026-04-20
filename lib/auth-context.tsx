@@ -16,8 +16,18 @@ type UserRole = "superuser" | "admin" | "curator" | "user";
 
 type AuthContextType = {
   user: User | null;
+  /** True when the user is admin or superuser. Does NOT include curator. */
   isAdmin: boolean;
+  /** True when the user is superuser. */
   isSuperuser: boolean;
+  /** True when the user has the curator role (not admin/superuser). */
+  isCurator: boolean;
+  /**
+   * True when the user can contribute content: log orders, rate as curator,
+   * toggle menu-item recommendations, edit their own take. Covers admin,
+   * superuser, and curator.
+   */
+  canManageContent: boolean;
   isLoading: boolean;
   roles: UserRole[];
   displayName: string | null;
@@ -134,11 +144,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [supabase, refreshAuth, hydrateUserData]);
 
+  // `isAdmin` excludes curator — this matches the server-side check in
+  // lib/auth-helpers.ts (`isAdmin(userId)`) and prevents curators from editing
+  // restaurants, viewing private/archived entries, or triggering refreshes.
+  // Curator-appropriate actions (log orders, rate, recommend items) use
+  // `canManageContent` or `isCurator`.
   const isAdmin =
-    roles.includes("admin") ||
-    roles.includes("superuser") ||
-    roles.includes("curator");
+    roles.includes("admin") || roles.includes("superuser");
   const isSuperuser = roles.includes("superuser");
+  const isCurator = roles.includes("curator") && !isAdmin;
+  const canManageContent = isAdmin || roles.includes("curator");
 
   return (
     <AuthContext.Provider
@@ -146,6 +161,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isAdmin,
         isSuperuser,
+        isCurator,
+        canManageContent,
         isLoading,
         roles,
         displayName,

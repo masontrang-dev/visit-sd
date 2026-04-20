@@ -18,10 +18,10 @@ export default function MenuItemRecommendToggle({
   recommenderNames,
   onChange,
 }: Props) {
-  const { user, isAdmin } = useAuth();
+  const { user, canManageContent } = useAuth();
   const [busy, setBusy] = useState(false);
 
-  if (!isAdmin || !user) return null;
+  if (!canManageContent || !user) return null;
 
   const iRecommend = recommendedUserIds.includes(user.id);
   const othersRecommend = recommendedUserIds.filter((id) => id !== user.id);

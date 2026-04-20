@@ -1,27 +1,10 @@
 "use client";
 
-import {
-  Suspense,
-  useEffect,
-  useState,
-  useCallback,
-  useRef,
-  useMemo,
-} from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import {
-  supabase,
-  type Restaurant,
-  type MenuItem,
-  type RestaurantVisit,
-} from "@/lib/supabase";
-import RestaurantGrid, {
-  type RestaurantPhoto,
-} from "@/components/RestaurantGrid";
-import FilterBar, {
-  type ImageDisplayMode,
-  type VisibilityFilter,
-} from "@/components/FilterBar";
+import { Suspense, useEffect, useState, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { supabase, type Restaurant } from "@/lib/supabase";
+import RestaurantGrid from "@/components/RestaurantGrid";
+import FilterBar from "@/components/FilterBar";
 import MapView from "@/components/MapView";
 import ContextHeader from "@/components/ContextHeader";
 import SurpriseBar from "@/components/SurpriseBar";
@@ -32,8 +15,9 @@ import ThemeToggle from "@/components/ThemeToggle";
 import ActivityFeed from "@/components/ActivityFeed";
 import AdminButton from "@/components/AdminButton";
 import { useAuth } from "@/lib/auth-context";
-import { trackEvent } from "@/lib/analytics";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useHomeData } from "@/hooks/useHomeData";
+import { useFilterState } from "@/hooks/useFilterState";
 import { success } from "@/lib/haptics";
 
 function SkeletonCard() {
@@ -130,58 +114,44 @@ function StatPill({
 }
 
 function HomeContent() {
-  const searchParams = useSearchParams();
   const router = useRouter();
   const { user, isAdmin } = useAuth();
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    restaurants,
+    recommendedItems,
+    restaurantPhotos,
+    visits,
+    loading,
+    reload,
+  } = useHomeData(isAdmin, user);
+  const {
+    activeCuisines,
+    activeNeighborhoods,
+    mustTryFilter,
+    activePrices,
+    activeVisibility,
+    searchQuery,
+    debouncedSearch,
+    viewMode,
+    imageDisplayMode,
+    isFiltered,
+    setActiveCuisines,
+    setActiveNeighborhoods,
+    setMustTryFilter,
+    setActivePrices,
+    setActiveVisibility,
+    setSearchQuery,
+    setViewMode,
+    setImageDisplayMode,
+  } = useFilterState();
+
   const [checkInRestaurant, setCheckInRestaurant] = useState<Restaurant | null>(
     null,
   );
   const [visitingId, setVisitingId] = useState<number | null>(null);
-  const [activeCuisines, setActiveCuisines] = useState<string[]>(() => {
-    const param = searchParams.get("cuisine");
-    return param ? param.split(",") : [];
-  });
-  const [activeNeighborhoods, setActiveNeighborhoods] = useState<string[]>(
-    () => {
-      const param = searchParams.get("neighborhood");
-      return param ? param.split(",") : [];
-    },
-  );
-  const [viewMode, setViewMode] = useState<"list" | "map">("list");
-  const [imageDisplayMode, setImageDisplayMode] = useState<ImageDisplayMode>(
-    () => {
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("visitsd-image-display");
-        if (saved === "full" || saved === "compact" || saved === "none") {
-          return saved;
-        }
-      }
-      return "full";
-    },
-  );
-  const [mustTryFilter, setMustTryFilter] = useState(
-    searchParams.get("must_try") === "true",
-  );
-  const [activePrices, setActivePrices] = useState<string[]>(() => {
-    const param = searchParams.get("price");
-    return param ? param.split(",") : [];
-  });
-  const [activeVisibility, setActiveVisibility] =
-    useState<VisibilityFilter>("public");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [mounted, setMounted] = useState(false);
   const [mapEverMounted, setMapEverMounted] = useState(false);
   const [isFirstVisit, setIsFirstVisit] = useState(false);
-  const [recommendedItems, setRecommendedItems] = useState<
-    Record<number, MenuItem[]>
-  >({});
-  const [restaurantPhotos, setRestaurantPhotos] = useState<
-    Record<number, RestaurantPhoto[]>
-  >({});
-  const [visits, setVisits] = useState<Record<number, RestaurantVisit[]>>({});
   const [showAddModal, setShowAddModal] = useState(false);
   const [addOpError, setAddOpError] = useState("");
   const surpriseBtnRef = useRef<HTMLButtonElement>(null);
@@ -189,20 +159,6 @@ function HomeContent() {
   function handleCheckInClick(restaurant: Restaurant) {
     setCheckInRestaurant(restaurant);
   }
-
-  const loadVisits = useCallback(async () => {
-    const { data } = await supabase
-      .from("restaurant_visits")
-      .select("*")
-      .order("visited_at", { ascending: false });
-    if (!data) return;
-    const grouped: Record<number, RestaurantVisit[]> = {};
-    data.forEach((visit: RestaurantVisit) => {
-      if (!grouped[visit.restaurant_id]) grouped[visit.restaurant_id] = [];
-      grouped[visit.restaurant_id].push(visit);
-    });
-    setVisits(grouped);
-  }, []);
 
   async function handleCheckIn(visitDate: string, shouldLogOrder: boolean) {
     if (!checkInRestaurant || !user) return;
@@ -238,7 +194,7 @@ function HomeContent() {
     }
 
     setVisitingId(null);
-    loadVisits();
+    await reload();
   }
 
   async function handleAddRestaurant(
@@ -251,199 +207,15 @@ function HomeContent() {
       setAddOpError("Failed to add restaurant.");
       return false;
     }
-    await load();
+    await reload();
     return true;
   }
-
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 200);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Log search queries separately with a longer settle window so we only
-  // capture queries the user actually paused on (not every keystroke).
-  useEffect(() => {
-    const q = searchQuery.trim();
-    if (q.length < 2) return;
-    const timer = setTimeout(() => trackEvent("search", q.slice(0, 100)), 1200);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  const syncParams = useCallback(
-    (
-      cuisines: string[],
-      neighborhoods: string[],
-      mustTry: boolean,
-      prices: string[],
-    ) => {
-      const params = new URLSearchParams();
-      if (cuisines.length > 0) params.set("cuisine", cuisines.join(","));
-      if (neighborhoods.length > 0)
-        params.set("neighborhood", neighborhoods.join(","));
-      if (mustTry) params.set("must_try", "true");
-      if (prices.length > 0) params.set("price", prices.join(","));
-      const qs = params.toString();
-      router.replace(qs ? `/?${qs}` : "/", { scroll: false });
-    },
-    [router],
-  );
-
-  function handleCuisineChange(v: string[]) {
-    setActiveCuisines(v);
-    syncParams(v, activeNeighborhoods, mustTryFilter, activePrices);
-  }
-  function handleNeighborhoodChange(v: string[]) {
-    setActiveNeighborhoods(v);
-    syncParams(activeCuisines, v, mustTryFilter, activePrices);
-  }
-  function handleMustTryChange(v: boolean) {
-    setMustTryFilter(v);
-    syncParams(activeCuisines, activeNeighborhoods, v, activePrices);
-  }
-  function handlePriceChange(v: string[]) {
-    setActivePrices(v);
-    syncParams(activeCuisines, activeNeighborhoods, mustTryFilter, v);
-  }
-  function handleImageDisplayModeChange(mode: ImageDisplayMode) {
-    setImageDisplayMode(mode);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("visitsd-image-display", mode);
-    }
-  }
-
-  const load = useCallback(async () => {
-    // Phase 1: fetch restaurants and render the grid immediately
-    let query = supabase
-      .from("restaurants")
-      .select("*")
-      .order("cuisine")
-      .order("name");
-    if (!isAdmin) {
-      query = query.eq("visibility", "public");
-    }
-    const { data } = (await query) as { data: Restaurant[] | null };
-    const rows = data ?? [];
-    setRestaurants(rows);
-    setLoading(false); // show grid now — photos/recommendations load in background
-
-    if (rows.length === 0) return;
-    const visibleRestaurantIds = rows.map((r) => r.id);
-
-    // Phase 2: recommendations + order photos in parallel (both only need Phase 1)
-    const [recResult, orderResult] = await Promise.all([
-      supabase
-        .from("menu_item_recommendations")
-        .select("menu_item_id") as Promise<{
-        data: { menu_item_id: number }[] | null;
-      }>,
-      supabase
-        .from("item_orders")
-        .select("restaurant_id, menu_item_id, photo_url, ordered_at")
-        .in("restaurant_id", visibleRestaurantIds)
-        .not("photo_url", "is", null)
-        .order("ordered_at", { ascending: false })
-        .limit(500) as Promise<{
-        data:
-          | {
-              restaurant_id: number;
-              menu_item_id: number;
-              photo_url: string;
-              ordered_at: string;
-            }[]
-          | null;
-      }>,
-    ]);
-
-    const recRows = recResult.data ?? [];
-    const orderRows = orderResult.data ?? [];
-
-    const recommendedIds = Array.from(
-      new Set(recRows.map((r) => r.menu_item_id)),
-    );
-    const recommendedSet = new Set(recommendedIds);
-    const orderMenuIds = Array.from(
-      new Set(orderRows.map((o) => o.menu_item_id)),
-    );
-
-    // Phase 3: menu item details + order item names in parallel
-    const [menuResult, nameResult] = await Promise.all([
-      recommendedIds.length > 0
-        ? (supabase
-            .from("menu_items")
-            .select("*")
-            .in("id", recommendedIds)
-            .in("restaurant_id", visibleRestaurantIds)
-            .order("name") as Promise<{ data: MenuItem[] | null }>)
-        : Promise.resolve({ data: [] as MenuItem[] }),
-      orderMenuIds.length > 0
-        ? (supabase
-            .from("menu_items")
-            .select("id, name")
-            .in("id", orderMenuIds) as Promise<{
-            data: { id: number; name: string }[] | null;
-          }>)
-        : Promise.resolve({ data: [] as { id: number; name: string }[] }),
-    ]);
-
-    // Recommended items by restaurant
-    const menuData = menuResult.data ?? [];
-    if (menuData.length > 0) {
-      const itemsByRestaurant: Record<number, MenuItem[]> = {};
-      menuData.forEach((item) => {
-        if (!itemsByRestaurant[item.restaurant_id])
-          itemsByRestaurant[item.restaurant_id] = [];
-        itemsByRestaurant[item.restaurant_id].push(item);
-      });
-      setRecommendedItems(itemsByRestaurant);
-    }
-
-    // Order photos by restaurant
-    if (orderRows.length > 0) {
-      const nameById = new Map<number, string>();
-      (nameResult.data ?? []).forEach((m) => nameById.set(m.id, m.name));
-
-      const buckets: Record<number, RestaurantPhoto[]> = {};
-      const seen: Record<number, Set<string>> = {};
-      orderRows.forEach((o) => {
-        if (!buckets[o.restaurant_id]) {
-          buckets[o.restaurant_id] = [];
-          seen[o.restaurant_id] = new Set();
-        }
-        if (seen[o.restaurant_id].has(o.photo_url)) return;
-        seen[o.restaurant_id].add(o.photo_url);
-        buckets[o.restaurant_id].push({
-          url: o.photo_url,
-          itemName: nameById.get(o.menu_item_id) ?? null,
-          isStorefront: false,
-          isRecommended: recommendedSet.has(o.menu_item_id),
-        });
-      });
-
-      Object.keys(buckets).forEach((key) => {
-        const id = Number(key);
-        buckets[id].sort(
-          (a, b) => Number(b.isRecommended) - Number(a.isRecommended),
-        );
-      });
-      setRestaurantPhotos(buckets);
-    }
-  }, [isAdmin]);
 
   useEffect(() => {
     if (viewMode === "map") setMapEverMounted(true);
   }, [viewMode]);
 
   useEffect(() => {
-    if (user) {
-      loadVisits();
-    } else {
-      setVisits({});
-    }
-  }, [user, loadVisits]);
-
-  useEffect(() => {
-    load();
     setMounted(true);
 
     const visited = localStorage.getItem("visitsd-visited");
@@ -452,7 +224,6 @@ function HomeContent() {
       localStorage.setItem("visitsd-visited", "1");
     }
 
-    // Optimize for mobile on initial load
     const handleResize = () => {
       const isMobile = window.innerWidth < 768;
       if (isMobile && viewMode === "map") {
@@ -461,7 +232,7 @@ function HomeContent() {
     };
     window.addEventListener("resize", handleResize);
 
-    // Handle scroll detection for fade effect on surprise button (via DOM, no re-render)
+    // DOM-only scroll fade for the Surprise-me button (no re-render).
     let scrollTimeout: ReturnType<typeof setTimeout>;
     const handleScroll = () => {
       if (surpriseBtnRef.current) {
@@ -481,11 +252,11 @@ function HomeContent() {
       window.removeEventListener("scroll", handleScroll);
       clearTimeout(scrollTimeout);
     };
-  }, [viewMode, load]);
+  }, [viewMode, setViewMode]);
 
   const { pullDistance, refreshing, threshold } = usePullToRefresh({
     onRefresh: async () => {
-      await load();
+      await reload();
       success();
     },
   });
@@ -582,21 +353,6 @@ function HomeContent() {
       new Set(restaurants.map((r) => r.neighborhood).filter(Boolean)).size,
     [restaurants],
   );
-  const isFiltered =
-    activeCuisines.length > 0 ||
-    activeNeighborhoods.length > 0 ||
-    mustTryFilter ||
-    activePrices.length > 0 ||
-    debouncedSearch.trim() !== "";
-
-  function handleClearAll() {
-    setActiveCuisines([]);
-    setActiveNeighborhoods([]);
-    setMustTryFilter(false);
-    setActivePrices([]);
-    setSearchQuery("");
-    syncParams([], [], false, []);
-  }
 
   return (
     <main className="min-h-screen">
@@ -710,27 +466,27 @@ function HomeContent() {
       <FilterBar
         cuisines={cuisines}
         activeCuisines={activeCuisines}
-        onCuisineChange={handleCuisineChange}
+        onCuisineChange={setActiveCuisines}
         cuisineCounts={cuisineCounts}
         neighborhoods={neighborhoods}
         activeNeighborhoods={activeNeighborhoods}
-        onNeighborhoodChange={handleNeighborhoodChange}
+        onNeighborhoodChange={setActiveNeighborhoods}
         neighborhoodCounts={neighborhoodCounts}
         priceCounts={priceCounts}
         onAdd={isAdmin ? () => setShowAddModal(true) : undefined}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         mustTryFilter={mustTryFilter}
-        onMustTryFilterChange={handleMustTryChange}
+        onMustTryFilterChange={setMustTryFilter}
         activePrices={activePrices}
-        onPriceChange={handlePriceChange}
+        onPriceChange={setActivePrices}
         isAdminView={isAdmin}
         activeVisibility={activeVisibility}
         onVisibilityChange={setActiveVisibility}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         imageDisplayMode={imageDisplayMode}
-        onImageDisplayModeChange={handleImageDisplayModeChange}
+        onImageDisplayModeChange={setImageDisplayMode}
       />
 
       {addOpError && (

@@ -11,6 +11,7 @@ import {
   extractCuisineFromTypes,
   extractNeighborhood,
   DEFAULT_CUISINE_OPTIONS,
+  type OpeningHours,
 } from "@/lib/google-types";
 
 type Props = {
@@ -112,7 +113,7 @@ export default function AddModal({
     editData?.occasions ?? [],
   );
   const [occasionInput, setOccasionInput] = useState("");
-  const [openingHours, setOpeningHours] = useState<any>(
+  const [openingHours, setOpeningHours] = useState<OpeningHours>(
     editData?.opening_hours ?? null,
   );
   const [storefrontPhotoUrl, setStorefrontPhotoUrl] = useState<string | null>(

@@ -330,79 +330,79 @@ An empty `graze/` directory exists in the repo root with no contents. This is li
 ### Phase 1 — Critical Fixes (Week 1–2)
 *Blocking bugs, data leaks, and broken security*
 
-| Priority | Task | File(s) | Effort |
-|----------|------|---------|--------|
-| P0 | Remove all `console.log` debug statements | `app/restaurant/[id]/page.tsx` | 1h |
-| P0 | Fix `/api/refresh-google-data` auth — replace legacy cookie check with Supabase session verification | `app/api/refresh-google-data/route.ts` | 2h |
-| P0 | Fix dead ternary `isMobile ? "list" : "list"` | `app/page.tsx` | 15m |
-| P1 | Replace `window.confirm()` with `ConfirmModal` in `handleDelete` | `app/restaurant/[id]/page.tsx` | 30m |
-| P1 | Add rate limiting to `/api/log-view` (simple IP-based, e.g., 10 req/min via Upstash) | `app/api/log-view/route.ts` | 3h |
-| P1 | Move geolocation lookup (`ipapi.co`) to background (fire-and-forget after response) | `app/api/log-view/route.ts` | 1h |
-| P1 | Rename `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` server usage to `GOOGLE_MAPS_SERVER_API_KEY` | `app/api/refresh-google-data/route.ts`, `.env` | 1h |
-| P1 | Add HTTP security headers to `next.config.js` (CSP, X-Frame-Options, X-Content-Type-Options) | `next.config.js` | 2h |
+| Done | Priority | Task | File(s) | Effort |
+|------|----------|------|---------|--------|
+| [x] | P0 | Remove all `console.log` debug statements | `app/restaurant/[id]/page.tsx` | 1h |
+| [x] | P0 | Fix `/api/refresh-google-data` auth — replace legacy cookie check with Supabase session verification | `app/api/refresh-google-data/route.ts` | 2h |
+| [x] | P0 | Fix dead ternary `isMobile ? "list" : "list"` | `app/page.tsx` | 15m |
+| [x] | P1 | Replace `window.confirm()` with `ConfirmModal` in `handleDelete` | `app/restaurant/[id]/page.tsx` | 30m |
+| [x] | P1 | Add rate limiting to `/api/log-view` (simple IP-based, e.g., 10 req/min via Upstash) | `app/api/log-view/route.ts` | 3h |
+| [x] | P1 | Move geolocation lookup (`ipapi.co`) to background (fire-and-forget after response) | `app/api/log-view/route.ts` | 1h |
+| [x] | P1 | Rename `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` server usage to `GOOGLE_MAPS_SERVER_API_KEY` | `app/api/refresh-google-data/route.ts`, `.env` | 1h |
+| [x] | P1 | Add HTTP security headers to `next.config.js` (CSP, X-Frame-Options, X-Content-Type-Options) | `next.config.js` | 2h |
 
 ### Phase 2 — Architecture Refactor (Week 3–5)
 *Structural changes that unblock SEO, maintainability, and testing*
 
-| Priority | Task | File(s) | Effort |
-|----------|------|---------|--------|
-| P0 | Convert `app/restaurant/[id]/page.tsx` to a server component with `generateMetadata` for per-restaurant OG tags | `app/restaurant/[id]/` | 1d |
-| P0 | Fix stats page — replace `select("*")` with server-side RPC aggregation queries | `app/admin/stats/page.tsx` | 1d |
-| P1 | Extract `CUISINE_COLORS` and `buildCuisineColorMap` to `lib/cuisine-colors.ts` | 3 files | 1h |
-| P1 | Split `app/restaurant/[id]/page.tsx` into focused sub-components | New files | 2d |
-| P1 | Extract `useHomeData()` and `useFilterState()` hooks from `app/page.tsx` | `app/page.tsx`, new hooks | 1d |
-| P1 | Fix `opening_hours: any` — apply proper TypeScript type from `google-types.ts` | `lib/supabase.ts`, `AddModal.tsx` | 2h |
-| P1 | Add `app/error.tsx` and `app/restaurant/[id]/error.tsx` error boundaries | New files | 2h |
-| P1 | Add `app/not-found.tsx` for 404 handling | New file | 1h |
-| P2 | Upgrade from canary React to stable React 19 | `package.json` | 30m |
-| P2 | Clarify `isAdmin` role semantics — add explicit permission checks per action type | `lib/auth-context.tsx` | 3h |
+| Done | Priority | Task | File(s) | Effort |
+|------|----------|------|---------|--------|
+| [x] | P0 | Convert `app/restaurant/[id]/page.tsx` to a server component with `generateMetadata` for per-restaurant OG tags | `app/restaurant/[id]/` | 1d |
+| [x] | P0 | Fix stats page — replace `select("*")` with server-side RPC aggregation queries | `app/admin/stats/page.tsx` | 1d |
+| [x] | P1 | Extract `CUISINE_COLORS` and `buildCuisineColorMap` to `lib/cuisine-colors.ts` | 3 files | 1h |
+| [x] | P1 | Split `app/restaurant/[id]/page.tsx` into focused sub-components | New files | 2d |
+| [x] | P1 | Extract `useHomeData()` and `useFilterState()` hooks from `app/page.tsx` | `app/page.tsx`, new hooks | 1d |
+| [x] | P1 | Fix `opening_hours: any` — apply proper TypeScript type from `google-types.ts` | `lib/supabase.ts`, `AddModal.tsx` | 2h |
+| [x] | P1 | Add `app/error.tsx` and `app/restaurant/[id]/error.tsx` error boundaries | New files | 2h |
+| [x] | P1 | Add `app/not-found.tsx` for 404 handling | New file | 1h |
+| [ ] | P2 | Upgrade from canary React to stable React 19 (deferred — see §10.1) | `package.json` | 30m |
+| [x] | P2 | Clarify `isAdmin` role semantics — add explicit permission checks per action type | `lib/auth-context.tsx` | 3h |
 
 ### Phase 3 — Visual & UX Polish (Week 6–8)
 *Design system fixes, dark mode, and interaction improvements*
 
-| Priority | Task | File(s) | Effort |
-|----------|------|---------|--------|
-| P1 | Replace hardcoded hex colors with CSS variables in `RestaurantGrid`, `PhotoCarousel`, `MapView` | 3 files | 3h |
-| P1 | Replace image-mode cycling button with a 3-way segmented control | `FilterBar.tsx` | 3h |
-| P1 | Show "Surprise Me" button even when filtered (pick random from filtered set) | `app/page.tsx` | 1h |
-| P1 | Add proper chart labels, axes, and tooltips to stats bar chart | `app/admin/stats/page.tsx` | 4h |
-| P2 | Make FilterBar collapse into a "Filters" sheet on mobile | `FilterBar.tsx` | 1d |
-| P2 | Add section anchor navigation on restaurant detail page | `app/restaurant/[id]/` | 4h |
-| P2 | Add skeleton loading state for map view and stats page | `MapView.tsx`, stats page | 2h |
-| P2 | Fix `MapView` InfoWindow to use CSS variables (dark mode) | `MapView.tsx` | 1h |
-| P3 | Add per-restaurant `opengraph-image.tsx` using Next.js `ImageResponse` | New file | 4h |
-| P3 | Add JSON-LD `Restaurant` structured data to detail page | `app/restaurant/[id]/` | 3h |
+| Done | Priority | Task | File(s) | Effort |
+|------|----------|------|---------|--------|
+| [ ] | P1 | Replace hardcoded hex colors with CSS variables in `RestaurantGrid`, `PhotoCarousel`, `MapView` | 3 files | 3h |
+| [ ] | P1 | Replace image-mode cycling button with a 3-way segmented control | `FilterBar.tsx` | 3h |
+| [ ] | P1 | Show "Surprise Me" button even when filtered (pick random from filtered set) | `app/page.tsx` | 1h |
+| [ ] | P1 | Add proper chart labels, axes, and tooltips to stats bar chart | `app/admin/stats/page.tsx` | 4h |
+| [ ] | P2 | Make FilterBar collapse into a "Filters" sheet on mobile | `FilterBar.tsx` | 1d |
+| [ ] | P2 | Add section anchor navigation on restaurant detail page | `app/restaurant/[id]/` | 4h |
+| [ ] | P2 | Add skeleton loading state for map view and stats page | `MapView.tsx`, stats page | 2h |
+| [ ] | P2 | Fix `MapView` InfoWindow to use CSS variables (dark mode) | `MapView.tsx` | 1h |
+| [ ] | P3 | Add per-restaurant `opengraph-image.tsx` using Next.js `ImageResponse` | New file | 4h |
+| [ ] | P3 | Add JSON-LD `Restaurant` structured data to detail page | `app/restaurant/[id]/` | 3h |
 
 ### Phase 4 — Feature Additions (Week 9–14)
 *New value-add features for public users and admins*
 
-| Priority | Feature | Notes | Effort |
-|----------|---------|-------|--------|
-| P1 | **Occasions filter** in FilterBar | Field already exists on restaurant model | 4h |
-| P1 | **"Open Now" filter** | Uses `isCurrentlyOpen()` which already exists | 3h |
-| P1 | **Sort options** (rating, recently visited, recently added) | Client-side sort on existing data | 4h |
-| P1 | **PWA `manifest.json`** with full icon set and `theme-color` | New file + icons | 4h |
-| P2 | **Related restaurants section** on detail page ("More in [neighborhood]") | Query existing data | 4h |
-| P2 | **"Near Me" sort** using Geolocation API | Use existing `lat`/`lng` on Restaurant | 6h |
-| P2 | **Bulk admin operations** (visibility change, CSV export) | New admin UI | 1d |
-| P3 | **User wishlist / "Want to go"** | New Supabase table, RLS, UI | 2d |
-| P3 | **Server-side check-in rate limiting** via Supabase RLS policy | New SQL policy | 4h |
+| Done | Priority | Feature | Notes | Effort |
+|------|----------|---------|-------|--------|
+| [ ] | P1 | **Occasions filter** in FilterBar | Field already exists on restaurant model | 4h |
+| [ ] | P1 | **"Open Now" filter** | Uses `isCurrentlyOpen()` which already exists | 3h |
+| [ ] | P1 | **Sort options** (rating, recently visited, recently added) | Client-side sort on existing data | 4h |
+| [ ] | P1 | **PWA `manifest.json`** with full icon set and `theme-color` | New file + icons | 4h |
+| [ ] | P2 | **Related restaurants section** on detail page ("More in [neighborhood]") | Query existing data | 4h |
+| [ ] | P2 | **"Near Me" sort** using Geolocation API | Use existing `lat`/`lng` on Restaurant | 6h |
+| [ ] | P2 | **Bulk admin operations** (visibility change, CSV export) | New admin UI | 1d |
+| [ ] | P3 | **User wishlist / "Want to go"** | New Supabase table, RLS, UI | 2d |
+| [ ] | P3 | **Server-side check-in rate limiting** via Supabase RLS policy | New SQL policy | 4h |
 
 ### Phase 5 — Dead Code Cleanup & Repo Hygiene (Week 15)
 *Remove clutter, enforce standards*
 
-| Priority | Task | Effort |
-|----------|------|--------|
-| P1 | Remove `getVisitRecency()` from `lib/utils.ts` | 15m |
-| P1 | Remove or redirect `app/admin/page.tsx` properly | 15m |
-| P1 | Remove `mustTryFilter` dead prop from `RestaurantGrid` Props type | 30m |
-| P1 | Move all SQL files to `supabase/migrations/` | 1h |
-| P1 | Move all planning `.md` files to `docs/` | 30m |
-| P1 | Verify and remove `AdminViewToggle.tsx` if orphaned | 30m |
-| P1 | Remove empty `graze/` directory | 5m |
-| P2 | Fix `isRestoring` state in `InfiniteCardGrid` to reset after restoration | `RestaurantGrid.tsx` | 1h |
-| P3 | Add Vitest + Testing Library, write smoke tests for auth flow and home page | New files | 2d |
-| P3 | Add Playwright e2e tests for check-in and restaurant detail flows | New files | 2d |
+| Done | Priority | Task | Effort |
+|------|----------|------|--------|
+| [ ] | P1 | Remove `getVisitRecency()` from `lib/utils.ts` | 15m |
+| [ ] | P1 | Remove or redirect `app/admin/page.tsx` properly | 15m |
+| [ ] | P1 | Remove `mustTryFilter` dead prop from `RestaurantGrid` Props type | 30m |
+| [ ] | P1 | Move all SQL files to `supabase/migrations/` | 1h |
+| [ ] | P1 | Move all planning `.md` files to `docs/` | 30m |
+| [ ] | P1 | Verify and remove `AdminViewToggle.tsx` if orphaned | 30m |
+| [ ] | P1 | Remove empty `graze/` directory | 5m |
+| [ ] | P2 | Fix `isRestoring` state in `InfiniteCardGrid` to reset after restoration (`RestaurantGrid.tsx`) | 1h |
+| [ ] | P3 | Add Vitest + Testing Library, write smoke tests for auth flow and home page | 2d |
+| [ ] | P3 | Add Playwright e2e tests for check-in and restaurant detail flows | 2d |
 
 ---
 
@@ -441,3 +441,26 @@ The current CSP uses `'unsafe-inline' 'unsafe-eval'` on `script-src` (for Next.j
 ### 9.3 Rename `middleware.ts` → `proxy.ts` (Next 16 deprecation)
 
 Next 16 emits a build warning: *"The 'middleware' file convention is deprecated. Please use 'proxy' instead."* The existing `middleware.ts` (Supabase SSR session refresh) still works, but the convention will be removed in a future major. Simple rename + adjust `export const config = {...}` if needed.
+
+---
+
+## 10. Phase 2 Deferred / Follow-ups
+
+### 10.1 Upgrade from canary React to stable React 19
+
+Deferred during Phase 2 because the stable channel caused an incompatibility with a package in the current dependency set. `package.json` still pins `react` / `react-dom` to `^19.3.0-canary-da9325b5-20260417`.
+
+**Follow-up**: re-attempt the upgrade after identifying the conflicting package. Likely candidates are `@vis.gl/react-google-maps`, `embla-carousel-react`, `eslint-config-next` (14.2.5), or an internal `react/canary` type import (see `app/layout.tsx` — `<ViewTransition>` uses canary types). Narrow by bumping one at a time.
+
+### 10.2 Automated tests (Vitest / Testing Library / Playwright)
+
+Deferred per user request during Phase 2 execution. The original Phase 5 §P3 entries for Vitest smoke tests and Playwright e2e still apply:
+- Smoke tests for auth flow, home page load, restaurant detail render
+- E2E tests for check-in and order logging flows
+- Add `npm test` script and wire into CI
+
+**Why it matters**: Phase 2 introduces non-trivial refactors (server-component split, hook extraction, role-permission changes). Without tests, regressions in these flows are only caught in production.
+
+### 10.3 Full split of the restaurant detail page
+
+**Resolved.** Introduced `RestaurantDetailContext` and extracted `StickyHeader`, `RestaurantActionBar`, and `VisitHistorySection` into sibling files under `app/restaurant/[id]/`. Local `formatDate` / `formatTime` helpers moved to `formatters.ts` so the new components can share them. `RestaurantDetailClient.tsx` still holds the heavier sections (hero, curator take, recommended items, curator order history) and the modals — further decomposition is possible but no longer blocking.

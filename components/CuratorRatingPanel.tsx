@@ -15,7 +15,9 @@ type Props = {
   ratings: CuratorRating[];
   profiles: Record<string, CuratorProfile>;
   userId?: string;
-  isAdmin: boolean;
+  /** True when the viewer can edit their own rating/note (admins, superusers,
+   *  curators). */
+  canEdit: boolean;
   onSave: (args: {
     rating: number | null;
     note: string | null;
@@ -68,7 +70,7 @@ export default function CuratorRatingPanel({
   ratings,
   profiles,
   userId,
-  isAdmin,
+  canEdit,
   onSave,
   bare = false,
 }: Props) {
@@ -174,7 +176,7 @@ export default function CuratorRatingPanel({
         </div>
       )}
 
-      {isAdmin && userId && (
+      {canEdit && userId && (
         <div
           className={`${showAllCurators ? "mt-4 pt-4 border-t border-brd" : ""}`}
         >
