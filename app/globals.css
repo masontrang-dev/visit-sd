@@ -4,98 +4,133 @@
 
 @layer base {
   :root {
-    --accent: #d85a30;
-    --accent2: #1d9e75;
-    --bg: #fafaf8;
-    --bg2: #f1efe8;
-    --txt: #1a1a18;
-    --txt2: #5f5e5a;
-    --brd: rgba(26, 26, 24, 0.12);
-    --error: #c0392b;
-    --success: #1d9e75;
-    --warning: #d4a017;
-    /* --font-display and --font-body are set by next/font via CSS variables on <html> */
+    /* ── Graze v2.1 palette ──
+       Forest/sage greens lead, warm cream backgrounds, heat (hot/warm/cool/cold)
+       used for momentum/recency signals. Coral reserved for errors/destructive. */
+    --accent: #2d6a4f;        /* Sage — primary brand, CTAs */
+    --accent2: #52b788;       /* Moss — secondary, active states, success */
+    --bg: #faf8f3;            /* Cream — page background */
+    --bg2: #f2ede3;           /* Warm — secondary surfaces, hover */
+    --txt: #1c1c1e;           /* Charcoal — primary text */
+    --txt2: #4a4a4a;          /* Mid — secondary text */
+    --brd: #e8e3da;           /* Border / dividers */
+    --error: #e76f51;         /* Hot — destructive */
+    --success: #52b788;       /* Moss */
+    --warning: #f4a261;       /* Warm */
 
-    /* Cuisine palette */
-    --cuisine-1: #d85a30;
-    --cuisine-2: #1d9e75;
-    --cuisine-3: #2d7dd2;
-    --cuisine-4: #9b5de5;
-    --cuisine-5: #c4663a;
-    --cuisine-6: #00856a;
-    --cuisine-7: #d4584a;
-    --cuisine-8: #5a7d4f;
-    --cuisine-9: #b07c3b;
-    --cuisine-10: #7c6992;
+    /* Graze deeper greens — available for emphasis */
+    --forest: #1a3a2a;
+    --mint: #95d5b2;
+    --pale: #d8f3dc;
 
-    /* Semantic tint tokens for status badges and pills */
-    --recency-bg: rgba(250, 238, 218, 0.95);
-    --recency-txt: #633806;
-    --open-bg: rgba(234, 243, 222, 0.95);
-    --open-txt: #27500a;
-    --closed-bg: rgba(241, 239, 232, 0.95);
-    --closed-txt: #5f5e5a;
-    --pick-bg: #e1f5ee;
-    --pick-txt: #085041;
+    /* Heat / momentum spectrum (Graze v2.1 core engagement metaphor) */
+    --hot: #e76f51;
+    --warm: #f4a261;
+    --cool: #457b9d;
+    --cold: #a8dadc;
+    --hot-bg: rgba(231, 111, 81, 0.14);
+    --warm-bg: rgba(244, 162, 97, 0.16);
+    --cool-bg: rgba(69, 123, 157, 0.14);
+    --cold-bg: rgba(168, 218, 220, 0.22);
+
+    /* Cuisine palette — re-tuned to harmonise with Graze warm/green identity */
+    --cuisine-1: #2d6a4f; /* Sage */
+    --cuisine-2: #52b788; /* Moss */
+    --cuisine-3: #457b9d; /* Cool */
+    --cuisine-4: #7c6992; /* Plum */
+    --cuisine-5: #e76f51; /* Hot coral */
+    --cuisine-6: #1a3a2a; /* Forest */
+    --cuisine-7: #c4663a; /* Burnt sienna */
+    --cuisine-8: #5a7d4f; /* Olive */
+    --cuisine-9: #f4a261; /* Warm */
+    --cuisine-10: #a8dadc; /* Cold */
+
+    /* Semantic tint tokens for status badges.
+       These sit over restaurant photos, so backgrounds are near-opaque
+       (not the low-alpha Graze on-surface tints) to maintain legibility. */
+    --recency-bg: #fce8d2;        /* near-opaque warm peach */
+    --recency-txt: #6b3410;       /* deep warm brown */
+    --open-bg: #d8efe1;            /* near-opaque pale moss */
+    --open-txt: #14361f;           /* deep forest */
+    --closed-bg: #ece8df;          /* near-opaque warm gray */
+    --closed-txt: #2a2a2a;         /* near-charcoal */
+    --pick-bg: #cfe6d9;             /* near-opaque sage tint */
+    --pick-txt: #143a26;            /* deep forest */
   }
 
   .dark {
-    --accent: #e8734f;
-    --accent2: #2bbf8e;
-    --bg: #1a1a18;
-    --bg2: #2a2a26;
-    --txt: #fafaf8;
-    --txt2: #a8a7a3;
-    --brd: rgba(250, 250, 248, 0.12);
-    --error: #e74c3c;
-    --success: #2bbf8e;
-    --warning: #f0c040;
+    /* Dark-mode tuning per Graze documentation backgrounds (#0E0F0D / #141512) */
+    --accent: #52b788;        /* Moss — brighter for dark contrast */
+    --accent2: #95d5b2;       /* Mint */
+    --bg: #141512;
+    --bg2: #1f1f1c;
+    --txt: #faf8f3;
+    --txt2: #8a8880;
+    --brd: rgba(232, 227, 218, 0.12);
+    --error: #f08770;
+    --success: #95d5b2;
+    --warning: #f6b67a;
 
-    /* Cuisine palette (dark) */
-    --cuisine-1: #e8734f;
-    --cuisine-2: #2bbf8e;
-    --cuisine-3: #4a9ae8;
-    --cuisine-4: #b07ce8;
-    --cuisine-5: #d98060;
-    --cuisine-6: #1aab88;
-    --cuisine-7: #e87068;
-    --cuisine-8: #7a9e6e;
-    --cuisine-9: #cfa05a;
-    --cuisine-10: #9a88ad;
+    --forest: #95d5b2;
+    --mint: #d8f3dc;
+    --pale: #1a3a2a;
 
-    /* Semantic tint tokens — tuned for dark-mode contrast while preserving warmth */
-    --recency-bg: rgba(90, 58, 20, 0.85);
-    --recency-txt: #f5d9a8;
-    --open-bg: rgba(32, 74, 36, 0.85);
-    --open-txt: #bfe8b3;
-    --closed-bg: rgba(50, 50, 46, 0.85);
-    --closed-txt: #a8a7a3;
-    --pick-bg: rgba(20, 72, 56, 0.85);
-    --pick-txt: #9fe3ca;
+    --hot: #f08770;
+    --warm: #f6b67a;
+    --cool: #6fa3c4;
+    --cold: #c4e8ea;
+    --hot-bg: rgba(240, 135, 112, 0.18);
+    --warm-bg: rgba(246, 182, 122, 0.18);
+    --cool-bg: rgba(111, 163, 196, 0.18);
+    --cold-bg: rgba(196, 232, 234, 0.14);
+
+    --cuisine-1: #52b788;
+    --cuisine-2: #95d5b2;
+    --cuisine-3: #6fa3c4;
+    --cuisine-4: #a48fb8;
+    --cuisine-5: #f08770;
+    --cuisine-6: #95d5b2;
+    --cuisine-7: #d98060;
+    --cuisine-8: #98b08c;
+    --cuisine-9: #f6b67a;
+    --cuisine-10: #c4e8ea;
+
+    /* Dark-mode badge tints — also near-opaque since they overlay photos */
+    --recency-bg: #4a2a14;          /* deep warm brown */
+    --recency-txt: #f8d8a8;         /* warm cream */
+    --open-bg: #1f4a30;              /* deep forest */
+    --open-txt: #cfeedb;             /* pale mint */
+    --closed-bg: #2e2e2a;            /* charcoal-warm */
+    --closed-txt: #d8d4c8;           /* warm light gray */
+    --pick-bg: #1f4a30;              /* deep forest */
+    --pick-txt: #cfeedb;             /* pale mint */
   }
 
   body {
     @apply font-body bg-bg text-txt antialiased;
+    /* Graze body text leans on a generous 1.7 line-height for editorial feel */
+    line-height: 1.7;
   }
 }
 
 @layer components {
-  /* ── Buttons ── */
+  /* ── Buttons (Graze: 12px radius, 0.2s transitions, sage primary) ── */
   .btn-base {
-    @apply font-body font-medium cursor-pointer transition-all duration-[0.12s]
+    @apply font-body font-medium cursor-pointer transition-all duration-200
            focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg
            disabled:opacity-40 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn-base bg-accent text-white border-none text-sm py-2.5 px-4 rounded-none
-           hover:opacity-90;
+    @apply btn-base bg-accent text-white border-none text-sm py-2.5 px-4 rounded-md
+           hover:bg-[var(--forest)];
   }
   .btn-secondary {
-    @apply btn-base bg-txt text-bg border-[1.5px] border-txt text-sm py-2.5 px-4 rounded-none;
+    @apply btn-base bg-txt text-bg border-[1.5px] border-txt text-sm py-2.5 px-4 rounded-md
+           hover:opacity-90;
   }
   .btn-outline {
-    @apply btn-base bg-transparent text-txt2 border-[1.5px] border-brd text-sm py-2.5 px-4 rounded-none
-           hover:bg-bg2;
+    @apply btn-base bg-transparent text-txt border-[1.5px] border-brd text-sm py-2.5 px-4 rounded-md
+           hover:border-accent hover:text-accent hover:bg-bg2;
   }
   .btn-ghost {
     @apply btn-base bg-transparent border-none text-txt2 text-sm p-0;
@@ -104,29 +139,72 @@
     @apply rounded-pill;
   }
 
-  /* ── Inputs ── */
+  /* ── Inputs (Graze: 10px radius, sage focus border) ── */
   .input-base {
-    @apply w-full py-2 px-3 text-base border-[1.5px] border-brd bg-bg text-txt
-           rounded-none outline-none font-body transition-[border-color] duration-[0.12s]
-           focus:border-accent focus-visible:ring-2 focus-visible:ring-accent
+    @apply w-full py-2.5 px-3 text-base border-[1.5px] border-brd bg-bg text-txt
+           rounded-md outline-none font-body transition-[border-color,background-color] duration-200
+           focus:border-accent focus:bg-bg2 focus-visible:ring-2 focus-visible:ring-accent
            focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
   }
 
-  /* ── Chips ── */
+  /* ── Chips (Graze pills: 100px radius, sage active state) ── */
   .chip {
     @apply font-body text-sm font-medium py-1.5 px-3.5 rounded-pill border-[1.5px]
            border-brd bg-transparent cursor-pointer text-txt2
-           transition-all duration-[0.12s] whitespace-nowrap active:scale-95;
+           transition-all duration-200 whitespace-nowrap active:scale-95
+           hover:border-accent hover:text-accent;
   }
   .chip-active {
     @apply font-body text-sm font-medium py-1.5 px-3.5 rounded-pill border-[1.5px]
-           border-txt bg-txt cursor-pointer text-bg
-           transition-all duration-[0.12s] whitespace-nowrap active:scale-95;
+           border-accent bg-accent cursor-pointer text-white
+           transition-all duration-200 whitespace-nowrap active:scale-95;
   }
 
   /* ── Badge ── */
   .badge {
     @apply text-2xs font-medium px-2 py-0.5 rounded-pill tracking-wide uppercase;
+  }
+
+  /* ── Card (Graze: 14px radius, soft border, lift on hover) ── */
+  .card-base {
+    @apply bg-bg border border-brd rounded-card transition-all duration-200
+           hover:bg-bg2 hover:border-accent/30
+           hover:shadow-[0_4px_18px_-6px_rgba(28,28,30,0.12)];
+  }
+
+  /* ── Modal surface (Graze: 14px radius, charcoal border, no longer sharp) ── */
+  .modal-base {
+    @apply bg-bg border-2 border-txt rounded-card
+           shadow-[0_24px_48px_-12px_rgba(0,0,0,0.35),0_8px_16px_-8px_rgba(0,0,0,0.18)];
+  }
+
+  /* ── Momentum tags (Graze v2.1: color-paired bg + text pills) ──
+     Use for recency / activity / "trending" signals. */
+  .tag-hot {
+    @apply text-2xs font-medium px-2 py-0.5 rounded-pill tracking-wide uppercase
+           bg-[var(--hot-bg)] text-hot;
+  }
+  .tag-warm {
+    @apply text-2xs font-medium px-2 py-0.5 rounded-pill tracking-wide uppercase
+           bg-[var(--warm-bg)] text-warm;
+  }
+  .tag-cool {
+    @apply text-2xs font-medium px-2 py-0.5 rounded-pill tracking-wide uppercase
+           bg-[var(--cool-bg)] text-cool;
+  }
+  .tag-cold {
+    @apply text-2xs font-medium px-2 py-0.5 rounded-pill tracking-wide uppercase
+           bg-[var(--cold-bg)] text-cool;
+  }
+
+  /* ── Editorial label (Graze: uppercase mono micro-label) ── */
+  .label-eyebrow {
+    @apply font-mono text-2xs uppercase tracking-wider text-txt2;
+  }
+
+  /* ── Editorial heading variants (Graze: Playfair italic for elegance) ── */
+  .heading-display {
+    @apply font-display font-normal italic;
   }
 }
 

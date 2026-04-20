@@ -120,10 +120,10 @@ export default function SectionNav() {
               href={`#${s.id}`}
               onClick={(e) => handleClick(e, s.id)}
               aria-current={active ? "true" : undefined}
-              className={`shrink-0 text-2xs font-medium tracking-wide uppercase px-2.5 py-1 rounded-pill border-[1.5px] transition-colors duration-[0.12s] no-underline ${
+              className={`shrink-0 text-2xs font-medium tracking-wide uppercase px-3 py-1 rounded-pill border-[1.5px] transition-colors duration-200 no-underline ${
                 active
-                  ? "text-bg border-transparent"
-                  : "text-txt2 border-brd hover:border-txt hover:text-txt"
+                  ? "text-white border-transparent"
+                  : "text-txt2 border-brd hover:border-accent hover:text-accent"
               }`}
               style={active ? { backgroundColor: cuisineColor } : undefined}
             >

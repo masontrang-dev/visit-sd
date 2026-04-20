@@ -21,31 +21,34 @@ export default function StickyHeader() {
 
   return (
     <div
-      className={`fixed top-0 left-0 right-0 z-30 bg-bg border-b-2 border-txt transition-transform duration-300 motion-reduce:transition-none ${
+      className={`fixed top-0 left-0 right-0 z-30 bg-bg/85 backdrop-blur-md border-b border-brd shadow-[0_4px_18px_-12px_rgba(28,28,30,0.22)] transition-transform duration-300 motion-reduce:transition-none ${
         isScrolled ? "translate-y-0" : "-translate-y-full"
       }`}
       style={{ visibility: hasScrolled.current ? "visible" : "hidden" }}
     >
       <div
         aria-hidden="true"
-        className="h-1 w-full"
+        className="h-[3px] w-full"
         style={{ backgroundColor: cuisineColor }}
       />
-      <div className="flex items-center justify-between p-4">
+      <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <Link
             href="/"
             onClick={handleBackClick}
-            className="text-txt no-underline shrink-0"
+            aria-label="Back"
+            className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-brd bg-bg text-txt no-underline transition-colors duration-200 hover:border-accent hover:text-accent hover:bg-bg2"
           >
-            ←
+            <span aria-hidden="true" className="text-base leading-none">
+              ←
+            </span>
           </Link>
           <div className="min-w-0 flex-1">
-            <h2 className="font-display text-2xl leading-tight truncate flex items-center gap-2">
+            <h2 className="font-display italic text-2xl leading-tight truncate flex items-center gap-2">
               <span className="truncate">{restaurant.name}</span>
               {restaurant.must_try && (
                 <span
-                  className="text-accent shrink-0 text-lg"
+                  className="text-accent shrink-0 text-lg not-italic"
                   aria-label="Must-try"
                   title="Must-try"
                 >
@@ -53,7 +56,7 @@ export default function StickyHeader() {
                 </span>
               )}
             </h2>
-            <p className="text-xs text-txt2 truncate">
+            <p className="font-mono text-2xs uppercase tracking-wider text-txt2 truncate mt-0.5">
               {restaurant.cuisine} · {restaurant.neighborhood}
             </p>
           </div>

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bebas_Neue, DM_Sans } from "next/font/google";
+import { Playfair_Display, Syne, DM_Mono } from "next/font/google";
 import { ViewTransition } from "react";
 // Canary channel types for <ViewTransition>
 import type {} from "react/canary";
@@ -8,18 +8,25 @@ import { AuthProvider } from "@/lib/auth-context";
 import ToastProvider from "@/components/Toast";
 import PageViewTracker from "@/components/PageViewTracker";
 
-const bebasNeue = Bebas_Neue({
-  weight: "400",
+const playfairDisplay = Playfair_Display({
+  weight: ["400", "500", "700"],
+  style: ["normal", "italic"],
   subsets: ["latin"],
   variable: "--font-display",
   display: "swap",
 });
 
-const dmSans = DM_Sans({
-  weight: ["400", "500"],
-  style: ["normal", "italic"],
+const syne = Syne({
+  weight: ["400", "500", "700"],
   subsets: ["latin"],
   variable: "--font-body",
+  display: "swap",
+});
+
+const dmMono = DM_Mono({
+  weight: ["400", "500"],
+  subsets: ["latin"],
+  variable: "--font-mono",
   display: "swap",
 });
 
@@ -48,8 +55,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fafaf8" },
-    { media: "(prefers-color-scheme: dark)", color: "#1a1a18" },
+    { media: "(prefers-color-scheme: light)", color: "#FAF8F3" },
+    { media: "(prefers-color-scheme: dark)", color: "#141512" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -61,7 +68,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${bebasNeue.variable} ${dmSans.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${playfairDisplay.variable} ${syne.variable} ${dmMono.variable}`} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{

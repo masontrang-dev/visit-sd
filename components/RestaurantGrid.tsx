@@ -148,13 +148,13 @@ function Card({
                 </div>
                 <div className="absolute top-2 right-2 flex gap-1.5 flex-wrap justify-end">
                   {recencyTag && (
-                    <span className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80 bg-recency-bg text-recency-txt">
+                    <span className="text-2xs font-bold px-2 py-1 rounded-pill shadow-sm tracking-wide uppercase border-2 border-white/80 bg-recency-bg text-recency-txt">
                       {recencyTag.text}
                     </span>
                   )}
                   {openNow !== null && (
                     <span
-                      className={`text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80 ${
+                      className={`text-2xs font-bold px-2 py-1 rounded-pill shadow-sm tracking-wide uppercase border-2 border-white/80 ${
                         openNow
                           ? "bg-open-bg text-open-txt"
                           : "bg-closed-bg text-closed-txt"
