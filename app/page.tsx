@@ -6,7 +6,6 @@ import { supabase, type Restaurant } from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar from "@/components/FilterBar";
 import MapView from "@/components/MapView";
-import ContextHeader from "@/components/ContextHeader";
 import SurpriseBar from "@/components/SurpriseBar";
 import CheckInModal from "@/components/CheckInModal";
 import AddModal from "@/components/AddModal";
@@ -14,11 +13,16 @@ import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import ActivityFeed from "@/components/ActivityFeed";
 import AdminButton from "@/components/AdminButton";
+import ContextHeader from "@/components/ContextHeader";
 import { useAuth } from "@/lib/auth-context";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useHomeData } from "@/hooks/useHomeData";
 import { useFilterState } from "@/hooks/useFilterState";
+import { useGeolocation } from "@/hooks/useGeolocation";
+import { useWishlist } from "@/hooks/useWishlist";
 import { success } from "@/lib/haptics";
+import { isCurrentlyOpen } from "@/lib/google-types";
+import { haversineMiles } from "@/lib/distance";
 
 function SkeletonCard() {
   return (
@@ -127,23 +131,51 @@ function HomeContent() {
   const {
     activeCuisines,
     activeNeighborhoods,
+    activeOccasions,
     mustTryFilter,
+    openNowFilter,
+    wishlistFilter,
     activePrices,
     activeVisibility,
     searchQuery,
     debouncedSearch,
     viewMode,
     imageDisplayMode,
+    sortMode,
     isFiltered,
     setActiveCuisines,
     setActiveNeighborhoods,
+    setActiveOccasions,
     setMustTryFilter,
+    setOpenNowFilter,
+    setWishlistFilter,
     setActivePrices,
     setActiveVisibility,
     setSearchQuery,
     setViewMode,
     setImageDisplayMode,
+    setSortMode,
   } = useFilterState();
+
+  const {
+    position: geoPosition,
+    status: geoStatus,
+    request: requestGeo,
+  } = useGeolocation();
+
+  const { ids: wishlistIds } = useWishlist(user);
+
+  // If the user signs out or clears their wishlist, don't leave the
+  // wishlist-only filter stranded — it would show an empty grid forever.
+  useEffect(() => {
+    if (!user && wishlistFilter) setWishlistFilter(false);
+  }, [user, wishlistFilter, setWishlistFilter]);
+
+  useEffect(() => {
+    if (sortMode === "near-me" && geoStatus === "idle") {
+      requestGeo();
+    }
+  }, [sortMode, geoStatus, requestGeo]);
 
   const [checkInRestaurant, setCheckInRestaurant] = useState<Restaurant | null>(
     null,
@@ -175,11 +207,17 @@ function HomeContent() {
           restaurant_id: checkInRestaurant.id,
           visited_by: visitedBy,
           visited_at: visitDate,
+          user_id: user.id,
         },
       ]);
 
     if (visitError) {
       console.error("Failed to log visit:", visitError);
+      if (/row-level security/i.test(visitError.message)) {
+        setAddOpError(
+          "You've already checked in here in the last 24 hours.",
+        );
+      }
       setVisitingId(null);
       return;
     }
@@ -278,6 +316,13 @@ function HomeContent() {
   const neighborhoods = Array.from(
     new Set(visibilityScoped.map((r) => r.neighborhood).filter(Boolean)),
   ).sort();
+  const occasions = useMemo(
+    () =>
+      Array.from(
+        new Set(visibilityScoped.flatMap((r) => r.occasions ?? [])),
+      ).sort(),
+    [visibilityScoped],
+  );
   const cuisineCounts = useMemo(() => {
     const m: Record<string, number> = {};
     visibilityScoped.forEach((r) => {
@@ -289,6 +334,15 @@ function HomeContent() {
     const m: Record<string, number> = {};
     visibilityScoped.forEach((r) => {
       if (r.neighborhood) m[r.neighborhood] = (m[r.neighborhood] ?? 0) + 1;
+    });
+    return m;
+  }, [visibilityScoped]);
+  const occasionCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    visibilityScoped.forEach((r) => {
+      (r.occasions ?? []).forEach((o) => {
+        m[o] = (m[o] ?? 0) + 1;
+      });
     });
     return m;
   }, [visibilityScoped]);
@@ -315,7 +369,14 @@ function HomeContent() {
           !activeNeighborhoods.includes(r.neighborhood || "")
         )
           return false;
+        if (activeOccasions.length > 0) {
+          const rOccasions = r.occasions ?? [];
+          if (!activeOccasions.some((o) => rOccasions.includes(o))) return false;
+        }
         if (mustTryFilter && !r.must_try) return false;
+        if (openNowFilter && isCurrentlyOpen(r.opening_hours) !== true)
+          return false;
+        if (wishlistFilter && !wishlistIds.has(r.id)) return false;
         if (activePrices.length > 0 && !activePrices.includes(r.price || ""))
           return false;
         if (debouncedSearch.trim()) {
@@ -334,11 +395,64 @@ function HomeContent() {
       activeVisibility,
       activeCuisines,
       activeNeighborhoods,
+      activeOccasions,
       mustTryFilter,
+      openNowFilter,
+      wishlistFilter,
+      wishlistIds,
       activePrices,
       debouncedSearch,
     ],
   );
+
+  const lastVisitedByRestaurant = useMemo(() => {
+    const map = new Map<number, number>();
+    Object.entries(visits).forEach(([restaurantId, visitList]) => {
+      let latest = 0;
+      for (const v of visitList) {
+        const t = v.visited_at ? new Date(v.visited_at).getTime() : 0;
+        if (t > latest) latest = t;
+      }
+      if (latest > 0) map.set(Number(restaurantId), latest);
+    });
+    return map;
+  }, [visits]);
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    if (sortMode === "rating") {
+      arr.sort((a, b) => (b.google_rating ?? 0) - (a.google_rating ?? 0));
+    } else if (sortMode === "recently-visited") {
+      arr.sort((a, b) => {
+        const ra =
+          lastVisitedByRestaurant.get(a.id) ??
+          (a.last_visited ? new Date(a.last_visited).getTime() : 0);
+        const rb =
+          lastVisitedByRestaurant.get(b.id) ??
+          (b.last_visited ? new Date(b.last_visited).getTime() : 0);
+        return rb - ra;
+      });
+    } else if (sortMode === "recently-added") {
+      arr.sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return tb - ta;
+      });
+    } else if (sortMode === "near-me" && geoPosition) {
+      arr.sort((a, b) => {
+        const da =
+          a.lat != null && a.lng != null
+            ? haversineMiles(geoPosition.lat, geoPosition.lng, a.lat, a.lng)
+            : Infinity;
+        const db =
+          b.lat != null && b.lng != null
+            ? haversineMiles(geoPosition.lat, geoPosition.lng, b.lat, b.lng)
+            : Infinity;
+        return da - db;
+      });
+    }
+    return arr;
+  }, [filtered, sortMode, lastVisitedByRestaurant, geoPosition]);
 
   const totalCount = restaurants.length;
   // Pills at the top describe the full dataset, not the current filter view,
@@ -386,7 +500,7 @@ function HomeContent() {
           className={`relative pt-6 md:pt-10 px-6 pb-4 md:pb-6 border-b-2 border-txt transition-opacity duration-500 overflow-hidden ${mounted ? "grain opacity-100" : "opacity-0"}`}
         >
           <div
-            className={`absolute top-4 right-4 flex flex-col items-end gap-2 ${mounted ? "z-10" : ""}`}
+            className={`absolute top-4 right-4 flex flex-col items-end gap-2 ${mounted ? "z-20" : ""}`}
           >
             <div className="flex gap-2">
               <ThemeToggle />
@@ -445,21 +559,16 @@ function HomeContent() {
           </div>
         </header>
       ) : (
-        <div className="relative">
-          <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-10">
-            <div className="flex gap-2">
-              <ThemeToggle />
-              <ActivityFeed />
-              <AdminButton />
-            </div>
-          </div>
+        <div className="flex items-center justify-between gap-3 px-6 pt-3 pb-2 border-b-2 border-txt bg-bg">
           <ContextHeader
-            activeCuisines={activeCuisines}
-            activeNeighborhoods={activeNeighborhoods}
-            searchQuery={debouncedSearch}
             matchCount={filtered.length}
             totalCount={totalCount}
           />
+          <div className="flex gap-2 shrink-0">
+            <ThemeToggle />
+            <ActivityFeed />
+            <AdminButton />
+          </div>
         </div>
       )}
 
@@ -472,12 +581,21 @@ function HomeContent() {
         activeNeighborhoods={activeNeighborhoods}
         onNeighborhoodChange={setActiveNeighborhoods}
         neighborhoodCounts={neighborhoodCounts}
+        occasions={occasions}
+        activeOccasions={activeOccasions}
+        onOccasionChange={setActiveOccasions}
+        occasionCounts={occasionCounts}
         priceCounts={priceCounts}
         onAdd={isAdmin ? () => setShowAddModal(true) : undefined}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         mustTryFilter={mustTryFilter}
         onMustTryFilterChange={setMustTryFilter}
+        openNowFilter={openNowFilter}
+        onOpenNowFilterChange={setOpenNowFilter}
+        wishlistFilter={wishlistFilter}
+        onWishlistFilterChange={setWishlistFilter}
+        showWishlist={!!user}
         activePrices={activePrices}
         onPriceChange={setActivePrices}
         isAdminView={isAdmin}
@@ -487,7 +605,23 @@ function HomeContent() {
         onSearchChange={setSearchQuery}
         imageDisplayMode={imageDisplayMode}
         onImageDisplayModeChange={setImageDisplayMode}
+        sortMode={sortMode}
+        onSortModeChange={setSortMode}
+        resultCount={filtered.length}
       />
+      {sortMode === "near-me" && geoStatus === "denied" && (
+        <p className="py-2 px-6 text-xs text-txt2">
+          Location permission denied — showing default order.
+        </p>
+      )}
+      {sortMode === "near-me" && geoStatus === "unsupported" && (
+        <p className="py-2 px-6 text-xs text-txt2">
+          Your browser doesn&apos;t support geolocation — showing default order.
+        </p>
+      )}
+      {sortMode === "near-me" && geoStatus === "requesting" && (
+        <p className="py-2 px-6 text-xs text-txt2">Getting your location…</p>
+      )}
 
       {addOpError && (
         <p className="py-3 px-6 text-error text-sm">{addOpError}</p>
@@ -507,7 +641,7 @@ function HomeContent() {
               aria-hidden={viewMode !== "list"}
             >
               <RestaurantGrid
-                restaurants={filtered}
+                restaurants={sorted}
                 grouped={false}
                 baseDelay={isFirstVisit ? 400 : 0}
                 recommendedItems={recommendedItems}
@@ -516,8 +650,10 @@ function HomeContent() {
                 onCheckIn={handleCheckInClick}
                 visitingId={visitingId}
                 visits={user ? visits : undefined}
+                userLocation={sortMode === "near-me" ? geoPosition : null}
+                preserveOrder={sortMode !== "default"}
               />
-              {isFiltered && <SurpriseBar restaurants={filtered} />}
+              {isFiltered && <SurpriseBar restaurants={sorted} />}
             </div>
             {mapEverMounted && (
               <div
@@ -528,14 +664,14 @@ function HomeContent() {
                 }`}
                 aria-hidden={viewMode !== "map"}
               >
-                <MapView restaurants={filtered} allRestaurants={restaurants} />
+                <MapView restaurants={sorted} allRestaurants={restaurants} />
               </div>
             )}
             {!isFiltered && viewMode === "list" && (
               <button
                 ref={surpriseBtnRef}
                 onClick={() => {
-                  const pool = filtered.filter(
+                  const pool = sorted.filter(
                     (r) => (r.visibility ?? "public") === "public",
                   );
                   if (pool.length === 0) return;

@@ -13,6 +13,7 @@ import {
   DEFAULT_CUISINE_OPTIONS,
   type OpeningHours,
 } from "@/lib/google-types";
+import { OCCASION_SUGGESTIONS } from "@/lib/occasions";
 
 type Props = {
   onSave: (entry: Omit<Restaurant, "id" | "created_at">) => Promise<boolean>;
@@ -42,18 +43,6 @@ const VISIBILITY_HINTS: Record<"public" | "private" | "archived", string> = {
   archived: "Kept for history — hidden from the public guide.",
 };
 
-const OCCASION_SUGGESTIONS = [
-  "casual",
-  "date-friendly",
-  "family-friendly",
-  "quick-bite",
-  "special-occasion",
-  "group-dining",
-  "late-night",
-  "brunch-spot",
-  "romantic",
-  "business-lunch",
-];
 
 const PRICE_LEVEL_MAP: Record<number, string> = {
   1: "$",

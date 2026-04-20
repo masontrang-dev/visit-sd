@@ -490,11 +490,17 @@ export default function RestaurantDetailClient({ params }: Props) {
           visited_by: visitedBy,
           visited_at: visitDate,
           note: note || null,
+          user_id: user?.id ?? null,
         },
       ]);
 
     if (insertError) {
-      toast("Failed to mark as visited", "error");
+      // The 24h cooldown is now enforced in Postgres; surface that clearly
+      // rather than leaving the user wondering why the button failed.
+      const msg = /row-level security/i.test(insertError.message)
+        ? "You've already checked in here in the last 24 hours."
+        : "Failed to mark as visited";
+      toast(msg, "error");
       setVisitingId(null);
       return;
     }

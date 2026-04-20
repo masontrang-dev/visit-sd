@@ -37,6 +37,7 @@ export type RestaurantVisit = {
   restaurant_id: number;
   visited_by: string;
   visited_at: string;
+  user_id?: string | null;
   note?: string | null;
   photo_url?: string | null;
 };
@@ -86,6 +87,13 @@ export type DrinkDetails = {
   toppings?: string[] | null;
   milk_type?: string | null;
   shots?: number | null;
+};
+
+export type WishlistItem = {
+  id: number;
+  user_id: string;
+  restaurant_id: number;
+  created_at: string;
 };
 
 export type ItemOrder = {

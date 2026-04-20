@@ -17,6 +17,7 @@ import PhotoCarousel, {
   type RestaurantPhoto,
 } from "@/components/PhotoCarousel";
 import { CUISINE_COLORS, buildCuisineColorMap } from "@/lib/cuisine-colors";
+import { haversineMiles, formatMiles } from "@/lib/distance";
 
 export type { RestaurantPhoto };
 
@@ -33,6 +34,11 @@ type Props = {
   recommendedItems?: Record<number, MenuItem[]>;
   restaurantPhotos?: Record<number, RestaurantPhoto[]>;
   imageDisplayMode?: ImageDisplayMode;
+  userLocation?: { lat: number; lng: number } | null;
+  /** When true, render restaurants in the exact order provided — skips the
+   * internal must-try-first / alphabetical sort. Set this when the parent has
+   * already applied a sort (e.g. rating, recently visited, near me). */
+  preserveOrder?: boolean;
 };
 
 function Card({
@@ -49,6 +55,7 @@ function Card({
   onNavigate,
   priority = false,
   heroName,
+  userLocation,
 }: {
   r: Restaurant;
   cuisineColor: string;
@@ -63,11 +70,16 @@ function Card({
   onNavigate?: () => void;
   priority?: boolean;
   heroName?: string;
+  userLocation?: { lat: number; lng: number } | null;
 }) {
   const isAdmin = !!(onEdit || onOrder);
   const visitCount = visits?.[r.id]?.length ?? 0;
   const recencyTag = formatRecencyTag(r.last_visited);
   const topDishes = recommendedItems?.slice(0, 3) || [];
+  const distance =
+    userLocation && r.lat != null && r.lng != null
+      ? haversineMiles(userLocation.lat, userLocation.lng, r.lat, r.lng)
+      : null;
 
   function formatDate(dateStr: string | null) {
     if (!dateStr) return "";
@@ -206,6 +218,11 @@ function Card({
                 style={{ backgroundColor: cuisineColor }}
               />
               {r.neighborhood}
+            </span>
+          )}
+          {distance != null && (
+            <span className="text-2xs font-medium px-2 py-0.5 rounded-pill text-txt2 tracking-tight">
+              📍 {formatMiles(distance)}
             </span>
           )}
         </div>
@@ -363,6 +380,7 @@ function InfiniteCardGrid({
   recommendedItems,
   restaurantPhotos,
   imageDisplayMode = "full",
+  userLocation,
 }: {
   restaurants: Restaurant[];
   cuisineColorMap: Record<string, string>;
@@ -375,6 +393,7 @@ function InfiniteCardGrid({
   recommendedItems?: Record<number, MenuItem[]>;
   restaurantPhotos?: Record<number, RestaurantPhoto[]>;
   imageDisplayMode?: ImageDisplayMode;
+  userLocation?: { lat: number; lng: number } | null;
 }) {
   const [visibleCount, setVisibleCount] = useState(() => {
     try {
@@ -483,6 +502,7 @@ function InfiniteCardGrid({
               recommendedItems={recommendedItems?.[r.id]}
               restaurantPhotos={restaurantPhotos?.[r.id]}
               imageDisplayMode={imageDisplayMode}
+              userLocation={userLocation}
               onNavigate={() => handleNavigate(r.id)}
               priority={i === 0}
               heroName={
@@ -533,6 +553,8 @@ export default function RestaurantGrid({
   recommendedItems,
   restaurantPhotos,
   imageDisplayMode = "full",
+  userLocation,
+  preserveOrder,
 }: Props) {
   const cuisineColorMap = useMemo(
     () => buildCuisineColorMap(restaurants),
@@ -556,12 +578,15 @@ export default function RestaurantGrid({
     );
   }
 
-  // Sort: must-try first, then alphabetical by name
-  const sorted = [...restaurants].sort((a, b) => {
-    if (a.must_try && !b.must_try) return -1;
-    if (!a.must_try && b.must_try) return 1;
-    return (a.name || "").localeCompare(b.name || "");
-  });
+  // Default sort: must-try first, then alphabetical by name.
+  // Skip when the parent already applied its own sort order.
+  const sorted = preserveOrder
+    ? restaurants
+    : [...restaurants].sort((a, b) => {
+        if (a.must_try && !b.must_try) return -1;
+        if (!a.must_try && b.must_try) return 1;
+        return (a.name || "").localeCompare(b.name || "");
+      });
 
   if (!grouped) {
     return (
@@ -577,6 +602,7 @@ export default function RestaurantGrid({
         recommendedItems={recommendedItems}
         restaurantPhotos={restaurantPhotos}
         imageDisplayMode={imageDisplayMode}
+        userLocation={userLocation}
       />
     );
   }
@@ -621,6 +647,7 @@ export default function RestaurantGrid({
                   recommendedItems={recommendedItems?.[r.id]}
                   restaurantPhotos={restaurantPhotos?.[r.id]}
                   imageDisplayMode={imageDisplayMode}
+                  userLocation={userLocation}
                   onNavigate={() => setGroupedActiveHeroId(r.id)}
                   priority={i === 0 && j === 0}
                   heroName={

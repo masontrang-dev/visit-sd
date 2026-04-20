@@ -3,6 +3,7 @@
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/Toast";
 import { trackEvent } from "@/lib/analytics";
+import WishlistToggle from "@/components/WishlistToggle";
 import { useRestaurantDetail } from "./RestaurantDetailContext";
 
 export default function RestaurantActionBar() {
@@ -87,6 +88,9 @@ export default function RestaurantActionBar() {
             Log order
           </button>
         )}
+        <div className="py-1 flex items-center">
+          <WishlistToggle restaurantId={restaurant.id} variant="icon" />
+        </div>
         <button
           onClick={handleShare}
           className="py-3 px-4 rounded-lg text-sm font-medium text-center bg-bg2 text-txt border-[1.5px] border-brd transition-colors hover:border-txt"
