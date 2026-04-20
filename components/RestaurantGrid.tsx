@@ -137,25 +137,17 @@ function Card({
                 </div>
                 <div className="absolute top-2 right-2 flex gap-1.5 flex-wrap justify-end">
                   {recencyTag && (
-                    <span
-                      className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
-                      style={{
-                        backgroundColor: "rgba(250, 238, 218, 0.95)",
-                        color: "#633806",
-                      }}
-                    >
+                    <span className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80 bg-recency-bg text-recency-txt">
                       {recencyTag.text}
                     </span>
                   )}
                   {openNow !== null && (
                     <span
-                      className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
-                      style={{
-                        backgroundColor: openNow
-                          ? "rgba(234, 243, 222, 0.95)"
-                          : "rgba(241, 239, 232, 0.95)",
-                        color: openNow ? "#27500A" : "#5F5E5A",
-                      }}
+                      className={`text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80 ${
+                        openNow
+                          ? "bg-open-bg text-open-txt"
+                          : "bg-closed-bg text-closed-txt"
+                      }`}
                     >
                       {openNow ? "Open now" : "Closed"}
                     </span>
@@ -259,11 +251,7 @@ function Card({
             {topDishes.map((item) => (
               <span
                 key={item.id}
-                className="text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight"
-                style={{
-                  backgroundColor: "#E1F5EE",
-                  color: "#085041",
-                }}
+                className="text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight bg-pick-bg text-pick-txt"
               >
                 {item.name}
               </span>

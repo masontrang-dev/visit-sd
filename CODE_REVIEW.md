@@ -362,16 +362,16 @@ An empty `graze/` directory exists in the repo root with no contents. This is li
 
 | Done | Priority | Task | File(s) | Effort |
 |------|----------|------|---------|--------|
-| [ ] | P1 | Replace hardcoded hex colors with CSS variables in `RestaurantGrid`, `PhotoCarousel`, `MapView` | 3 files | 3h |
-| [ ] | P1 | Replace image-mode cycling button with a 3-way segmented control | `FilterBar.tsx` | 3h |
-| [ ] | P1 | Show "Surprise Me" button even when filtered (pick random from filtered set) | `app/page.tsx` | 1h |
-| [ ] | P1 | Add proper chart labels, axes, and tooltips to stats bar chart | `app/admin/stats/page.tsx` | 4h |
-| [ ] | P2 | Make FilterBar collapse into a "Filters" sheet on mobile | `FilterBar.tsx` | 1d |
-| [ ] | P2 | Add section anchor navigation on restaurant detail page | `app/restaurant/[id]/` | 4h |
-| [ ] | P2 | Add skeleton loading state for map view and stats page | `MapView.tsx`, stats page | 2h |
-| [ ] | P2 | Fix `MapView` InfoWindow to use CSS variables (dark mode) | `MapView.tsx` | 1h |
-| [ ] | P3 | Add per-restaurant `opengraph-image.tsx` using Next.js `ImageResponse` | New file | 4h |
-| [ ] | P3 | Add JSON-LD `Restaurant` structured data to detail page | `app/restaurant/[id]/` | 3h |
+| [x] | P1 | Replace hardcoded hex colors with CSS variables in `RestaurantGrid`, `PhotoCarousel`, `MapView` | 3 files | 3h |
+| [x] | P1 | Replace image-mode cycling button with a 3-way segmented control | `FilterBar.tsx` | 3h |
+| [x] | P1 | Show "Surprise Me" button even when filtered (pick random from filtered set) | `app/page.tsx` | 1h |
+| [x] | P1 | Add proper chart labels, axes, and tooltips to stats bar chart | `app/admin/stats/page.tsx` | 4h |
+| [x] | P2 | Make FilterBar collapse into a "Filters" sheet on mobile | `FilterBar.tsx` | 1d |
+| [x] | P2 | Add section anchor navigation on restaurant detail page | `app/restaurant/[id]/` | 4h |
+| [x] | P2 | Add skeleton loading state for map view and stats page | `MapView.tsx`, stats page | 2h |
+| [x] | P2 | Fix `MapView` InfoWindow to use CSS variables (dark mode) | `MapView.tsx` | 1h |
+| [x] | P3 | Add per-restaurant `opengraph-image.tsx` using Next.js `ImageResponse` | New file | 4h |
+| [x] | P3 | Add JSON-LD `Restaurant` structured data to detail page | `app/restaurant/[id]/` | 3h |
 
 ### Phase 4 — Feature Additions (Week 9–14)
 *New value-add features for public users and admins*
@@ -464,3 +464,27 @@ Deferred per user request during Phase 2 execution. The original Phase 5 §P3 en
 ### 10.3 Full split of the restaurant detail page
 
 **Resolved.** Introduced `RestaurantDetailContext` and extracted `StickyHeader`, `RestaurantActionBar`, and `VisitHistorySection` into sibling files under `app/restaurant/[id]/`. Local `formatDate` / `formatTime` helpers moved to `formatters.ts` so the new components can share them. `RestaurantDetailClient.tsx` still holds the heavier sections (hero, curator take, recommended items, curator order history) and the modals — further decomposition is possible but no longer blocking.
+
+---
+
+## 11. Phase 3 Deferred / Follow-ups
+
+### 11.1 FilterBar mobile "Filters" sheet
+
+**Resolved.** Below `md` (768px), the existing three desktop rows are hidden (`hidden md:flex`) and replaced with a single `Filters (N)` chip plus a horizontally scrollable row of active-filter pills. Tapping the chip opens a bottom sheet with the full control set: view toggle, image-mode segmented control, Must-Try, visibility (admin), and cuisine/area/price chip groups, with a `Clear all` / `Show results (N)` footer. Sheet open-state is mirrored to the `#filters` URL hash via `pushState` / `replaceState`, so back/forward navigation restores it. Desktop (`md+`) keeps the original inline layout untouched.
+
+Implementation notes for future work:
+
+- **Animation**: two CSS keyframe pairs in `tailwind.config.js` (`sheet-in` / `sheet-out`, `backdrop-in` / `backdrop-out`) drive the slide + fade. The sheet stays mounted for 280ms after `sheetOpen` flips to false so the exit keyframes can play before unmount. All animation utilities are gated by `motion-safe:` so reduced-motion users get an instant show/hide.
+- **Styling**: the sheet uses `rounded-t-[20px] overflow-hidden` with a soft ambient shadow and no top border. A drag-handle pill sits at the top for affordance, but the sheet is not yet draggable; swipe-to-dismiss would be a follow-up.
+- **Backdrop stacking**: the backdrop and sheet are both `absolute` inside a `fixed inset-0` container — the backdrop covers the full viewport (`absolute inset-0`) so it sits *behind* the sheet, not above it. A previous attempt used `flex flex-col` with the backdrop as `flex-1` and the sheet stacked below; that caused the page's own `bg-bg` to leak through the rounded corner cutouts (white in light mode, black in dark mode). Layering the backdrop full-bleed fixes it; do not revert to the stacked layout.
+- **Scroll-lock + ESC**: body overflow is locked while the sheet is open, and Escape closes it. Outside clicks on the backdrop also close.
+
+### 11.2 Notes on Phase 3 implementation
+
+A few notes worth preserving for future work in these areas:
+
+- **Semantic tint tokens**: `--recency-bg` / `--recency-txt`, `--open-bg` / `--open-txt`, `--closed-bg` / `--closed-txt`, and `--pick-bg` / `--pick-txt` now live in `app/globals.css` with dark-mode variants, mapped into Tailwind via `tailwind.config.js`. Prefer these over hardcoded hex when adding new status badges or pills.
+- **InfoWindow dark mode**: Google Maps' `InfoWindow` injects a fixed-white container into `.gm-style`. Rather than fight it per-marker, `app/globals.css` has a `.dark .gm-style .gm-style-iw-*` override that swaps the background to `var(--bg)` and the text to `var(--txt)` in dark mode, and content inside `MapView.tsx` now uses `text-txt` / `text-txt2` / `text-accent2` classes so the whole block themes together.
+- **`SectionNav`**: a tab bar (`app/restaurant/[id]/SectionNav.tsx`) is rendered *inside* `StickyHeader` so the title row and the tabs slide in/out as one unit — rendering them as separate fixed-positioned elements caused the z-30 `StickyHeader` to cover the section nav when it expanded. It detects section presence by DOM id at mount time and uses an `IntersectionObserver` with `rootMargin: -148px 0px -60% 0px` to track the active section. Anchor IDs in use: `our-take`, `recommended-items`, `order-history`, `visit-history`. New sections should add an `id` to participate.
+- **Stats `ViewsByDayChart`**: extracted into a local component with y-axis ticks, hover tooltips, peak highlighting, and summary stats (total / avg / peak). If usage grows, consider migrating to a charting lib (e.g. Recharts) rather than extending the inline SVG-less implementation.

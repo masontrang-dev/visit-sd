@@ -5,7 +5,25 @@ import RestaurantDetailClient from "./RestaurantDetailClient";
 
 type Params = Promise<{ id: string }>;
 
-async function fetchRestaurantMeta(id: number) {
+type RestaurantMeta = {
+  id: number;
+  name: string;
+  cuisine: string | null;
+  neighborhood: string | null;
+  price: string | null;
+  must_try: boolean | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  photo_url: string | null;
+  storefront_photo_url: string | null;
+  google_rating: number | null;
+  google_review_count: number | null;
+  google_maps_url: string | null;
+  visibility: string | null;
+};
+
+async function fetchRestaurantMeta(id: number): Promise<RestaurantMeta | null> {
   // Use the anon-key client here — generateMetadata runs during static/ISR
   // rendering where cookies() would make the route dynamic. Per-user
   // visibility checks stay on the client component.
@@ -15,10 +33,65 @@ async function fetchRestaurantMeta(id: number) {
   );
   const { data } = await supabase
     .from("restaurants")
-    .select("id, name, cuisine, neighborhood, price, must_try")
+    .select(
+      "id, name, cuisine, neighborhood, price, must_try, address, lat, lng, photo_url, storefront_photo_url, google_rating, google_review_count, google_maps_url, visibility",
+    )
     .eq("id", id)
     .single();
-  return data;
+  return (data as RestaurantMeta) ?? null;
+}
+
+function priceToRange(price: string | null): string | undefined {
+  if (!price) return undefined;
+  // Schema.org accepts "$", "$$", "$$$", "$$$$"
+  return price;
+}
+
+function buildRestaurantJsonLd(r: RestaurantMeta) {
+  const image = [r.photo_url, r.storefront_photo_url].filter(Boolean);
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Restaurant",
+    name: r.name,
+    ...(r.cuisine ? { servesCuisine: r.cuisine } : {}),
+    ...(image.length ? { image } : {}),
+    ...(r.address
+      ? {
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: r.address,
+            addressLocality: "San Diego",
+            addressRegion: "CA",
+            addressCountry: "US",
+          },
+        }
+      : {}),
+    ...(r.lat != null && r.lng != null
+      ? {
+          geo: {
+            "@type": "GeoCoordinates",
+            latitude: r.lat,
+            longitude: r.lng,
+          },
+        }
+      : {}),
+    ...(priceToRange(r.price) ? { priceRange: priceToRange(r.price) } : {}),
+    ...(r.google_rating != null
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: r.google_rating,
+            ...(r.google_review_count != null
+              ? { reviewCount: r.google_review_count }
+              : {}),
+            bestRating: 5,
+            worstRating: 1,
+          },
+        }
+      : {}),
+    ...(r.google_maps_url ? { sameAs: [r.google_maps_url] } : {}),
+  };
+  return jsonLd;
 }
 
 export async function generateMetadata({
@@ -50,6 +123,9 @@ export async function generateMetadata({
   return {
     title,
     description,
+    alternates: {
+      canonical: `/restaurant/${restaurant.id}`,
+    },
     openGraph: {
       title,
       description,
@@ -75,5 +151,20 @@ export default async function RestaurantDetailPage({
   const restaurant = await fetchRestaurantMeta(parsed);
   if (!restaurant) notFound();
 
-  return <RestaurantDetailClient params={params} />;
+  // Only emit JSON-LD for publicly visible restaurants — hides private/archived
+  // spots from search indexing.
+  const isPublic = (restaurant.visibility ?? "public") === "public";
+  const jsonLd = isPublic ? buildRestaurantJsonLd(restaurant) : null;
+
+  return (
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      <RestaurantDetailClient params={params} />
+    </>
+  );
 }

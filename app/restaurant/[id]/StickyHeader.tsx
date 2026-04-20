@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRestaurantDetail } from "./RestaurantDetailContext";
+import SectionNav from "./SectionNav";
 
 export default function StickyHeader() {
   const router = useRouter();
@@ -58,6 +59,7 @@ export default function StickyHeader() {
           </div>
         </div>
       </div>
+      <SectionNav />
     </div>
   );
 }

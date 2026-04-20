@@ -174,25 +174,17 @@ export default function PhotoCarousel({
       {/* Top-right: recency, open/closed */}
       <div className="absolute top-2 right-2 flex gap-1.5 flex-wrap justify-end z-[2]">
         {recencyTag && (
-          <span
-            className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
-            style={{
-              backgroundColor: "rgba(250, 238, 218, 0.95)",
-              color: "#633806",
-            }}
-          >
+          <span className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80 bg-recency-bg text-recency-txt">
             {recencyTag.text}
           </span>
         )}
         {openNow !== null && (
           <span
-            className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80"
-            style={{
-              backgroundColor: openNow
-                ? "rgba(234, 243, 222, 0.95)"
-                : "rgba(241, 239, 232, 0.95)",
-              color: openNow ? "#27500A" : "#5F5E5A",
-            }}
+            className={`text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80 ${
+              openNow
+                ? "bg-open-bg text-open-txt"
+                : "bg-closed-bg text-closed-txt"
+            }`}
           >
             {openNow ? "Open now" : "Closed"}
           </span>

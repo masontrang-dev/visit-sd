@@ -6,10 +6,42 @@ import {
   Map,
   AdvancedMarker,
   InfoWindow,
+  useApiIsLoaded,
 } from "@vis.gl/react-google-maps";
 import Link from "next/link";
 import { type Restaurant } from "@/lib/supabase";
 import { CUISINE_COLORS, buildCuisineColorMap } from "@/lib/cuisine-colors";
+
+function MapSkeleton() {
+  return (
+    <div
+      aria-hidden="true"
+      className="absolute inset-0 bg-bg2 overflow-hidden"
+    >
+      <div
+        className="absolute inset-0 opacity-60"
+        style={{
+          backgroundImage:
+            "linear-gradient(90deg, transparent 0%, var(--bg) 50%, transparent 100%)",
+          backgroundSize: "200% 100%",
+          animation: "shimmer 1.5s ease-in-out infinite",
+        }}
+      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-txt2 text-sm bg-bg/80 px-3 py-1.5 rounded-pill backdrop-blur-sm">
+          <div className="w-3 h-3 border-2 border-txt2 border-t-transparent rounded-full animate-spin" />
+          Loading map...
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MapLoadingOverlay() {
+  const isLoaded = useApiIsLoaded();
+  if (isLoaded) return null;
+  return <MapSkeleton />;
+}
 
 function MarkerPin({ color }: { color: string }) {
   return (
@@ -59,8 +91,9 @@ export default function MapView({ restaurants, allRestaurants }: Props) {
   const markersData = restaurants.filter((r) => r.lat != null && r.lng != null);
 
   return (
-    <div className="h-[calc(100vh-200px)] min-h-[400px]">
+    <div className="h-[calc(100vh-200px)] min-h-[400px] relative">
       <APIProvider apiKey={apiKey}>
+        <MapLoadingOverlay />
         <Map
           defaultCenter={SD_CENTER}
           defaultZoom={12}
@@ -86,19 +119,18 @@ export default function MapView({ restaurants, allRestaurants }: Props) {
               position={{ lat: selected.lat, lng: selected.lng }}
               onCloseClick={() => setSelected(null)}
             >
-              <div className="font-body max-w-[220px] p-1" style={{ color: "#1a1a18" }}>
+              <div className="font-body max-w-[220px] p-1 text-txt">
                 <Link
                   href={`/restaurant/${selected.id}`}
-                  className="font-display text-xl leading-tight mb-1 block no-underline transition-colors"
-                  style={{ color: "#1a1a18" }}
+                  className="font-display text-xl leading-tight mb-1 block no-underline text-txt transition-colors"
                 >
                   {selected.name}
                 </Link>
-                <p className="text-xs mb-0.5" style={{ color: "#5f5e5a" }}>
+                <p className="text-xs mb-0.5 text-txt2">
                   {selected.cuisine} · {selected.price}
                 </p>
                 {selected.neighborhood && (
-                  <p className="text-xs" style={{ color: "#5f5e5a" }}>{selected.neighborhood}</p>
+                  <p className="text-xs text-txt2">{selected.neighborhood}</p>
                 )}
                 {selected.must_try && (
                   <span className="inline-block mt-1 text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white">
@@ -107,8 +139,7 @@ export default function MapView({ restaurants, allRestaurants }: Props) {
                 )}
                 <Link
                   href={`/restaurant/${selected.id}`}
-                  className="block mt-2 text-xs font-medium no-underline hover:opacity-70 transition-opacity"
-                  style={{ color: "#1d9e75" }}
+                  className="block mt-2 text-xs font-medium text-accent2 no-underline hover:opacity-70 transition-opacity"
                 >
                   View details →
                 </Link>

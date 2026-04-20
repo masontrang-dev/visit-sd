@@ -1,11 +1,201 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 import AdminButton from "@/components/AdminButton";
 import ThemeToggle from "@/components/ThemeToggle";
+
+function formatShortDate(iso: string) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function niceMax(value: number) {
+  if (value <= 1) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(value)));
+  const n = value / mag;
+  const nice = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+  return nice * mag;
+}
+
+function StatsSkeleton() {
+  return (
+    <div className="animate-pulse">
+      <div className="flex gap-4 mb-6 flex-wrap">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="p-4 pr-5 border-[1.5px] border-brd min-w-[140px]"
+          >
+            <div className="h-3 w-20 bg-bg2 mb-2" />
+            <div className="h-8 w-16 bg-bg2" />
+          </div>
+        ))}
+      </div>
+      <div className="mb-6">
+        <div className="h-3 w-48 bg-bg2 mb-2" />
+        <div className="flex items-end gap-0.5 h-32 border-b border-brd pb-1">
+          {Array.from({ length: 30 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex-1 min-w-[4px] bg-bg2"
+              style={{ height: `${20 + ((i * 37) % 70)}%` }}
+            />
+          ))}
+        </div>
+      </div>
+      {Array.from({ length: 3 }).map((_, section) => (
+        <div key={section} className="mb-6">
+          <div className="h-3 w-32 bg-bg2 mb-2" />
+          {Array.from({ length: 4 }).map((_, row) => (
+            <div
+              key={row}
+              className="flex justify-between py-1.5 border-b border-brd"
+            >
+              <div className="h-4 w-1/2 bg-bg2" />
+              <div className="h-4 w-8 bg-bg2" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ViewsByDayChart({
+  data,
+}: {
+  data: { date: string; count: number }[];
+}) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  const { rawMax, yMax, total, avg, peak, ticks } = useMemo(() => {
+    const counts = data.map((d) => d.count);
+    const rawMax = counts.length ? Math.max(...counts) : 0;
+    const yMax = niceMax(rawMax);
+    const total = counts.reduce((a, b) => a + b, 0);
+    const avg = counts.length ? total / counts.length : 0;
+    const peak = data.reduce(
+      (best, d) => (d.count > best.count ? d : best),
+      data[0],
+    );
+    const ticks = [0, 0.5, 1].map((r) => Math.round(yMax * r));
+    return { rawMax, yMax, total, avg, peak, ticks };
+  }, [data]);
+
+  if (data.length === 0) return null;
+
+  const labelIndexes = data.map((_, i) => i).filter((i) => {
+    if (data.length <= 7) return true;
+    // First, last, and evenly spaced middle labels
+    if (i === 0 || i === data.length - 1) return true;
+    const step = Math.max(1, Math.floor(data.length / 5));
+    return i % step === 0;
+  });
+
+  const hover = hoverIdx != null ? data[hoverIdx] : null;
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-baseline justify-between mb-2 gap-4 flex-wrap">
+        <p className="text-2xs tracking-wide uppercase font-medium text-txt2">
+          Views per day (last {data.length} days)
+        </p>
+        <div className="flex gap-4 text-2xs text-txt2">
+          <span>
+            Total <span className="text-txt font-medium">{total}</span>
+          </span>
+          <span>
+            Avg{" "}
+            <span className="text-txt font-medium">
+              {avg.toFixed(avg >= 10 ? 0 : 1)}
+            </span>
+          </span>
+          <span>
+            Peak <span className="text-txt font-medium">{rawMax}</span>
+          </span>
+        </div>
+      </div>
+
+      <div className="relative">
+        {/* Chart area with y-axis labels */}
+        <div className="flex gap-2">
+          <div className="flex flex-col justify-between items-end h-32 text-2xs text-txt2 py-1 w-6 shrink-0">
+            {[...ticks].reverse().map((t) => (
+              <span key={t} className="leading-none">
+                {t}
+              </span>
+            ))}
+          </div>
+
+          <div className="flex-1 relative h-32">
+            {/* Gridlines */}
+            {ticks.map((t, i) => (
+              <div
+                key={t}
+                className="absolute left-0 right-0 border-t border-brd"
+                style={{ top: `${(1 - i / (ticks.length - 1)) * 100}%` }}
+                aria-hidden="true"
+              />
+            ))}
+
+            {/* Bars */}
+            <div className="absolute inset-0 flex items-end gap-0.5 pb-px">
+              {data.map((d, i) => {
+                const h = yMax > 0 ? (d.count / yMax) * 100 : 0;
+                const isPeak = d.date === peak.date && d.count > 0;
+                const isHovered = hoverIdx === i;
+                return (
+                  <button
+                    key={d.date}
+                    type="button"
+                    onMouseEnter={() => setHoverIdx(i)}
+                    onMouseLeave={() => setHoverIdx(null)}
+                    onFocus={() => setHoverIdx(i)}
+                    onBlur={() => setHoverIdx(null)}
+                    aria-label={`${formatShortDate(d.date)}: ${d.count} views`}
+                    className={`flex-1 min-w-[4px] rounded-t-sm transition-opacity duration-100 outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      isHovered || isPeak ? "opacity-100" : "opacity-80"
+                    } ${isPeak ? "bg-accent" : "bg-accent/70 hover:bg-accent"}`}
+                    style={{ height: `${Math.max(h, 1.5)}%` }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Tooltip */}
+            {hover && (
+              <div
+                className="absolute -top-10 px-2 py-1 bg-txt text-bg text-2xs font-medium rounded-sm pointer-events-none shadow-md z-10 whitespace-nowrap"
+                style={{
+                  left: `${((hoverIdx! + 0.5) / data.length) * 100}%`,
+                  transform: "translateX(-50%)",
+                }}
+              >
+                {formatShortDate(hover.date)} · {hover.count} view
+                {hover.count !== 1 ? "s" : ""}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* X-axis labels */}
+        <div className="flex gap-0.5 pl-8 mt-1 relative h-4">
+          {data.map((d, i) => (
+            <div
+              key={d.date}
+              className="flex-1 min-w-[4px] text-2xs text-txt2 text-center"
+            >
+              {labelIndexes.includes(i) ? formatShortDate(d.date) : ""}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function StatsPage() {
   const { isSuperuser, isLoading: authLoading } = useAuth();
@@ -189,7 +379,7 @@ export default function StatsPage() {
 
       <section className="p-6">
         {statsLoading ? (
-          <p className="text-txt2 text-sm">Loading stats...</p>
+          <StatsSkeleton />
         ) : (
           <>
             <div className="flex gap-4 mb-6 flex-wrap">
@@ -229,27 +419,7 @@ export default function StatsPage() {
               </div>
             </div>
 
-            {viewsByDay.length > 0 && (
-              <div className="mb-6">
-                <p className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-2">
-                  Views per day (last 30 days)
-                </p>
-                <div className="flex items-end gap-0.5 h-20 border-b border-brd pb-1">
-                  {viewsByDay.map((d) => {
-                    const max = Math.max(...viewsByDay.map((v) => v.count));
-                    const h = max > 0 ? (d.count / max) * 70 : 0;
-                    return (
-                      <div
-                        key={d.date}
-                        title={`${d.date}: ${d.count}`}
-                        className="flex-1 bg-accent rounded-t-sm min-w-[4px]"
-                        style={{ height: Math.max(h, 2) }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {viewsByDay.length > 0 && <ViewsByDayChart data={viewsByDay} />}
 
             {topPages.length > 0 && (
               <div className="mb-6">

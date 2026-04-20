@@ -1256,7 +1256,10 @@ export default function RestaurantDetailClient({ params }: Props) {
           </>
         );
         return (
-          <section className="px-6 py-7 border-b border-brd scroll-fade-in">
+          <section
+            id="our-take"
+            className="px-6 py-7 border-b border-brd scroll-fade-in"
+          >
             {curatorRatings.length > 0 && (
               <header className="flex items-baseline justify-between gap-3 mb-5">
                 <h2 className="font-display text-2xl tracking-tight leading-none">
@@ -1398,7 +1401,10 @@ export default function RestaurantDetailClient({ params }: Props) {
 
       {/* What to order here — public-facing, recommended dishes only */}
       {publicDishes.length > 0 && (
-        <div className="p-6 border-b border-brd scroll-fade-in">
+        <div
+          id="recommended-items"
+          className="p-6 border-b border-brd scroll-fade-in"
+        >
           <h2 className="font-display text-xl mb-3 tracking-tight">
             Recommended Items
           </h2>
@@ -1490,7 +1496,10 @@ export default function RestaurantDetailClient({ params }: Props) {
 
       {/* Curator order history — read-only for non-admins */}
       {itemOrders.length > 0 && (
-        <div className="p-6 border-t border-brd scroll-fade-in">
+        <div
+          id="order-history"
+          className="p-6 border-t border-brd scroll-fade-in"
+        >
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h2 className="font-display text-xl tracking-tight">
               Curators&rsquo; order history

@@ -46,7 +46,7 @@ export default function VisitHistorySection() {
   } = useRestaurantDetail();
 
   return (
-    <div className="p-6 border-t border-brd scroll-fade-in">
+    <div id="visit-history" className="p-6 border-t border-brd scroll-fade-in">
       <button
         onClick={() => setShowVisitHistory((v) => !v)}
         className="w-full flex items-center justify-between gap-3 bg-transparent border-none cursor-pointer p-0 text-left"

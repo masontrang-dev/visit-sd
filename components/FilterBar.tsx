@@ -12,6 +12,14 @@ const VISIBILITY_OPTIONS: VisibilityFilter[] = [
   "all",
 ];
 
+const PRICE_OPTIONS = ["$", "$$", "$$$", "$$$$"] as const;
+
+const IMAGE_MODE_OPTIONS = [
+  { value: "full", label: "Full", icon: "🖼️" },
+  { value: "compact", label: "Compact", icon: "▢" },
+  { value: "none", label: "None", icon: "☰" },
+] as const;
+
 type Props = {
   cuisines: string[];
   activeCuisines: string[];
@@ -42,12 +50,6 @@ function toggleItem(arr: string[], item: string): string[] {
   return arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item];
 }
 
-function filterLabel(selected: string[], fallback: string): string {
-  if (selected.length === 0) return fallback;
-  if (selected.length === 1) return selected[0];
-  return `${selected.length} selected`;
-}
-
 export default function FilterBar({
   cuisines,
   activeCuisines,
@@ -76,6 +78,9 @@ export default function FilterBar({
   const [activePanel, setActivePanel] = useState<
     "cuisine" | "area" | "price" | null
   >(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // Stays true through the close animation so the exit can play before unmount
+  const [sheetMounted, setSheetMounted] = useState(false);
 
   const [isScrolled, setIsScrolled] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
@@ -87,7 +92,7 @@ export default function FilterBar({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Close panel on clicks outside the filter bar
+  // Close desktop panel on clicks outside the filter bar
   useEffect(() => {
     if (!activePanel) return;
     function handleClick(e: MouseEvent) {
@@ -99,12 +104,72 @@ export default function FilterBar({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [activePanel]);
 
+  // Sync mobile sheet state with URL hash so back/forward navigation preserves it
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash === "#filters") setSheetOpen(true);
+    function onHash() {
+      setSheetOpen(window.location.hash === "#filters");
+    }
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  // Scroll-lock body + ESC-to-close while sheet is open
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") closeSheet();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetOpen]);
+
+  // Delay unmount until the close animation finishes; cancel if reopened
+  useEffect(() => {
+    if (sheetOpen) {
+      setSheetMounted(true);
+      return;
+    }
+    const t = window.setTimeout(() => setSheetMounted(false), 280);
+    return () => window.clearTimeout(t);
+  }, [sheetOpen]);
+
+  function openSheet() {
+    setSheetOpen(true);
+    if (typeof window !== "undefined" && window.location.hash !== "#filters") {
+      window.history.pushState(null, "", "#filters");
+    }
+  }
+
+  function closeSheet() {
+    setSheetOpen(false);
+    if (typeof window !== "undefined" && window.location.hash === "#filters") {
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    }
+  }
+
   const hasCuisineFilter = activeCuisines.length > 0;
   const hasAreaFilter = (activeNeighborhoods ?? []).length > 0;
   const hasPriceFilter = (activePrices ?? []).length > 0;
   const panelOpen = activePanel !== null;
   const hasAnyFilter =
     hasCuisineFilter || hasAreaFilter || hasPriceFilter || mustTryFilter;
+  const filterCount =
+    activeCuisines.length +
+    (activeNeighborhoods?.length ?? 0) +
+    (activePrices?.length ?? 0) +
+    (mustTryFilter ? 1 : 0);
 
   function handleClearAll() {
     onCuisineChange([]);
@@ -125,12 +190,282 @@ export default function FilterBar({
     }
   }
 
+  // ── Render helpers (shared between desktop inline layout and mobile sheet) ──
+  function renderViewToggle() {
+    if (!onViewModeChange) return null;
+    return (
+      <>
+        <span className="text-2xs font-medium text-txt2 uppercase tracking-wide">
+          View:
+        </span>
+        <div className="flex gap-1">
+          <button
+            className={viewMode === "list" ? "chip-active" : "chip"}
+            onClick={() => onViewModeChange("list")}
+            title="Switch to list view"
+          >
+            List ☰
+          </button>
+          <button
+            className={viewMode === "map" ? "chip-active" : "chip"}
+            onClick={() => onViewModeChange("map")}
+            title="Switch to map view"
+          >
+            Map
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  function renderImageMode() {
+    if (viewMode !== "list" || !onImageDisplayModeChange) return null;
+    return (
+      <>
+        <span className="text-2xs font-medium text-txt2 uppercase tracking-wide">
+          Images:
+        </span>
+        <div
+          role="radiogroup"
+          aria-label="Image display mode"
+          className="inline-flex items-center rounded-pill border-[1.5px] border-brd bg-bg overflow-hidden"
+        >
+          {IMAGE_MODE_OPTIONS.map((opt, i) => {
+            const active = (imageDisplayMode || "full") === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => onImageDisplayModeChange(opt.value)}
+                title={`${opt.label} images`}
+                className={`text-xs font-medium py-1.5 px-3 transition-colors duration-[0.12s] focus:outline-none ${
+                  active
+                    ? "bg-txt text-bg"
+                    : "text-txt2 hover:text-txt hover:bg-bg2"
+                } ${i > 0 ? "border-l-[1.5px] border-brd" : ""}`}
+              >
+                <span aria-hidden className="mr-1">
+                  {opt.icon}
+                </span>
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
+
+  function renderMustTry() {
+    if (!onMustTryFilterChange) return null;
+    return (
+      <button
+        className={
+          mustTryFilter
+            ? "chip !border-accent !bg-accent !text-white"
+            : "chip"
+        }
+        onClick={() => onMustTryFilterChange(!mustTryFilter)}
+      >
+        ★ Must-Try
+      </button>
+    );
+  }
+
+  function renderVisibility() {
+    if (!isAdminView || !onVisibilityChange) return null;
+    return (
+      <>
+        <span className="text-2xs font-medium text-txt2 uppercase tracking-wide">
+          Visibility:
+        </span>
+        <div className="flex gap-1 flex-wrap">
+          {VISIBILITY_OPTIONS.map((v) => (
+            <button
+              key={v}
+              className={activeVisibility === v ? "chip-active" : "chip"}
+              onClick={() => onVisibilityChange(v)}
+              title={
+                v === "public"
+                  ? "Shown to everyone"
+                  : v === "private"
+                    ? "Curator journal only — hidden from public"
+                    : v === "archived"
+                      ? "Kept for history — hidden from public"
+                      : "All visibilities"
+              }
+            >
+              {v === "public"
+                ? "Public"
+                : v === "private"
+                  ? "🔒 Private"
+                  : v === "archived"
+                    ? "📦 Archived"
+                    : "All"}
+            </button>
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  function renderCuisineChips() {
+    return (
+      <div className="flex gap-1.5 flex-wrap items-center">
+        <button
+          className={!hasCuisineFilter ? "chip-active" : "chip"}
+          onClick={() => onCuisineChange([])}
+        >
+          All
+        </button>
+        {cuisines.map((c) => {
+          const count = cuisineCounts?.[c] ?? 0;
+          const empty = cuisineCounts && count === 0;
+          return (
+            <button
+              key={c}
+              disabled={empty}
+              className={`${
+                activeCuisines.includes(c) ? "chip-active" : "chip"
+              } ${empty ? "opacity-40 cursor-not-allowed" : ""}`}
+              onClick={() => onCuisineChange(toggleItem(activeCuisines, c))}
+            >
+              {c}
+              {cuisineCounts && (
+                <span className="ml-1 opacity-60">({count})</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderAreaChips() {
+    if (!neighborhoods || !onNeighborhoodChange) return null;
+    return (
+      <div className="flex gap-1.5 flex-wrap items-center">
+        <button
+          className={!hasAreaFilter ? "chip-active" : "chip"}
+          onClick={() => onNeighborhoodChange([])}
+        >
+          All
+        </button>
+        {neighborhoods.map((n) => {
+          const count = neighborhoodCounts?.[n] ?? 0;
+          const empty = neighborhoodCounts && count === 0;
+          return (
+            <button
+              key={n}
+              disabled={empty}
+              className={`${
+                (activeNeighborhoods ?? []).includes(n)
+                  ? "chip-active"
+                  : "chip"
+              } ${empty ? "opacity-40 cursor-not-allowed" : ""}`}
+              onClick={() =>
+                onNeighborhoodChange(toggleItem(activeNeighborhoods ?? [], n))
+              }
+            >
+              {n}
+              {neighborhoodCounts && (
+                <span className="ml-1 opacity-60">({count})</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderPriceChips() {
+    if (!onPriceChange) return null;
+    return (
+      <div className="flex gap-1.5 flex-wrap items-center">
+        <button
+          className={!hasPriceFilter ? "chip-active" : "chip"}
+          onClick={() => onPriceChange([])}
+        >
+          All
+        </button>
+        {PRICE_OPTIONS.map((p) => {
+          const count = priceCounts?.[p] ?? 0;
+          const empty = priceCounts && count === 0;
+          return (
+            <button
+              key={p}
+              disabled={empty}
+              className={`${
+                (activePrices ?? []).includes(p) ? "chip-active" : "chip"
+              } ${empty ? "opacity-40 cursor-not-allowed" : ""}`}
+              onClick={() => onPriceChange(toggleItem(activePrices ?? [], p))}
+            >
+              {p}
+              {priceCounts && (
+                <span className="ml-1 opacity-60">({count})</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderActivePills() {
+    return (
+      <>
+        {activeCuisines.map((cuisine) => (
+          <button
+            key={`pill-cuisine-${cuisine}`}
+            onClick={() => removeFilter("cuisine", cuisine)}
+            className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
+          >
+            {cuisine}
+            <span className="text-xs">✕</span>
+          </button>
+        ))}
+        {(activeNeighborhoods ?? []).map((area) => (
+          <button
+            key={`pill-area-${area}`}
+            onClick={() => removeFilter("area", area)}
+            className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
+          >
+            {area}
+            <span className="text-xs">✕</span>
+          </button>
+        ))}
+        {(activePrices ?? []).map((price) => (
+          <button
+            key={`pill-price-${price}`}
+            onClick={() => removeFilter("price", price)}
+            className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
+          >
+            {price}
+            <span className="text-xs">✕</span>
+          </button>
+        ))}
+        {mustTryFilter && onMustTryFilterChange && (
+          <button
+            key="pill-must-try"
+            onClick={() => onMustTryFilterChange(false)}
+            className="chip !border-accent !bg-accent !text-white flex items-center gap-1.5"
+          >
+            ★ Must-Try
+            <span className="text-xs">✕</span>
+          </button>
+        )}
+      </>
+    );
+  }
+
   return (
     <div
       ref={barRef}
       className={`sticky top-0 z-10 bg-bg isolate transition-[border-color] duration-200 ${isScrolled ? "border-b-2 border-txt" : "border-b-2 border-transparent"}`}
     >
-      {/* Row 1: Search + Add */}
+      {/* Row 1: Search + Add (all viewports) */}
       <div className="flex gap-2 pt-3 pb-2 px-6 items-center flex-wrap">
         {onSearchChange != null && (
           <input
@@ -152,151 +487,61 @@ export default function FilterBar({
         )}
       </div>
 
-      {/* Row 2: View toggle + Must Try */}
-      <div className="flex gap-2 pb-2 px-6 items-center justify-between flex-wrap">
-        <div className="flex gap-2 items-center">
-          {/* View mode toggle */}
-          {onViewModeChange && (
-            <>
-              <span className="text-2xs font-medium text-txt2 uppercase tracking-wide">
-                View:
-              </span>
-              <div className="flex gap-1">
-                <button
-                  className={viewMode === "list" ? "chip-active" : "chip"}
-                  onClick={() => {
-                    if (viewMode === "list" && onImageDisplayModeChange) {
-                      // Cycle through image display modes when already in list view
-                      const modes: ImageDisplayMode[] = [
-                        "full",
-                        "compact",
-                        "none",
-                      ];
-                      const currentIndex = modes.indexOf(
-                        imageDisplayMode || "full",
-                      );
-                      const nextIndex = (currentIndex + 1) % modes.length;
-                      onImageDisplayModeChange(modes[nextIndex]);
-                    } else {
-                      // Switch to list view
-                      onViewModeChange("list");
-                    }
-                  }}
-                  title={
-                    viewMode === "list"
-                      ? `List view: ${imageDisplayMode === "full" ? "Full images" : imageDisplayMode === "compact" ? "Compact images" : "No images"} (click to cycle)`
-                      : "Switch to list view"
-                  }
-                >
-                  {viewMode === "list"
-                    ? imageDisplayMode === "full"
-                      ? "Full 🖼️"
-                      : imageDisplayMode === "compact"
-                        ? "Compact ▢"
-                        : "List ☰"
-                    : "List ☰"}
-                </button>
-                <button
-                  className={viewMode === "map" ? "chip-active" : "chip"}
-                  onClick={() => onViewModeChange("map")}
-                  title="Switch to map view"
-                >
-                  Map
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Must-Try button on the right */}
-        {onMustTryFilterChange && (
+      {/* Mobile: single "Filters (N)" button + Clear link */}
+      <div className="md:hidden flex gap-2 pb-2 px-6 items-center">
+        <button
+          type="button"
+          onClick={openSheet}
+          aria-expanded={sheetOpen}
+          aria-controls="filters-sheet"
+          className={`chip flex items-center gap-1.5 ${
+            filterCount > 0 ? "!border-txt !bg-txt !text-bg" : ""
+          }`}
+        >
+          <span aria-hidden>⚙︎</span>
+          Filters
+          {filterCount > 0 && <span>({filterCount})</span>}
+        </button>
+        {hasAnyFilter && (
           <button
-            className={
-              mustTryFilter
-                ? "chip !border-accent !bg-accent !text-white"
-                : "chip"
-            }
-            onClick={() => onMustTryFilterChange(!mustTryFilter)}
+            onClick={handleClearAll}
+            className="text-2xs font-medium text-accent bg-transparent border-none cursor-pointer px-1 py-0.5 transition-opacity duration-150 hover:opacity-70"
           >
-            ★ Must-Try
+            Clear
           </button>
         )}
       </div>
 
-      {/* Row 2.5: Visibility toggle (admin only) */}
-      {isAdminView && onVisibilityChange && (
-        <div className="flex gap-2 pb-2 px-6 items-center flex-wrap">
-          <span className="text-2xs font-medium text-txt2 uppercase tracking-wide">
-            Visibility:
-          </span>
-          <div className="flex gap-1 flex-wrap">
-            {VISIBILITY_OPTIONS.map((v) => (
-              <button
-                key={v}
-                className={activeVisibility === v ? "chip-active" : "chip"}
-                onClick={() => onVisibilityChange(v)}
-                title={
-                  v === "public"
-                    ? "Shown to everyone"
-                    : v === "private"
-                      ? "Curator journal only — hidden from public"
-                      : v === "archived"
-                        ? "Kept for history — hidden from public"
-                        : "All visibilities"
-                }
-              >
-                {v === "public"
-                  ? "Public"
-                  : v === "private"
-                    ? "🔒 Private"
-                    : v === "archived"
-                      ? "📦 Archived"
-                      : "All"}
-              </button>
-            ))}
-          </div>
+      {/* Mobile: horizontally scrollable row of active filter pills */}
+      {hasAnyFilter && (
+        <div className="md:hidden flex gap-1.5 px-6 pb-3 overflow-x-auto scrollbar-hide">
+          {renderActivePills()}
         </div>
       )}
 
-      {/* Row 3: Filter buttons and active filter pills */}
-      <div className="flex gap-2 pb-3 px-6 items-center flex-wrap">
+      {/* Desktop Row 2: View toggle + Image mode + Must-Try */}
+      <div className="hidden md:flex gap-2 pb-2 px-6 items-center justify-between flex-wrap">
+        <div className="flex gap-2 items-center flex-wrap">
+          {renderViewToggle()}
+          {renderImageMode()}
+        </div>
+        {renderMustTry()}
+      </div>
+
+      {/* Desktop Row 2.5: Visibility (admin only) */}
+      {isAdminView && onVisibilityChange && (
+        <div className="hidden md:flex gap-2 pb-2 px-6 items-center flex-wrap">
+          {renderVisibility()}
+        </div>
+      )}
+
+      {/* Desktop Row 3: Filters label + active pills + dropdown toggles */}
+      <div className="hidden md:flex gap-2 pb-3 px-6 items-center flex-wrap">
         <span className="text-2xs font-medium text-txt2 uppercase tracking-wide">
           Filters:
         </span>
-        {/* Active filter pills */}
-        {activeCuisines.map((cuisine) => (
-          <button
-            key={`active-cuisine-${cuisine}`}
-            onClick={() => removeFilter("cuisine", cuisine)}
-            className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
-          >
-            {cuisine}
-            <span className="text-xs">✕</span>
-          </button>
-        ))}
-        {(activeNeighborhoods ?? []).map((area) => (
-          <button
-            key={`active-area-${area}`}
-            onClick={() => removeFilter("area", area)}
-            className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
-          >
-            {area}
-            <span className="text-xs">✕</span>
-          </button>
-        ))}
-        {(activePrices ?? []).map((price) => (
-          <button
-            key={`active-price-${price}`}
-            onClick={() => removeFilter("price", price)}
-            className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
-          >
-            {price}
-            <span className="text-xs">✕</span>
-          </button>
-        ))}
+        {renderActivePills()}
 
-        {/* Filter dropdown buttons (only show if not active) */}
-        {/* Cuisine toggle - only show if no active cuisines */}
         {!hasCuisineFilter && (
           <button
             className={`chip flex items-center gap-1.5 ${activePanel === "cuisine" ? "!border-txt !bg-txt !text-bg" : ""}`}
@@ -313,7 +558,6 @@ export default function FilterBar({
           </button>
         )}
 
-        {/* Area toggle - only show if no active areas */}
         {neighborhoods &&
           neighborhoods.length > 0 &&
           onNeighborhoodChange &&
@@ -333,7 +577,6 @@ export default function FilterBar({
             </button>
           )}
 
-        {/* Price toggle - only show if no active prices */}
         {onPriceChange && !hasPriceFilter && (
           <button
             className={`chip flex items-center gap-1.5 ${activePanel === "price" ? "!border-txt !bg-txt !text-bg" : ""}`}
@@ -350,7 +593,6 @@ export default function FilterBar({
           </button>
         )}
 
-        {/* Clear all link */}
         {hasAnyFilter && (
           <button
             onClick={handleClearAll}
@@ -361,14 +603,13 @@ export default function FilterBar({
         )}
       </div>
 
-      {/* Slide-down panel */}
+      {/* Desktop slide-down chip panel */}
       <div
-        className="grid transition-[grid-template-rows] duration-200 ease-in-out bg-bg"
+        className="hidden md:grid transition-[grid-template-rows] duration-200 ease-in-out bg-bg"
         style={{ gridTemplateRows: panelOpen ? "1fr" : "0fr" }}
       >
         <div className="overflow-hidden">
           <div className="py-3 px-6 max-h-[60vh] overflow-y-auto border-b-2 border-brd">
-            {/* Panel header */}
             <div className="flex items-center justify-between mb-2.5">
               <span className="font-body text-xs font-medium text-txt2 uppercase tracking-wide">
                 {activePanel === "cuisine"
@@ -385,125 +626,147 @@ export default function FilterBar({
               </button>
             </div>
 
-            {/* Cuisine chips */}
-            {activePanel === "cuisine" && (
-              <div className="flex gap-1.5 flex-wrap items-center">
-                <button
-                  className={!hasCuisineFilter ? "chip-active" : "chip"}
-                  onClick={() => onCuisineChange([])}
-                >
-                  All
-                </button>
-                {cuisines.map((c) => {
-                  const count = cuisineCounts?.[c] ?? 0;
-                  const empty = cuisineCounts && count === 0;
-                  return (
-                    <button
-                      key={c}
-                      disabled={empty}
-                      className={`${
-                        activeCuisines.includes(c) ? "chip-active" : "chip"
-                      } ${empty ? "opacity-40 cursor-not-allowed" : ""}`}
-                      onClick={() =>
-                        onCuisineChange(toggleItem(activeCuisines, c))
-                      }
-                    >
-                      {c}
-                      {cuisineCounts && (
-                        <span className="ml-1 opacity-60">({count})</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Area chips */}
-            {activePanel === "area" &&
-              neighborhoods &&
-              onNeighborhoodChange && (
-                <div className="flex gap-1.5 flex-wrap items-center">
-                  <button
-                    className={!hasAreaFilter ? "chip-active" : "chip"}
-                    onClick={() => onNeighborhoodChange([])}
-                  >
-                    All
-                  </button>
-                  {neighborhoods.map((n) => {
-                    const count = neighborhoodCounts?.[n] ?? 0;
-                    const empty = neighborhoodCounts && count === 0;
-                    return (
-                      <button
-                        key={n}
-                        disabled={empty}
-                        className={`${
-                          (activeNeighborhoods ?? []).includes(n)
-                            ? "chip-active"
-                            : "chip"
-                        } ${empty ? "opacity-40 cursor-not-allowed" : ""}`}
-                        onClick={() =>
-                          onNeighborhoodChange(
-                            toggleItem(activeNeighborhoods ?? [], n),
-                          )
-                        }
-                      >
-                        {n}
-                        {neighborhoodCounts && (
-                          <span className="ml-1 opacity-60">({count})</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-            {/* Price chips */}
-            {activePanel === "price" && onPriceChange && (
-              <div className="flex gap-1.5 flex-wrap items-center">
-                <button
-                  className={!hasPriceFilter ? "chip-active" : "chip"}
-                  onClick={() => onPriceChange([])}
-                >
-                  All
-                </button>
-                {["$", "$$", "$$$", "$$$$"].map((p) => {
-                  const count = priceCounts?.[p] ?? 0;
-                  const empty = priceCounts && count === 0;
-                  return (
-                    <button
-                      key={p}
-                      disabled={empty}
-                      className={`${
-                        (activePrices ?? []).includes(p)
-                          ? "chip-active"
-                          : "chip"
-                      } ${empty ? "opacity-40 cursor-not-allowed" : ""}`}
-                      onClick={() =>
-                        onPriceChange(toggleItem(activePrices ?? [], p))
-                      }
-                    >
-                      {p}
-                      {priceCounts && (
-                        <span className="ml-1 opacity-60">({count})</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {activePanel === "cuisine" && renderCuisineChips()}
+            {activePanel === "area" && renderAreaChips()}
+            {activePanel === "price" && renderPriceChips()}
           </div>
         </div>
       </div>
 
-      {/* Shadow — absolutely positioned so it's not clipped */}
+      {/* Desktop panel shadow */}
       {panelOpen && (
         <div
-          className="absolute left-0 right-0 bottom-0 h-6 pointer-events-none translate-y-full transition-opacity duration-200"
+          className="hidden md:block absolute left-0 right-0 bottom-0 h-6 pointer-events-none translate-y-full transition-opacity duration-200"
           style={{
             background:
               "linear-gradient(to bottom, rgba(0,0,0,0.06), transparent)",
           }}
         />
+      )}
+
+      {/* Mobile bottom sheet */}
+      {sheetMounted && (
+        <div
+          id="filters-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Filters"
+          className="md:hidden fixed inset-0 z-[100]"
+        >
+          <button
+            type="button"
+            aria-label="Close filters"
+            onClick={closeSheet}
+            className={`absolute inset-0 w-full h-full bg-black/55 cursor-pointer border-none p-0 ${
+              sheetOpen
+                ? "motion-safe:animate-backdrop-in"
+                : "motion-safe:animate-backdrop-out opacity-0"
+            }`}
+          />
+          <div
+            className={`absolute left-0 right-0 bottom-0 bg-bg max-h-[85vh] flex flex-col rounded-t-[20px] overflow-hidden shadow-[0_-18px_40px_-8px_rgba(0,0,0,0.35)] will-change-transform ${
+              sheetOpen
+                ? "motion-safe:animate-sheet-in"
+                : "motion-safe:animate-sheet-out motion-reduce:translate-y-full"
+            }`}
+          >
+            <div className="flex items-center justify-center pt-2.5 pb-1">
+              <span
+                aria-hidden
+                className="block w-10 h-[5px] rounded-full bg-txt2/30"
+              />
+            </div>
+            <div className="flex items-center justify-between px-6 pt-1 pb-3 border-b-2 border-brd">
+              <h2 className="font-display text-2xl tracking-tight leading-none">
+                Filters
+              </h2>
+              <button
+                type="button"
+                onClick={closeSheet}
+                aria-label="Close"
+                className="btn-ghost !text-xl text-txt2 hover:text-txt leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+              {onViewModeChange && (
+                <section className="flex gap-2 items-center flex-wrap">
+                  {renderViewToggle()}
+                </section>
+              )}
+
+              {viewMode === "list" && onImageDisplayModeChange && (
+                <section className="flex gap-2 items-center flex-wrap">
+                  {renderImageMode()}
+                </section>
+              )}
+
+              {onMustTryFilterChange && (
+                <section>
+                  <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                    Highlights
+                  </span>
+                  {renderMustTry()}
+                </section>
+              )}
+
+              {isAdminView && onVisibilityChange && (
+                <section className="flex gap-2 items-center flex-wrap">
+                  {renderVisibility()}
+                </section>
+              )}
+
+              {cuisines.length > 0 && (
+                <section>
+                  <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                    Cuisine
+                  </span>
+                  {renderCuisineChips()}
+                </section>
+              )}
+
+              {neighborhoods &&
+                neighborhoods.length > 0 &&
+                onNeighborhoodChange && (
+                  <section>
+                    <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                      Area
+                    </span>
+                    {renderAreaChips()}
+                  </section>
+                )}
+
+              {onPriceChange && (
+                <section>
+                  <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                    Price
+                  </span>
+                  {renderPriceChips()}
+                </section>
+              )}
+            </div>
+
+            <div className="flex gap-2 px-6 py-4 border-t-2 border-brd">
+              <button
+                type="button"
+                onClick={handleClearAll}
+                disabled={!hasAnyFilter}
+                className="btn-outline flex-1"
+              >
+                Clear all
+              </button>
+              <button
+                type="button"
+                onClick={closeSheet}
+                className="btn-primary flex-1"
+              >
+                {hasAnyFilter ? `Show results (${filterCount})` : "Done"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -19,6 +19,14 @@ module.exports = {
         error: "var(--error)",
         success: "var(--success)",
         warning: "var(--warning)",
+        "recency-bg": "var(--recency-bg)",
+        "recency-txt": "var(--recency-txt)",
+        "open-bg": "var(--open-bg)",
+        "open-txt": "var(--open-txt)",
+        "closed-bg": "var(--closed-bg)",
+        "closed-txt": "var(--closed-txt)",
+        "pick-bg": "var(--pick-bg)",
+        "pick-txt": "var(--pick-txt)",
       },
       fontFamily: {
         display: ["var(--font-display)"],
@@ -68,6 +76,22 @@ module.exports = {
           "0%, 100%": { transform: "scale(1)" },
           "50%": { transform: "scale(1.15)" },
         },
+        "sheet-in": {
+          from: { transform: "translateY(100%)" },
+          to: { transform: "translateY(0)" },
+        },
+        "sheet-out": {
+          from: { transform: "translateY(0)" },
+          to: { transform: "translateY(100%)" },
+        },
+        "backdrop-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "backdrop-out": {
+          from: { opacity: "1" },
+          to: { opacity: "0" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.4s ease-out both",
@@ -77,6 +101,10 @@ module.exports = {
         "scroll-fade-in": "scroll-fade-in 0.5s ease-out both",
         "word-reveal": "word-reveal 0.4s cubic-bezier(0.22,1,0.36,1) both",
         "badge-pulse": "badge-pulse 2s ease-in-out infinite",
+        "sheet-in": "sheet-in 340ms cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        "sheet-out": "sheet-out 260ms cubic-bezier(0.55, 0, 0.7, 0.2) forwards",
+        "backdrop-in": "backdrop-in 300ms ease-out forwards",
+        "backdrop-out": "backdrop-out 220ms ease-in forwards",
       },
     },
   },
