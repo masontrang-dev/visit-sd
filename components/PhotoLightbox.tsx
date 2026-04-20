@@ -13,9 +13,15 @@ type Props = {
   photos: LightboxPhoto[];
   startIndex: number;
   onClose: () => void;
+  header?: string;
 };
 
-export default function PhotoLightbox({ photos, startIndex, onClose }: Props) {
+export default function PhotoLightbox({
+  photos,
+  startIndex,
+  onClose,
+  header,
+}: Props) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     startIndex,
     align: "center",
@@ -66,25 +72,46 @@ export default function PhotoLightbox({ photos, startIndex, onClose }: Props) {
       className="fixed inset-0 z-[200] bg-black/90 flex flex-col"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <button
-        onClick={onClose}
-        aria-label="Close"
-        className="absolute top-3 right-3 z-[2] w-10 h-10 flex items-center justify-center text-white bg-black/40 hover:bg-black/60 rounded-full border-none cursor-pointer backdrop-blur-sm"
-      >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+      <div className="absolute top-0 left-0 right-0 z-[2] flex items-center justify-between gap-3 px-4 py-3 pointer-events-none">
+        <div className="flex items-baseline gap-2 min-w-0 text-white">
+          {header && (
+            <span className="font-display text-lg tracking-tight truncate">
+              {header}
+            </span>
+          )}
+          {multiple && (
+            <span className="text-xs text-white/60 shrink-0 tabular-nums">
+              <span
+                className="inline-block text-right"
+                style={{ minWidth: `${String(photos.length).length}ch` }}
+              >
+                {activeIndex + 1}
+              </span>
+              {" / "}
+              {photos.length}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="pointer-events-auto w-10 h-10 flex items-center justify-center text-white bg-black/40 hover:bg-black/60 rounded-full border-none cursor-pointer backdrop-blur-sm shrink-0"
         >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
 
       <div
         ref={emblaRef}
@@ -131,14 +158,12 @@ export default function PhotoLightbox({ photos, startIndex, onClose }: Props) {
         )}
         {hasCaption && (
           <>
-            {active.title && (
-              <p className="font-display text-xl tracking-tight leading-tight">
-                {active.title}
-              </p>
-            )}
-            {active.subtitle && (
-              <p className="text-xs text-white/70 mt-1">{active.subtitle}</p>
-            )}
+            <p className="font-display text-xl tracking-tight leading-tight">
+              {active.title ?? "\u00A0"}
+            </p>
+            <p className="text-xs text-white/70 mt-1">
+              {active.subtitle ?? "\u00A0"}
+            </p>
           </>
         )}
       </div>

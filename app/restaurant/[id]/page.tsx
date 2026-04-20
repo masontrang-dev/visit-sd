@@ -131,6 +131,7 @@ export default function RestaurantDetailPage({ params }: Props) {
   const [lightbox, setLightbox] = useState<{
     photos: LightboxPhoto[];
     index: number;
+    header?: string;
   } | null>(null);
   const [curatorRatings, setCuratorRatings] = useState<CuratorRating[]>([]);
   const [curatorProfiles, setCuratorProfiles] = useState<
@@ -837,20 +838,46 @@ export default function RestaurantDetailPage({ params }: Props) {
       }));
   }
 
-  function openDishLightbox(
-    orders: ItemOrder[],
-    dishName: string,
-    focusUrl?: string,
-  ) {
-    const photos = buildDishPhotos(orders, dishName);
+  function buildOrderHistoryPhotos(): LightboxPhoto[] {
+    if (historyView === "by-dish") {
+      return curatorDishes.flatMap((group) =>
+        buildDishPhotos(group.orders, group.menuItem.name),
+      );
+    }
+    return itemOrders
+      .filter((o) => (o.photo_url ?? "").trim().length > 0)
+      .map((o) => {
+        const mi = menuItems.find((m) => m.id === o.menu_item_id);
+        return {
+          url: o.photo_url!,
+          title: mi?.name ?? "Unknown item",
+          subtitle: `${formatDate(o.ordered_at)} · by ${
+            ordererNames[o.ordered_by] || "curator"
+          }`,
+        };
+      });
+  }
+
+  function openOrderHistoryLightbox(focusUrl: string) {
+    const photos = buildOrderHistoryPhotos();
     if (photos.length === 0) return;
-    const idx = focusUrl
-      ? Math.max(
-          0,
-          photos.findIndex((p) => p.url === focusUrl),
-        )
-      : 0;
-    setLightbox({ photos, index: idx });
+    const idx = Math.max(
+      0,
+      photos.findIndex((p) => p.url === focusUrl),
+    );
+    setLightbox({ photos, index: idx, header: "Order History" });
+  }
+
+  function openRecommendedLightbox(focusUrl: string) {
+    const photos = publicDishes.flatMap((group) =>
+      buildDishPhotos(group.orders, group.menuItem.name),
+    );
+    if (photos.length === 0) return;
+    const idx = Math.max(
+      0,
+      photos.findIndex((p) => p.url === focusUrl),
+    );
+    setLightbox({ photos, index: idx, header: "Recommended Items" });
   }
 
   function formatTime(dateStr: string) {
@@ -1493,11 +1520,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                     <button
                       type="button"
                       onClick={() =>
-                        openDishLightbox(
-                          item.orders,
-                          item.menuItem.name,
-                          item.latestPhotoUrl!,
-                        )
+                        openRecommendedLightbox(item.latestPhotoUrl!)
                       }
                       className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
                       aria-label={`View photos of ${item.menuItem.name}`}
@@ -1713,11 +1736,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                           <button
                             type="button"
                             onClick={() =>
-                              openDishLightbox(
-                                group.orders,
-                                group.menuItem.name,
-                                group.latestPhotoUrl!,
-                              )
+                              openOrderHistoryLightbox(group.latestPhotoUrl!)
                             }
                             className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
                             aria-label={`View photo of ${group.menuItem.name}`}
@@ -1791,11 +1810,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                           <button
                             type="button"
                             onClick={() =>
-                              openDishLightbox(
-                                group.orders,
-                                group.menuItem.name,
-                                group.latestPhotoUrl!,
-                              )
+                              openOrderHistoryLightbox(group.latestPhotoUrl!)
                             }
                             className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
                             aria-label={`View photos of ${group.menuItem.name}`}
@@ -1871,11 +1886,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                               <button
                                 type="button"
                                 onClick={() =>
-                                  openDishLightbox(
-                                    group.orders,
-                                    group.menuItem.name,
-                                    order.photo_url!,
-                                  )
+                                  openOrderHistoryLightbox(order.photo_url!)
                                 }
                                 className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
                                 aria-label={`View photo of ${group.menuItem.name}`}
@@ -1942,18 +1953,9 @@ export default function RestaurantDetailPage({ params }: Props) {
                       {order.photo_url && (
                         <button
                           type="button"
-                          onClick={() => {
-                            const dishOrders = menuItem
-                              ? itemOrders.filter(
-                                  (o) => o.menu_item_id === menuItem.id,
-                                )
-                              : [order];
-                            openDishLightbox(
-                              dishOrders,
-                              menuItem?.name || "Unknown item",
-                              order.photo_url!,
-                            );
-                          }}
+                          onClick={() =>
+                            openOrderHistoryLightbox(order.photo_url!)
+                          }
                           className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
                           aria-label={`View photo of ${menuItem?.name || "order"}`}
                         >
@@ -2137,6 +2139,7 @@ export default function RestaurantDetailPage({ params }: Props) {
         <PhotoLightbox
           photos={lightbox.photos}
           startIndex={lightbox.index}
+          header={lightbox.header}
           onClose={() => setLightbox(null)}
         />
       )}
