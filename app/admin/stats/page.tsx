@@ -343,8 +343,8 @@ export default function StatsPage() {
           <p className="text-txt2 text-sm mb-6">
             Only superusers can access site stats.
           </p>
-          <Link href="/admin" className="text-accent hover:underline">
-            Back to Admin
+          <Link href="/" className="text-accent hover:underline">
+            Back to Home
           </Link>
         </div>
       </main>
@@ -371,8 +371,8 @@ export default function StatsPage() {
         <h1 className="font-display text-5xl mb-2">STATS</h1>
         <p className="text-txt2 text-sm">Site traffic and usage analytics</p>
         <div className="mt-4">
-          <Link href="/admin" className="text-sm text-accent hover:underline">
-            ← Back to Admin
+          <Link href="/" className="text-sm text-accent hover:underline">
+            ← Back to Home
           </Link>
         </div>
       </header>

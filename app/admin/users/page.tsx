@@ -270,8 +270,8 @@ export default function UsersPage() {
           <p className="text-txt2 text-sm mb-6">
             Only superusers can access user management.
           </p>
-          <Link href="/admin" className="text-accent hover:underline">
-            Back to Admin
+          <Link href="/" className="text-accent hover:underline">
+            Back to Home
           </Link>
         </div>
       </main>
@@ -291,8 +291,8 @@ export default function UsersPage() {
         <h1 className="font-display text-5xl mb-2">USERS</h1>
         <p className="text-txt2 text-sm">Manage user roles and permissions</p>
         <div className="mt-4">
-          <Link href="/admin" className="text-sm text-accent hover:underline">
-            ← Back to Admin
+          <Link href="/" className="text-sm text-accent hover:underline">
+            ← Back to Home
           </Link>
         </div>
       </header>

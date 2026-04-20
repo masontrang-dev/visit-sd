@@ -340,8 +340,8 @@ export default function BobaDashboardPage() {
           <p className="text-txt2 text-sm mb-6">
             Only superusers can access boba analytics.
           </p>
-          <Link href="/admin" className="text-accent hover:underline">
-            Back to Admin
+          <Link href="/" className="text-accent hover:underline">
+            Back to Home
           </Link>
         </div>
       </main>
@@ -350,16 +350,6 @@ export default function BobaDashboardPage() {
 
   return (
     <main className="min-h-screen">
-      {/* Header */}
-      <div className="p-6 pb-4 border-b border-brd">
-        <Link
-          href="/admin"
-          className="text-xs tracking-wide uppercase font-medium text-accent2 no-underline"
-        >
-          ← Back to admin
-        </Link>
-      </div>
-
       <header className="relative pt-10 px-6 pb-6 border-b-2 border-txt">
         <div className="absolute top-4 right-4 flex gap-2">
           <ThemeToggle />
@@ -373,6 +363,11 @@ export default function BobaDashboardPage() {
           <br />
           <span className="text-accent">TRACKER</span>
         </h1>
+        <div className="mt-4">
+          <Link href="/" className="text-sm text-accent hover:underline">
+            ← Back to Home
+          </Link>
+        </div>
       </header>
 
       {loading ? (
