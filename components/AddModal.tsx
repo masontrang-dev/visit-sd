@@ -78,11 +78,9 @@ export default function AddModal({
   );
   const [cuisine, setCuisine] = useState(editData?.cuisine ?? "");
   const [price, setPrice] = useState(editData?.price ?? "$$$");
-  const [note, setNote] = useState(editData?.note ?? "");
   const [addedBy, setAddedBy] = useState(
     editData?.added_by ?? displayName ?? "",
   );
-  const [mustTry, setMustTry] = useState(editData?.must_try ?? false);
   const [visibility, setVisibility] = useState<
     "public" | "private" | "archived"
   >(editData?.visibility ?? "public");
@@ -329,14 +327,6 @@ export default function AddModal({
 
     console.log("Saving restaurant with photo_url:", finalPhotoUrl);
 
-    const nextMustTry = isPublic ? mustTry : false;
-    const wasMustTry = editData?.must_try ?? false;
-    let nextMustTrySince = editData?.must_try_since ?? null;
-    if (nextMustTry && !wasMustTry) {
-      nextMustTrySince = new Date().toISOString();
-    } else if (!nextMustTry) {
-      nextMustTrySince = null;
-    }
 
     const previousVisibility = editData?.visibility ?? null;
     const visibilityChanged =
@@ -353,7 +343,7 @@ export default function AddModal({
       neighborhood: neighborhood.trim(),
       cuisine: cuisine.trim(),
       price,
-      note: note.trim(),
+      note: editData?.note ?? "",
       added_by: addedBy || null,
       address: address.trim() || null,
       google_maps_url: googleMapsUrl || null,
@@ -362,8 +352,8 @@ export default function AddModal({
       lng,
       photo_url: finalPhotoUrl.trim() || null,
       storefront_photo_url: storefrontPhotoUrl,
-      must_try: nextMustTry,
-      must_try_since: nextMustTrySince,
+      must_try: editData?.must_try ?? false,
+      must_try_since: editData?.must_try_since ?? null,
       date_added: editData?.date_added ?? null,
       last_visited: editData?.last_visited ?? null,
       google_rating: googleRating,
@@ -673,25 +663,6 @@ export default function AddModal({
           </div>
         </div>
 
-        <div className="mb-4">
-          <label className={labelCls}>Must-Try</label>
-          <button
-            type="button"
-            onClick={() => isPublic && setMustTry(!mustTry)}
-            disabled={!isPublic}
-            className={`chip ${
-              mustTry && isPublic ? "!bg-accent !text-white !border-accent" : ""
-            } ${!isPublic ? "opacity-40 cursor-not-allowed" : ""}`}
-            title={
-              isPublic
-                ? undefined
-                : "Must-Try only applies to public restaurants"
-            }
-          >
-            {mustTry && isPublic ? "★ Must-Try" : "☆ Mark as Must-Try"}
-          </button>
-        </div>
-
         {googleRating !== null && (
           <div className="mb-4 p-3 bg-bg2 border border-brd">
             <label className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1 block">
@@ -754,17 +725,6 @@ export default function AddModal({
               }}
             />
           )}
-        </div>
-
-        <div className="mb-4">
-          <label className={labelCls}>Why you love it</label>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="What makes this place special?"
-            rows={3}
-            className="input-base resize-y leading-relaxed"
-          />
         </div>
 
         {error && <p className="text-error text-sm mb-2">{error}</p>}

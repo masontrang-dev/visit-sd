@@ -44,9 +44,11 @@ export type CuratorRating = {
   id: number;
   restaurant_id: number;
   user_id: string;
-  rating: number;
+  rating: number | null;
   previous_rating: number | null;
   note: string | null;
+  must_try: boolean;
+  must_try_since: string | null;
   created_at: string;
   updated_at: string;
 };

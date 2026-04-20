@@ -576,7 +576,18 @@ function HomeContent() {
   );
 
   const totalCount = restaurants.length;
-  const cuisineCount = cuisines.length;
+  // Pills at the top describe the full dataset, not the current filter view,
+  // so they stay steady when the admin toggles between visibility filters.
+  const cuisineCount = useMemo(
+    () =>
+      new Set(restaurants.map((r) => r.cuisine).filter(Boolean)).size,
+    [restaurants],
+  );
+  const neighborhoodCount = useMemo(
+    () =>
+      new Set(restaurants.map((r) => r.neighborhood).filter(Boolean)).size,
+    [restaurants],
+  );
   const isFiltered =
     activeCuisines.length > 0 ||
     activeNeighborhoods.length > 0 ||
@@ -664,7 +675,7 @@ function HomeContent() {
               [
                 [totalCount, "spots"],
                 [cuisineCount, "cuisines"],
-                [neighborhoods.length, "areas"],
+                [neighborhoodCount, "areas"],
               ] as const
             ).map(([count, label], i) => (
               <span

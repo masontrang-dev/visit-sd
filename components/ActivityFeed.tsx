@@ -134,7 +134,7 @@ export default function ActivityFeed() {
       supabase
         .from("curator_ratings")
         .select(
-          "id, restaurant_id, user_id, rating, previous_rating, created_at, updated_at",
+          "id, restaurant_id, user_id, rating, previous_rating, must_try, must_try_since, created_at, updated_at",
         )
         .gte("updated_at", since)
         .order("updated_at", { ascending: false })
@@ -148,10 +148,10 @@ export default function ActivityFeed() {
       supabase
         .from("restaurants")
         .select(
-          "id, name, created_at, must_try_since, visibility, previous_visibility, visibility_changed_at, added_by",
+          "id, name, created_at, visibility, previous_visibility, visibility_changed_at, added_by",
         )
         .or(
-          `created_at.gte.${since},must_try_since.gte.${since},visibility_changed_at.gte.${since}`,
+          `created_at.gte.${since},visibility_changed_at.gte.${since}`,
         )
         .order("created_at", { ascending: false })
         .limit(MAX_EVENTS * 2),
@@ -250,23 +250,36 @@ export default function ActivityFeed() {
 
     ratings.forEach((r: any) => {
       const restaurantName = restaurantMap[r.restaurant_id] ?? "a restaurant";
-      const isUpdate =
-        r.previous_rating !== null &&
-        r.previous_rating !== undefined &&
-        r.previous_rating !== r.rating;
-      const kind: EventKind = isUpdate ? "rating_changed" : "rating_new";
-      const primary = isUpdate
-        ? `changed rating of ${restaurantName} from ${r.previous_rating} to ${r.rating}`
-        : `rated ${restaurantName} ${r.rating}/5`;
-      list.push({
-        id: `rating-${r.id}-${r.updated_at}`,
-        kind,
-        at: r.updated_at,
-        restaurantId: r.restaurant_id,
-        restaurantName,
-        actorLabel: profileMap[r.user_id] ?? null,
-        primary,
-      });
+      if (r.rating !== null) {
+        const isUpdate =
+          r.previous_rating !== null &&
+          r.previous_rating !== undefined &&
+          r.previous_rating !== r.rating;
+        const kind: EventKind = isUpdate ? "rating_changed" : "rating_new";
+        const primary = isUpdate
+          ? `changed rating of ${restaurantName} from ${r.previous_rating} to ${r.rating}`
+          : `rated ${restaurantName} ${r.rating}/5`;
+        list.push({
+          id: `rating-${r.id}-${r.updated_at}`,
+          kind,
+          at: r.updated_at,
+          restaurantId: r.restaurant_id,
+          restaurantName,
+          actorLabel: profileMap[r.user_id] ?? null,
+          primary,
+        });
+      }
+      if (r.must_try && r.must_try_since && r.must_try_since >= since) {
+        list.push({
+          id: `musttry-${r.id}-${r.must_try_since}`,
+          kind: "must_try",
+          at: r.must_try_since,
+          restaurantId: r.restaurant_id,
+          restaurantName,
+          actorLabel: profileMap[r.user_id] ?? null,
+          primary: `marked ${restaurantName} must-try`,
+        });
+      }
     });
 
     recs.forEach((r: any) => {
@@ -294,17 +307,6 @@ export default function ActivityFeed() {
           restaurantName: r.name,
           actorLabel: r.added_by ?? null,
           primary: `added ${r.name}`,
-        });
-      }
-      if (r.must_try_since && r.must_try_since >= since) {
-        list.push({
-          id: `musttry-${r.id}-${r.must_try_since}`,
-          kind: "must_try",
-          at: r.must_try_since,
-          restaurantId: r.id,
-          restaurantName: r.name,
-          actorLabel: r.added_by ?? null,
-          primary: `marked ${r.name} must-try`,
         });
       }
       if (r.visibility_changed_at && r.visibility_changed_at >= since) {

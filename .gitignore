@@ -13,3 +13,6 @@ VERIFY_*.sql
 DIAGNOSE_*.sql
 MIGRATION_*.sql
 UPDATE_*.sql
+ADD_*.sql
+ALLOW_*.sql
+CLEANUP_*.sql

@@ -10,6 +10,7 @@ import {
   type ItemOrder,
   type DrinkDetails,
   type MenuItemRecommendation,
+  type CuratorRating,
 } from "@/lib/supabase";
 import IllustrationNoVisits from "@/components/IllustrationNoVisits";
 import { useAuth } from "@/lib/auth-context";
@@ -19,6 +20,9 @@ import OrderModal from "@/components/OrderModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import CheckInModal from "@/components/CheckInModal";
 import CuratorRatingControl from "@/components/CuratorRatingControl";
+import CuratorRatingPanel, {
+  type CuratorProfile,
+} from "@/components/CuratorRatingPanel";
 import MenuItemRecommendToggle from "@/components/MenuItemRecommendToggle";
 import PhotoCarousel, {
   type RestaurantPhoto,
@@ -121,7 +125,21 @@ export default function RestaurantDetailPage({ params }: Props) {
     "by-dish",
   );
   const [expandedDishId, setExpandedDishId] = useState<number | null>(null);
-  const [ratingRefresh, setRatingRefresh] = useState(0);
+  const [curatorRatings, setCuratorRatings] = useState<CuratorRating[]>([]);
+  const [curatorProfiles, setCuratorProfiles] = useState<
+    Record<string, CuratorProfile>
+  >({});
+  const [curatorRatingsLoaded, setCuratorRatingsLoaded] = useState(false);
+  const [curatorRatingExpanded, setCuratorRatingExpanded] = useState(false);
+
+  // Average of the 1-5 ratings (ignoring note-only rows). Drives both the
+  // "Curators' rating" header and the public notes-section heading.
+  const curatorAvg = useMemo(() => {
+    const rated = curatorRatings.filter((r) => r.rating !== null);
+    if (rated.length === 0) return null;
+    const sum = rated.reduce((s, r) => s + (r.rating ?? 0), 0);
+    return sum / rated.length;
+  }, [curatorRatings]);
   const [isScrolled, setIsScrolled] = useState(false);
   const hasScrolled = useRef(false);
   const stickySentinelRef = useRef<HTMLDivElement>(null);
@@ -285,13 +303,123 @@ export default function RestaurantDetailPage({ params }: Props) {
         setCuisines(uniqueCuisines as string[]);
       }
 
-      await loadRecommendationsAndNames(
-        menuResult.data ?? [],
-        ordersResult.data ?? [],
-      );
+      await Promise.all([
+        loadRecommendationsAndNames(
+          menuResult.data ?? [],
+          ordersResult.data ?? [],
+        ),
+        loadCuratorRatings(id),
+      ]);
     }
     fetchData();
   }, [params]);
+
+  async function loadCuratorRatings(restaurantId: number) {
+    const { data: ratingsData } = await supabase
+      .from("curator_ratings")
+      .select("*")
+      .eq("restaurant_id", restaurantId);
+    const rows = (ratingsData ?? []) as CuratorRating[];
+    setCuratorRatings(rows);
+
+    if (rows.length > 0) {
+      const ids = rows.map((r) => r.user_id);
+      const { data: profilesData } = await supabase
+        .from("user_profiles")
+        .select("user_id, display_name, avatar_url")
+        .in("user_id", ids);
+      const map: Record<string, CuratorProfile> = {};
+      (profilesData ?? []).forEach((p: CuratorProfile) => {
+        map[p.user_id] = p;
+      });
+      setCuratorProfiles(map);
+    } else {
+      setCuratorProfiles({});
+    }
+    setCuratorRatingsLoaded(true);
+  }
+
+  async function saveCuratorRating(args: {
+    rating: number | null;
+    note: string | null;
+    must_try: boolean;
+  }) {
+    if (!user || !restaurant) return;
+    const existing = curatorRatings.find((r) => r.user_id === user.id);
+    const cleanedNote =
+      args.note && args.note.trim().length > 0 ? args.note.trim() : null;
+
+    // must_try_since: stamp now on false->true, keep on true->true, null on *->false.
+    const wasMustTry = existing?.must_try ?? false;
+    const nextMustTrySince = args.must_try
+      ? wasMustTry
+        ? (existing?.must_try_since ?? new Date().toISOString())
+        : new Date().toISOString()
+      : null;
+
+    if (
+      args.rating === null &&
+      cleanedNote === null &&
+      args.must_try === false
+    ) {
+      await supabase
+        .from("curator_ratings")
+        .delete()
+        .eq("restaurant_id", restaurant.id)
+        .eq("user_id", user.id);
+    } else {
+      await supabase.from("curator_ratings").upsert(
+        {
+          restaurant_id: restaurant.id,
+          user_id: user.id,
+          rating: args.rating,
+          previous_rating: existing?.rating ?? null,
+          note: cleanedNote,
+          must_try: args.must_try,
+          must_try_since: nextMustTrySince,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "restaurant_id,user_id" },
+      );
+    }
+
+    // Recompute the cached rollup on restaurants so the home grid/filters stay
+    // consistent with the per-curator flags.
+    const { data: refreshed } = await supabase
+      .from("curator_ratings")
+      .select("must_try, must_try_since")
+      .eq("restaurant_id", restaurant.id);
+    const flagged = (refreshed ?? []).filter(
+      (r: { must_try: boolean; must_try_since: string | null }) =>
+        r.must_try && r.must_try_since,
+    ) as { must_try: boolean; must_try_since: string }[];
+    const nextRollupMustTry = flagged.length > 0;
+    const nextRollupSince = nextRollupMustTry
+      ? flagged
+          .map((r) => r.must_try_since)
+          .sort()[0]
+      : null;
+
+    if (
+      nextRollupMustTry !== restaurant.must_try ||
+      nextRollupSince !== restaurant.must_try_since
+    ) {
+      await supabase
+        .from("restaurants")
+        .update({
+          must_try: nextRollupMustTry,
+          must_try_since: nextRollupSince,
+        })
+        .eq("id", restaurant.id);
+      setRestaurant({
+        ...restaurant,
+        must_try: nextRollupMustTry,
+        must_try_since: nextRollupSince,
+      });
+    }
+
+    await loadCuratorRatings(restaurant.id);
+  }
 
   async function loadRecommendationsAndNames(
     items: MenuItem[],
@@ -980,9 +1108,12 @@ export default function RestaurantDetailPage({ params }: Props) {
         </div>
         <div className="w-px bg-brd" />
         <CuratorRatingControl
-          key={`curator-${restaurant.id}-${ratingRefresh}`}
-          restaurantId={restaurant.id}
-          onChange={() => setRatingRefresh((n) => n + 1)}
+          ratingsCount={curatorRatings.length}
+          avg={curatorAvg !== null ? Math.round(curatorAvg * 2) / 2 : null}
+          loaded={curatorRatingsLoaded}
+          expanded={curatorRatingExpanded}
+          onToggle={() => setCuratorRatingExpanded((e) => !e)}
+          hasDetails={curatorRatings.length > 0 || (isAdmin && !!user)}
         />
         <div className="w-px bg-brd" />
         <div className="flex-1 text-center py-3 px-3">
@@ -1016,30 +1147,71 @@ export default function RestaurantDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Curator Take Section */}
-      {restaurant.note && (
-        <div className="p-6 border-b border-brd scroll-fade-in">
-          <h2 className="text-2xs uppercase tracking-wide text-txt2 mb-3 font-medium">
-            Why we love it
-          </h2>
-          <blockquote className="border-l-2 border-accent pl-3">
-            <p className="text-base text-txt leading-relaxed italic">
-              &ldquo;{restaurant.note}&rdquo;
-            </p>
-            {restaurant.added_by && (
-              <footer className="text-2xs uppercase tracking-wide text-txt2 mt-2 not-italic">
-                — {formatDisplayName(restaurant.added_by)}
-              </footer>
-            )}
-          </blockquote>
-        </div>
+      {/* Curator rating expanded panel — full-width sibling so the stat bar
+          columns don't reflow when the curators' rating is expanded. */}
+      {curatorRatingExpanded && (
+        <CuratorRatingPanel
+          ratings={curatorRatings}
+          profiles={curatorProfiles}
+          userId={user?.id}
+          isAdmin={isAdmin}
+          onSave={saveCuratorRating}
+        />
       )}
+
+      {/* Curator Take Section — one blockquote per curator with a note */}
+      {(() => {
+        const noted = curatorRatings.filter(
+          (r) => r.note && r.note.trim().length > 0,
+        );
+        if (noted.length === 0) return null;
+        return (
+          <div className="p-6 border-b border-brd scroll-fade-in">
+            <h2 className="text-2xs uppercase tracking-wide text-txt2 mb-3 font-medium">
+              {curatorAvg !== null && curatorAvg >= 4
+                ? "Why we love it"
+                : "Our thoughts"}
+            </h2>
+            <div className="space-y-4">
+              {noted.map((r) => {
+                const p = curatorProfiles[r.user_id];
+                const name =
+                  formatDisplayName(p?.display_name) || "Curator";
+                return (
+                  <blockquote
+                    key={r.id}
+                    className="border-l-2 border-accent pl-3"
+                  >
+                    <p className="text-base text-txt leading-relaxed italic">
+                      &ldquo;{r.note}&rdquo;
+                    </p>
+                    <footer className="text-2xs uppercase tracking-wide text-txt2 mt-2 not-italic flex items-center gap-2">
+                      <span>— {name}</span>
+                      {r.rating !== null && (
+                        <span
+                          className="text-accent normal-case tracking-normal"
+                          aria-label={`${r.rating} out of 5 stars`}
+                        >
+                          {"★".repeat(r.rating)}
+                          <span className="text-brd">
+                            {"★".repeat(5 - r.rating)}
+                          </span>
+                        </span>
+                      )}
+                    </footer>
+                  </blockquote>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* What to order here — public-facing, recommended dishes only */}
       {publicDishes.length > 0 && (
         <div className="p-6 border-b border-brd scroll-fade-in">
           <h2 className="font-display text-xl mb-3 tracking-tight">
-            What to order here
+            Recommended Items
           </h2>
           <div className="space-y-3">
             {publicDishes.map((item) => {
