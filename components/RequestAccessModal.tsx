@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase-client";
 import { useAuth } from "@/lib/auth-context";
 
@@ -24,7 +25,14 @@ export default function RequestAccessModal({
     null,
   );
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -36,7 +44,6 @@ export default function RequestAccessModal({
         .order("created_at", { ascending: false });
       if (fetchErr) setError(fetchErr.message);
       else setRequests((data as RoleRequest[]) ?? []);
-      setLoading(false);
     })();
   }, [supabase, user]);
 
@@ -67,7 +74,7 @@ export default function RequestAccessModal({
     setSubmitting(null);
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4"
       onClick={onClose}
@@ -94,68 +101,61 @@ export default function RequestAccessModal({
           </button>
         </div>
 
-        {loading ? (
-          <p className="text-txt2 text-sm">Loading…</p>
-        ) : (
-          <>
-            {pending.length > 0 && (
-              <div className="mb-4 p-3 border border-accent bg-accent/10 rounded-md">
-                <p className="text-accent text-sm font-medium">
-                  Pending:{" "}
-                  {pending.map((r) => r.requested_role).join(", ")}
-                </p>
-                <p className="text-txt2 text-xs mt-1">
-                  A superuser will review shortly.
-                </p>
-              </div>
-            )}
-
-            <label
-              htmlFor="request-message"
-              className="block text-xs uppercase tracking-wide text-txt2 mb-1"
-            >
-              Message (optional)
-            </label>
-            <textarea
-              id="request-message"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={3}
-              placeholder="Why would you like access?"
-              className="w-full mb-4 p-2 text-sm border border-brd bg-bg text-txt rounded-md resize-none"
-            />
-
-            {error && (
-              <p className="text-error text-sm mb-3">{error}</p>
-            )}
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => submit("curator")}
-                disabled={submitting !== null || hasPending("curator")}
-                className="btn-secondary flex-1 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {hasPending("curator")
-                  ? "Curator pending"
-                  : submitting === "curator"
-                    ? "Requesting…"
-                    : "Request curator"}
-              </button>
-              <button
-                onClick={() => submit("admin")}
-                disabled={submitting !== null || hasPending("admin")}
-                className="btn-secondary flex-1 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {hasPending("admin")
-                  ? "Admin pending"
-                  : submitting === "admin"
-                    ? "Requesting…"
-                    : "Request admin"}
-              </button>
-            </div>
-          </>
+        {pending.length > 0 && (
+          <div className="mb-4 p-3 border border-accent bg-accent/10 rounded-md">
+            <p className="text-accent text-sm font-medium">
+              Pending:{" "}
+              {pending.map((r) => r.requested_role).join(", ")}
+            </p>
+            <p className="text-txt2 text-xs mt-1">
+              A superuser will review shortly.
+            </p>
+          </div>
         )}
+
+        <label
+          htmlFor="request-message"
+          className="block text-xs uppercase tracking-wide text-txt2 mb-1"
+        >
+          Message (optional)
+        </label>
+        <textarea
+          id="request-message"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={3}
+          placeholder="Why would you like access?"
+          className="w-full mb-4 p-2 text-sm border border-brd bg-bg text-txt rounded-md resize-none"
+        />
+
+        {error && <p className="text-error text-sm mb-3">{error}</p>}
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => submit("curator")}
+            disabled={submitting !== null || hasPending("curator")}
+            className="btn-secondary flex-1 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {hasPending("curator")
+              ? "Curator pending"
+              : submitting === "curator"
+                ? "Requesting…"
+                : "Request curator"}
+          </button>
+          <button
+            onClick={() => submit("admin")}
+            disabled={submitting !== null || hasPending("admin")}
+            className="btn-secondary flex-1 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {hasPending("admin")
+              ? "Admin pending"
+              : submitting === "admin"
+                ? "Requesting…"
+                : "Request admin"}
+          </button>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
