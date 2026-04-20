@@ -564,7 +564,7 @@ export default function StatsPage() {
             <p className="text-2xs text-txt2 opacity-60 mt-1">
               Stats aggregated server-side via{" "}
               <code className="font-mono">stats_*</code> RPCs — see{" "}
-              <code className="font-mono">MIGRATION_STEP_36_STATS_RPCS.sql</code>.
+              <code className="font-mono">supabase/migrations/MIGRATION_STEP_36_STATS_RPCS.sql</code>.
             </p>
           </>
         )}

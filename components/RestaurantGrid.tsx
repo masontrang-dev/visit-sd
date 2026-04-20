@@ -27,7 +27,6 @@ type Props = {
   onEdit?: (r: Restaurant) => void;
   onOrder?: (r: Restaurant) => void;
   onCheckIn?: (r: Restaurant) => void;
-  mustTryFilter?: boolean;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   baseDelay?: number;
@@ -409,7 +408,7 @@ function InfiniteCardGrid({
   const sentinelRef = useRef<HTMLDivElement>(null);
   const prevRestaurantIdsRef = useRef<string>("");
   const restoredRef = useRef(false);
-  const [isRestoring] = useState(() => {
+  const [isRestoring, setIsRestoring] = useState(() => {
     try {
       return !!sessionStorage.getItem(SCROLL_POS_KEY);
     } catch {
@@ -417,7 +416,8 @@ function InfiniteCardGrid({
     }
   });
 
-  // Restore scroll position after the grid has rendered with the saved visible count
+  // Restore scroll position after the grid has rendered with the saved visible count,
+  // then flip isRestoring off so subsequent list changes get the FadeUp animation.
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
@@ -429,9 +429,14 @@ function InfiniteCardGrid({
         const scrollY = parseInt(raw, 10);
         requestAnimationFrame(() => {
           window.scrollTo(0, scrollY);
+          setIsRestoring(false);
         });
+      } else {
+        setIsRestoring(false);
       }
-    } catch {}
+    } catch {
+      setIsRestoring(false);
+    }
   }, []);
 
   // Reset visible count only when the actual restaurant list changes (not on re-renders)
@@ -546,7 +551,6 @@ export default function RestaurantGrid({
   onEdit,
   onOrder,
   onCheckIn,
-  mustTryFilter,
   visitingId,
   visits,
   baseDelay,

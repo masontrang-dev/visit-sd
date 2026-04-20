@@ -1,16 +1,3 @@
-export function getVisitRecency(lastVisited: string | null): string | null {
-  if (!lastVisited) return null;
-  
-  const now = new Date();
-  const visitDate = new Date(lastVisited);
-  const daysDiff = Math.floor((now.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (daysDiff <= 7) return "This week";
-  if (daysDiff <= 30) return "This month";
-  
-  return null;
-}
-
 export function formatDisplayName(name: string | null | undefined): string {
   if (!name) return "";
   const parts = name.trim().split(/\s+/).filter(Boolean);

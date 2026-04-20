@@ -12,9 +12,8 @@ visitsd/
 ├── components/             # Flat directory of React components
 ├── lib/                    # Shared types and clients
 ├── scripts/                # One-off scripts (e.g., seed-users.ts)
-├── *.sql                   # SQL migration files (run manually in Supabase)
-├── STANDARDS.md            # Coding and design standards
-├── ROADMAP.md              # Implementation checklist
+├── supabase/migrations/    # SQL migration files (run manually in Supabase)
+├── docs/                   # Planning docs (STANDARDS.md, ROADMAP.md, etc.)
 ├── next.config.js          # Next.js config (exposes app version from package.json)
 ├── tailwind.config.js      # Tailwind theme extensions (CSS variable references)
 ├── tsconfig.json           # TypeScript strict mode, @/* path alias

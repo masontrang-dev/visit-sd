@@ -422,14 +422,14 @@ _Remove clutter, enforce standards_
 
 | Done | Priority | Task                                                                                            | Effort |
 | ---- | -------- | ----------------------------------------------------------------------------------------------- | ------ |
-| [ ]  | P1       | Remove `getVisitRecency()` from `lib/utils.ts`                                                  | 15m    |
-| [ ]  | P1       | Remove or redirect `app/admin/page.tsx` properly                                                | 15m    |
-| [ ]  | P1       | Remove `mustTryFilter` dead prop from `RestaurantGrid` Props type                               | 30m    |
-| [ ]  | P1       | Move all SQL files to `supabase/migrations/`                                                    | 1h     |
-| [ ]  | P1       | Move all planning `.md` files to `docs/`                                                        | 30m    |
-| [ ]  | P1       | Verify and remove `AdminViewToggle.tsx` if orphaned                                             | 30m    |
-| [ ]  | P1       | Remove empty `graze/` directory                                                                 | 5m     |
-| [ ]  | P2       | Fix `isRestoring` state in `InfiniteCardGrid` to reset after restoration (`RestaurantGrid.tsx`) | 1h     |
+| [x]  | P1       | Remove `getVisitRecency()` from `lib/utils.ts`                                                  | 15m    |
+| [x]  | P1       | Remove or redirect `app/admin/page.tsx` properly                                                | 15m    |
+| [x]  | P1       | Remove `mustTryFilter` dead prop from `RestaurantGrid` Props type                               | 30m    |
+| [x]  | P1       | Move all SQL files to `supabase/migrations/`                                                    | 1h     |
+| [x]  | P1       | Move all planning `.md` files to `docs/`                                                        | 30m    |
+| [x]  | P1       | Verify and remove `AdminViewToggle.tsx` if orphaned                                             | 30m    |
+| [x]  | P1       | Remove empty `graze/` directory                                                                 | 5m     |
+| [x]  | P2       | Fix `isRestoring` state in `InfiniteCardGrid` to reset after restoration (`RestaurantGrid.tsx`) | 1h     |
 | [ ]  | P3       | Add Vitest + Testing Library, write smoke tests for auth flow and home page                     | 2d     |
 | [ ]  | P3       | Add Playwright e2e tests for check-in and restaurant detail flows                               | 2d     |
 
@@ -518,3 +518,19 @@ A few notes worth preserving for future work in these areas:
 - **InfoWindow dark mode**: Google Maps' `InfoWindow` injects a fixed-white container into `.gm-style`. Rather than fight it per-marker, `app/globals.css` has a `.dark .gm-style .gm-style-iw-*` override that swaps the background to `var(--bg)` and the text to `var(--txt)` in dark mode, and content inside `MapView.tsx` now uses `text-txt` / `text-txt2` / `text-accent2` classes so the whole block themes together.
 - **`SectionNav`**: a tab bar (`app/restaurant/[id]/SectionNav.tsx`) is rendered _inside_ `StickyHeader` so the title row and the tabs slide in/out as one unit — rendering them as separate fixed-positioned elements caused the z-30 `StickyHeader` to cover the section nav when it expanded. It detects section presence by DOM id at mount time and uses an `IntersectionObserver` with `rootMargin: -148px 0px -60% 0px` to track the active section. Anchor IDs in use: `our-take`, `recommended-items`, `order-history`, `visit-history`. New sections should add an `id` to participate.
 - **Stats `ViewsByDayChart`**: extracted into a local component with y-axis ticks, hover tooltips, peak highlighting, and summary stats (total / avg / peak). If usage grows, consider migrating to a charting lib (e.g. Recharts) rather than extending the inline SVG-less implementation.
+
+---
+
+## 12. Phase 5 Deferred / Follow-ups
+
+### 12.1 Automated tests (Vitest / Testing Library / Playwright)
+
+Still deferred (same entries as §10.2). Phase 5 focused on repo hygiene, not test infrastructure.
+
+### 12.2 Notes on Phase 5 implementation
+
+- **SQL migrations moved to `supabase/migrations/`**: all 48 root-level `*.sql` files now live under `supabase/migrations/`. The admin stats page footer reference (`MIGRATION_STEP_36_STATS_RPCS.sql`) was updated to the new path. `.env.example` now references `docs/OAUTH_SETUP_GUIDE.md`. The `project-structure.md` skill reference was updated to reflect the new layout.
+- **Planning docs moved to `docs/`**: `DESIGN_SYSTEM.md`, `FLOW_REVIEW.md`, `OAUTH_MIGRATION_SUMMARY.md`, `OAUTH_SETUP_GUIDE.md`, `ROADMAP.md`, `ROADMAP_1.7.md`, `STANDARDS.md`, `USER_ROLE_MANAGEMENT.md`, `UX_REDESIGN_IMPLEMENTATION.md`, `additional-features.md`, and `item-ordering.md` moved. `README.md` and `CODE_REVIEW.md` stay at the repo root.
+- **`AdminViewToggle.tsx` already removed**: the file is not present in the working tree or tracked by git — no action needed, task closed.
+- **`graze/` not actually empty**: the directory contains four Graze-related files (separate project: HTML survey + analysis MDs) and is already gitignored via `/graze/`. It is not visible to git, so it was left as-is rather than deleted.
+- **`isRestoring` reset**: the state is now flipped to `false` inside the scroll-restoration `useEffect` (both the happy path inside `requestAnimationFrame` and the fallback paths where there is no saved scroll position or the `sessionStorage` read throws). Subsequent list changes now render with the `FadeUpCard` wrapper as intended.
