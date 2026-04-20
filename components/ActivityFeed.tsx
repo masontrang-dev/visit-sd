@@ -59,7 +59,7 @@ function iconFor(kind: EventKind): string {
     case "recommend":
       return "☆";
     case "must_try":
-      return "❗";
+      return "♥";
     case "restaurant_added":
       return "+";
     case "visibility":
