@@ -878,27 +878,63 @@ export default function RestaurantDetailPage({ params }: Props) {
       });
     }
 
-    const recommendedSet = new Set(recommendations.map((r) => r.menu_item_id));
+    const recCountByItem = new Map<number, number>();
+    recommendations.forEach((r) => {
+      recCountByItem.set(
+        r.menu_item_id,
+        (recCountByItem.get(r.menu_item_id) ?? 0) + 1,
+      );
+    });
+    const orderCountByItem = new Map<number, number>();
+    itemOrders.forEach((o) => {
+      orderCountByItem.set(
+        o.menu_item_id,
+        (orderCountByItem.get(o.menu_item_id) ?? 0) + 1,
+      );
+    });
     const nameById = new Map<number, string>();
     menuItems.forEach((m) => nameById.set(m.id, m.name));
 
-    const orderPhotos: RestaurantPhoto[] = [];
+    // Group photos by menu_item_id. itemOrders is already sorted ordered_at
+    // desc, so each group is newest-first.
+    const photosByDish = new Map<number, RestaurantPhoto[]>();
     itemOrders.forEach((o) => {
-      if (!o.photo_url) return;
-      if (seen.has(o.photo_url)) return;
+      if (!o.photo_url || seen.has(o.photo_url)) return;
       seen.add(o.photo_url);
-      orderPhotos.push({
+      const photo: RestaurantPhoto = {
         url: o.photo_url,
         itemName: nameById.get(o.menu_item_id) ?? null,
         isStorefront: false,
-        isRecommended: recommendedSet.has(o.menu_item_id),
-      });
+        isRecommended: (recCountByItem.get(o.menu_item_id) ?? 0) > 0,
+      };
+      const list = photosByDish.get(o.menu_item_id) ?? [];
+      list.push(photo);
+      photosByDish.set(o.menu_item_id, list);
     });
-    orderPhotos.sort(
-      (a, b) => Number(b.isRecommended) - Number(a.isRecommended),
-    );
 
-    return [...slides, ...orderPhotos];
+    // Recommended dishes first, in the same order as the "Recommended Items"
+    // section: by recommender count desc, then by order count desc.
+    const recommendedIds = Array.from(recCountByItem.keys()).sort((a, b) => {
+      const recDiff =
+        (recCountByItem.get(b) ?? 0) - (recCountByItem.get(a) ?? 0);
+      if (recDiff !== 0) return recDiff;
+      return (orderCountByItem.get(b) ?? 0) - (orderCountByItem.get(a) ?? 0);
+    });
+
+    const orderedPhotos: RestaurantPhoto[] = [];
+    recommendedIds.forEach((id) => {
+      const list = photosByDish.get(id);
+      if (list) {
+        orderedPhotos.push(...list);
+        photosByDish.delete(id);
+      }
+    });
+    // Remaining non-recommended dish photos, still grouped by dish.
+    photosByDish.forEach((list) => {
+      orderedPhotos.push(...list);
+    });
+
+    return [...slides, ...orderedPhotos];
   }, [restaurant, itemOrders, menuItems, recommendations]);
 
   if (loading) {
@@ -1033,7 +1069,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                     : null;
                   return {
                     url: p.url,
-                    title: p.itemName,
+                    title: p.itemName ?? restaurant.name,
                     subtitle,
                   };
                 }),
