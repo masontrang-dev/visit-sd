@@ -115,6 +115,8 @@ export default function RestaurantDetailPage({ params }: Props) {
   const [showDeleteVisitConfirm, setShowDeleteVisitConfirm] = useState<
     number | null
   >(null);
+  const [showDeleteRestaurantConfirm, setShowDeleteRestaurantConfirm] =
+    useState(false);
   const [superuserNames, setSuperuserNames] = useState<string[]>([]);
   const [adminNames, setAdminNames] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<
@@ -539,10 +541,16 @@ export default function RestaurantDetailPage({ params }: Props) {
     }
   }
 
-  async function handleDelete() {
-    if (!restaurant || !confirm(`Delete ${restaurant.name}?`)) return;
+  function handleDelete() {
+    if (!restaurant) return;
+    setShowDeleteRestaurantConfirm(true);
+  }
 
+  async function confirmDeleteRestaurant() {
+    if (!restaurant) return;
+    setShowDeleteRestaurantConfirm(false);
     setDeletingId(restaurant.id);
+
     const { error } = await supabase
       .from("restaurants")
       .delete()
@@ -568,29 +576,15 @@ export default function RestaurantDetailPage({ params }: Props) {
     if (!restaurant) return false;
     setSaveError("");
 
-    console.log(
-      "Restaurant detail UPDATE payload:",
-      JSON.stringify(entry, null, 2),
-    );
-    console.log("Photo URL being updated:", entry.photo_url);
-
-    const { data: updateData, error } = await supabase
+    const { error } = await supabase
       .from("restaurants")
       .update(entry)
-      .eq("id", restaurant.id)
-      .select();
-
-    console.log("Update response:", { data: updateData, error });
+      .eq("id", restaurant.id);
 
     if (error) {
       console.error("Update error:", error);
       setSaveError("Failed to update restaurant.");
       return false;
-    }
-
-    if (updateData && Array.isArray(updateData) && updateData.length > 0) {
-      console.log("Updated restaurant from response:", updateData[0]);
-      console.log("Photo URL in update response:", updateData[0]?.photo_url);
     }
 
     // Reload restaurant data
@@ -601,12 +595,6 @@ export default function RestaurantDetailPage({ params }: Props) {
       .single();
 
     if (restaurantData) {
-      console.log("Reloaded restaurant data:", restaurantData);
-      console.log("Photo URL in reloaded data:", restaurantData.photo_url);
-      console.log(
-        "FULL Photo URL (no truncation):",
-        JSON.stringify(restaurantData.photo_url),
-      );
       setRestaurant(restaurantData);
     }
 
@@ -2165,6 +2153,18 @@ export default function RestaurantDetailPage({ params }: Props) {
           cancelText="Cancel"
           onConfirm={() => handleDeleteVisit(showDeleteVisitConfirm)}
           onCancel={() => setShowDeleteVisitConfirm(null)}
+        />
+      )}
+
+      {/* Delete Restaurant Confirmation Modal */}
+      {showDeleteRestaurantConfirm && restaurant && (
+        <ConfirmModal
+          title={`Delete ${restaurant.name}?`}
+          message="This will permanently delete the restaurant and all associated visits, orders, and recommendations. This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          onConfirm={confirmDeleteRestaurant}
+          onCancel={() => setShowDeleteRestaurantConfirm(false)}
         />
       )}
     </main>

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getCurrentUser } from "@/lib/auth-helpers";
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
-const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+const googleApiKey =
+  process.env.GOOGLE_MAPS_SERVER_API_KEY ||
+  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+  "";
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -57,13 +61,13 @@ export async function POST(req: NextRequest) {
   // Verify this is an admin request or a Vercel Cron request
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-
   const isVercelCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
-  const sessionCookie = req.cookies.get("admin_session");
-  const isAdmin = !!sessionCookie?.value;
 
-  if (!isVercelCron && !isAdmin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isVercelCron) {
+    const user = await getCurrentUser();
+    if (!user?.isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   if (!googleApiKey) {

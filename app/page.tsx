@@ -149,13 +149,7 @@ function HomeContent() {
       return param ? param.split(",") : [];
     },
   );
-  const [viewMode, setViewMode] = useState<"list" | "map">(() => {
-    if (typeof window !== "undefined") {
-      const isMobile = window.innerWidth < 768;
-      return isMobile ? "list" : "list";
-    }
-    return "list";
-  });
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [imageDisplayMode, setImageDisplayMode] = useState<ImageDisplayMode>(
     () => {
       if (typeof window !== "undefined") {
