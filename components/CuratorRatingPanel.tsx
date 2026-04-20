@@ -21,6 +21,9 @@ type Props = {
     note: string | null;
     must_try: boolean;
   }) => Promise<void>;
+  /** When true, drop the panel's outer container styling so it can be
+   *  embedded inside a parent card (e.g. the curator-take editor). */
+  bare?: boolean;
 };
 
 function getNoteLabels(rating: number | null): {
@@ -67,6 +70,7 @@ export default function CuratorRatingPanel({
   userId,
   isAdmin,
   onSave,
+  bare = false,
 }: Props) {
   const myRating = userId ? ratings.find((r) => r.user_id === userId) : null;
   const myValue = myRating?.rating ?? null;
@@ -128,9 +132,17 @@ export default function CuratorRatingPanel({
     });
   }
 
+  const showAllCurators = !bare && ratings.length > 0;
+
   return (
-    <div className="px-6 py-4 border-b border-brd bg-bg2 scroll-fade-in">
-      {ratings.length > 0 && (
+    <div
+      className={
+        bare
+          ? ""
+          : "px-6 py-4 border-b border-brd bg-bg2 scroll-fade-in"
+      }
+    >
+      {showAllCurators && (
         <div className="space-y-1.5">
           <div className="text-2xs uppercase tracking-wide text-txt2 mb-2">
             All curators
@@ -164,7 +176,7 @@ export default function CuratorRatingPanel({
 
       {isAdmin && userId && (
         <div
-          className={`${ratings.length > 0 ? "mt-4 pt-4 border-t border-brd" : ""}`}
+          className={`${showAllCurators ? "mt-4 pt-4 border-t border-brd" : ""}`}
         >
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="min-w-0">

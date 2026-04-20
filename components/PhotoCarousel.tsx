@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import useEmblaCarousel from "embla-carousel-react";
 import { formatRecencyTag } from "@/lib/utils";
@@ -21,6 +21,7 @@ type Props = {
   aspectClass?: string;
   heroName?: string;
   cuisineColor?: string;
+  onPhotoClick?: (index: number) => void;
 };
 
 export default function PhotoCarousel({
@@ -32,6 +33,7 @@ export default function PhotoCarousel({
   aspectClass = "aspect-[3/2]",
   heroName,
   cuisineColor,
+  onPhotoClick,
 }: Props) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: "start",
@@ -58,6 +60,31 @@ export default function PhotoCarousel({
     [emblaApi],
   );
 
+  // Suppress clicks that happen at the end of a drag/swipe so the lightbox
+  // only opens on intentional taps.
+  const draggingRef = useRef(false);
+  useEffect(() => {
+    if (!emblaApi || !onPhotoClick) return;
+    const onPointerDown = () => {
+      draggingRef.current = false;
+    };
+    const onScroll = () => {
+      draggingRef.current = true;
+    };
+    emblaApi.on("pointerDown", onPointerDown);
+    emblaApi.on("scroll", onScroll);
+    return () => {
+      emblaApi.off("pointerDown", onPointerDown);
+      emblaApi.off("scroll", onScroll);
+    };
+  }, [emblaApi, onPhotoClick]);
+
+  const handleSlideClick = (i: number) => {
+    if (!onPhotoClick) return;
+    if (draggingRef.current) return;
+    onPhotoClick(i);
+  };
+
   const multiple = photos.length > 1;
 
   return (
@@ -80,10 +107,13 @@ export default function PhotoCarousel({
           {photos.map((photo, i) => (
             <div
               key={`${photo.url}-${i}`}
-              className="relative h-full flex-[0_0_100%] min-w-0"
+              className={`relative h-full flex-[0_0_100%] min-w-0 ${
+                onPhotoClick ? "cursor-pointer" : ""
+              }`}
               style={
                 heroName && i === 0 ? { viewTransitionName: heroName } : undefined
               }
+              onClick={onPhotoClick ? () => handleSlideClick(i) : undefined}
             >
               {Math.abs(i - activeIndex) <= 1 &&
                 (photo.isStorefront ? (

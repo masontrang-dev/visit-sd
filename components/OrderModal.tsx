@@ -138,6 +138,9 @@ export default function OrderModal({
   const [pastOrders, setPastOrders] = useState<ItemOrder[]>([]);
   const [pastOrdersDismissed, setPastOrdersDismissed] = useState(false);
   const [showAllPast, setShowAllPast] = useState(false);
+  // When true, the dish/category are locked to a past order and the user is
+  // only tweaking date/photo/note/drink details for a quick "log again" copy.
+  const [lockedToPast, setLockedToPast] = useState(false);
 
   // UI state
   const [saving, setSaving] = useState(false);
@@ -382,7 +385,7 @@ export default function OrderModal({
         menu_item_id: past.menu_item_id,
         restaurant_id: past.restaurant_id,
         ordered_at: new Date().toISOString().slice(0, 10),
-        notes: past.notes,
+        notes: null,
         drink_details: past.drink_details,
         photo_url: null,
         ordered_by: user.id,
@@ -407,10 +410,11 @@ export default function OrderModal({
       setMenuSearch(item.name);
       if (item.category) setSelectedCategory(item.category);
     }
-    setNotes(past.notes ?? "");
+    setNotes("");
     setOrderedAt(new Date().toISOString().slice(0, 10));
     setPhotoFile(null);
     setPhotoUrl("");
+    setLockedToPast(true);
 
     const drink = (past.drink_details as DrinkDetails) ?? null;
     if (drink) {
@@ -559,7 +563,7 @@ export default function OrderModal({
                         disabled={saving || success}
                         className="py-1 px-2 text-2xs font-medium bg-transparent text-txt2 border-[1.5px] border-brd cursor-pointer disabled:opacity-50"
                       >
-                        Adjust & log
+                        Log again with changes
                       </button>
                     </div>
                   </div>
@@ -585,7 +589,25 @@ export default function OrderModal({
           </div>
         )}
 
+        {/* Locked dish display for "Log again with changes" */}
+        {lockedToPast && selectedItem && (
+          <div className="mb-4">
+            <label className={labelCls}>Item</label>
+            <div className="flex items-center gap-2 p-2 bg-bg2 border-[1.5px] border-brd">
+              <span className="text-sm font-medium text-txt">
+                {selectedItem.name}
+              </span>
+              {selectedCategory && (
+                <span className="text-2xs text-txt2 capitalize">
+                  {selectedCategory}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Menu item search/select */}
+        {!lockedToPast && (
         <div ref={dropdownRef} className="mb-4 relative">
           <label className={labelCls}>Menu item</label>
           <input
@@ -662,8 +684,10 @@ export default function OrderModal({
             </ul>
           )}
         </div>
+        )}
 
         {/* Category */}
+        {!lockedToPast && (
         <div className="mb-4">
           <label className={labelCls}>Category</label>
           <div className="flex gap-2">
@@ -682,6 +706,7 @@ export default function OrderModal({
             ))}
           </div>
         </div>
+        )}
 
         {/* Date */}
         <div className="mb-4">

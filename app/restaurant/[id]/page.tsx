@@ -27,6 +27,9 @@ import MenuItemRecommendToggle from "@/components/MenuItemRecommendToggle";
 import PhotoCarousel, {
   type RestaurantPhoto,
 } from "@/components/PhotoCarousel";
+import PhotoLightbox, {
+  type LightboxPhoto,
+} from "@/components/PhotoLightbox";
 import Link from "next/link";
 import { isCurrentlyOpen } from "@/lib/google-types";
 import { trackEvent } from "@/lib/analytics";
@@ -125,12 +128,16 @@ export default function RestaurantDetailPage({ params }: Props) {
     "by-dish",
   );
   const [expandedDishId, setExpandedDishId] = useState<number | null>(null);
+  const [lightbox, setLightbox] = useState<{
+    photos: LightboxPhoto[];
+    index: number;
+  } | null>(null);
   const [curatorRatings, setCuratorRatings] = useState<CuratorRating[]>([]);
   const [curatorProfiles, setCuratorProfiles] = useState<
     Record<string, CuratorProfile>
   >({});
   const [curatorRatingsLoaded, setCuratorRatingsLoaded] = useState(false);
-  const [curatorRatingExpanded, setCuratorRatingExpanded] = useState(false);
+  const [editingMyTake, setEditingMyTake] = useState(false);
 
   // Average of the 1-5 ratings (ignoring note-only rows). Drives both the
   // "Curators' rating" header and the public notes-section heading.
@@ -634,7 +641,7 @@ export default function RestaurantDetailPage({ params }: Props) {
         menu_item_id: source.menu_item_id,
         restaurant_id: source.restaurant_id,
         ordered_at: new Date().toISOString().slice(0, 10),
-        notes: source.notes,
+        notes: null,
         drink_details: source.drink_details,
         photo_url: null,
         ordered_by: user.id,
@@ -726,7 +733,7 @@ export default function RestaurantDetailPage({ params }: Props) {
     menuItem: MenuItem;
     orders: ItemOrder[];
     latestOrder: ItemOrder | null;
-    latestNote: string | null;
+    noteOrder: ItemOrder | null;
     latestPhotoUrl: string | null;
     orderCount: number;
     recommenderIds: string[];
@@ -735,8 +742,8 @@ export default function RestaurantDetailPage({ params }: Props) {
   const dishGroups: DishGroup[] = menuItems.map((mi) => {
     const orders = itemOrders.filter((o) => o.menu_item_id === mi.id);
     const latestOrder = orders[0] ?? null;
-    const latestNote =
-      orders.find((o) => (o.notes ?? "").trim().length > 0)?.notes ?? null;
+    const noteOrder =
+      orders.find((o) => (o.notes ?? "").trim().length > 0) ?? null;
     const latestPhotoUrl =
       orders.find((o) => (o.photo_url ?? "").trim().length > 0)?.photo_url ??
       null;
@@ -747,7 +754,7 @@ export default function RestaurantDetailPage({ params }: Props) {
       menuItem: mi,
       orders,
       latestOrder,
-      latestNote,
+      noteOrder,
       latestPhotoUrl,
       orderCount: orders.length,
       recommenderIds,
@@ -813,6 +820,37 @@ export default function RestaurantDetailPage({ params }: Props) {
       day: "numeric",
       year: "numeric",
     });
+  }
+
+  function buildDishPhotos(
+    orders: ItemOrder[],
+    dishName: string,
+  ): LightboxPhoto[] {
+    return orders
+      .filter((o) => (o.photo_url ?? "").trim().length > 0)
+      .map((o) => ({
+        url: o.photo_url!,
+        title: dishName,
+        subtitle: `${formatDate(o.ordered_at)} · by ${
+          ordererNames[o.ordered_by] || "curator"
+        }`,
+      }));
+  }
+
+  function openDishLightbox(
+    orders: ItemOrder[],
+    dishName: string,
+    focusUrl?: string,
+  ) {
+    const photos = buildDishPhotos(orders, dishName);
+    if (photos.length === 0) return;
+    const idx = focusUrl
+      ? Math.max(
+          0,
+          photos.findIndex((p) => p.url === focusUrl),
+        )
+      : 0;
+    setLightbox({ photos, index: idx });
   }
 
   function formatTime(dateStr: string) {
@@ -984,6 +1022,24 @@ export default function RestaurantDetailPage({ params }: Props) {
             priority
             aspectClass="aspect-[16/9] max-h-[320px]"
             heroName={`hero-${restaurant.id}`}
+            onPhotoClick={(i) => {
+              setLightbox({
+                photos: heroPhotos.map((p) => {
+                  const order = itemOrders.find((o) => o.photo_url === p.url);
+                  const subtitle = order
+                    ? `${formatDate(order.ordered_at)} · by ${
+                        ordererNames[order.ordered_by] || "curator"
+                      }`
+                    : null;
+                  return {
+                    url: p.url,
+                    title: p.itemName,
+                    subtitle,
+                  };
+                }),
+                index: i,
+              });
+            }}
           />
         )}
         <div className="px-6 pt-5 pb-4">
@@ -1111,9 +1167,6 @@ export default function RestaurantDetailPage({ params }: Props) {
           ratingsCount={curatorRatings.length}
           avg={curatorAvg !== null ? Math.round(curatorAvg * 2) / 2 : null}
           loaded={curatorRatingsLoaded}
-          expanded={curatorRatingExpanded}
-          onToggle={() => setCuratorRatingExpanded((e) => !e)}
-          hasDetails={curatorRatings.length > 0 || (isAdmin && !!user)}
         />
         <div className="w-px bg-brd" />
         <div className="flex-1 text-center py-3 px-3">
@@ -1147,63 +1200,191 @@ export default function RestaurantDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Curator rating expanded panel — full-width sibling so the stat bar
-          columns don't reflow when the curators' rating is expanded. */}
-      {curatorRatingExpanded && (
-        <CuratorRatingPanel
-          ratings={curatorRatings}
-          profiles={curatorProfiles}
-          userId={user?.id}
-          isAdmin={isAdmin}
-          onSave={saveCuratorRating}
-        />
-      )}
-
-      {/* Curator Take Section — one blockquote per curator with a note */}
+      {/* Curator Take Section — public quotes plus inline edit for the
+          signed-in curator (replaces the old expandable rating panel). */}
       {(() => {
+        const myRating = user
+          ? curatorRatings.find((r) => r.user_id === user.id)
+          : null;
+        const hasMyRating = !!myRating;
         const noted = curatorRatings.filter(
           (r) => r.note && r.note.trim().length > 0,
         );
-        if (noted.length === 0) return null;
+        const showSection =
+          curatorRatings.length > 0 || (isAdmin && !!user);
+        if (!showSection) return null;
+        const sectionLabel =
+          curatorAvg !== null && curatorAvg >= 5
+            ? "Why we love it"
+            : curatorAvg !== null && curatorAvg >= 4
+              ? "Why we like it"
+              : "Our Take";
+        // Animated expand/collapse using a 1fr ↔ 0fr grid row. Both views
+        // (quote + editor, or CTA + editor) stay mounted; the height
+        // transition gives a smooth in-place morph instead of a hard swap.
+        const expandRow = (open: boolean) =>
+          `grid transition-[grid-template-rows] duration-[280ms] ease-out ${
+            open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          }`;
+        const editorBody = (
+          <>
+            <CuratorRatingPanel
+              bare
+              ratings={curatorRatings}
+              profiles={curatorProfiles}
+              userId={user?.id}
+              isAdmin={isAdmin}
+              onSave={saveCuratorRating}
+            />
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setEditingMyTake(false)}
+                className="btn-secondary text-sm px-3 py-1.5"
+              >
+                Done
+              </button>
+            </div>
+          </>
+        );
         return (
-          <div className="p-6 border-b border-brd scroll-fade-in">
-            <h2 className="text-2xs uppercase tracking-wide text-txt2 mb-3 font-medium">
-              {curatorAvg !== null && curatorAvg >= 4
-                ? "Why we love it"
-                : "Our thoughts"}
-            </h2>
-            <div className="space-y-4">
-              {noted.map((r) => {
+          <section className="px-6 py-7 border-b border-brd scroll-fade-in">
+            {curatorRatings.length > 0 && (
+              <header className="flex items-baseline justify-between gap-3 mb-5">
+                <h2 className="font-display text-2xl tracking-tight leading-none">
+                  {noted.length > 0 ? sectionLabel : "Our Take"}
+                </h2>
+                <span className="text-2xs uppercase tracking-[0.1em] text-txt2 shrink-0">
+                  {curatorRatings.length} curator
+                  {curatorRatings.length !== 1 ? "s" : ""}
+                </span>
+              </header>
+            )}
+
+            <div className="space-y-3">
+              {curatorRatings.map((r) => {
+                const isOwn = isAdmin && !!user && r.user_id === user.id;
+                const isEditingThis = isOwn && editingMyTake;
+                const hasNote = !!(r.note && r.note.trim().length > 0);
                 const p = curatorProfiles[r.user_id];
                 const name =
                   formatDisplayName(p?.display_name) || "Curator";
                 return (
-                  <blockquote
+                  <figure
                     key={r.id}
-                    className="border-l-2 border-accent pl-3"
+                    className="relative bg-bg2 border border-brd p-5"
                   >
-                    <p className="text-base text-txt leading-relaxed italic">
-                      &ldquo;{r.note}&rdquo;
-                    </p>
-                    <footer className="text-2xs uppercase tracking-wide text-txt2 mt-2 not-italic flex items-center gap-2">
-                      <span>— {name}</span>
-                      {r.rating !== null && (
-                        <span
-                          className="text-accent normal-case tracking-normal"
-                          aria-label={`${r.rating} out of 5 stars`}
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm text-txt truncate">
+                          {name}
+                        </div>
+                        {!isEditingThis && (
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {r.rating !== null && (
+                              <span
+                                className="text-accent text-xs leading-none"
+                                aria-label={`${r.rating} out of 5 stars`}
+                              >
+                                {"★".repeat(r.rating)}
+                                <span className="text-brd">
+                                  {"★".repeat(5 - r.rating)}
+                                </span>
+                              </span>
+                            )}
+                            {r.must_try && (
+                              <span className="text-2xs font-medium px-1.5 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase leading-none">
+                                ★ Must-Try
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {isOwn && !editingMyTake && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingMyTake(true)}
+                          aria-label="Edit your take"
+                          className="text-txt2 hover:text-accent bg-transparent border-none cursor-pointer p-1.5 -m-1.5 transition-colors duration-150 shrink-0"
                         >
-                          {"★".repeat(r.rating)}
-                          <span className="text-brd">
-                            {"★".repeat(5 - r.rating)}
-                          </span>
-                        </span>
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                          </svg>
+                        </button>
                       )}
-                    </footer>
-                  </blockquote>
+                    </div>
+
+                    {/* Quote view — collapses when own + editing.
+                        Skipped for curators who only rated. */}
+                    {hasNote && (
+                      <div className={expandRow(!isEditingThis)}>
+                        <div className="overflow-hidden">
+                          <p className="text-base text-txt leading-relaxed pt-3">
+                            {r.note}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Editor view — only mounted for the signed-in curator */}
+                    {isOwn && (
+                      <div className={expandRow(isEditingThis)}>
+                        <div className="overflow-hidden">
+                          <div className="pt-4">{editorBody}</div>
+                        </div>
+                      </div>
+                    )}
+                  </figure>
                 );
               })}
+
+              {/* Add-your-take slot — only when admin has no rating row yet.
+                  If they've rated (with or without a note) their card above
+                  already contains the editor. */}
+              {isAdmin && !!user && !hasMyRating && (
+                <figure className="relative bg-bg2 border border-brd overflow-hidden">
+                  <div className={expandRow(!editingMyTake)}>
+                    <div className="overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setEditingMyTake(true)}
+                        className="w-full py-4 px-5 text-txt2 hover:text-accent transition-colors duration-150 text-sm font-medium tracking-wide flex items-center justify-center gap-2 bg-transparent cursor-pointer border-none"
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        <span>Add your take</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className={expandRow(editingMyTake)}>
+                    <div className="overflow-hidden">
+                      <div className="p-5">{editorBody}</div>
+                    </div>
+                  </div>
+                </figure>
+              )}
             </div>
-          </div>
+          </section>
         );
       })()}
 
@@ -1232,9 +1413,23 @@ export default function RestaurantDetailPage({ params }: Props) {
                         </span>
                       )}
                     </div>
-                    {item.latestNote && (
+                    {item.noteOrder && (
                       <p className="text-xs text-txt leading-snug italic mb-1">
-                        &ldquo;{item.latestNote}&rdquo;
+                        {item.noteOrder.id !== item.latestOrder?.id && (
+                          <span className="not-italic text-txt2">
+                            Latest note (from{" "}
+                            {formatDate(item.noteOrder.ordered_at)}):{" "}
+                          </span>
+                        )}
+                        &ldquo;{item.noteOrder.notes}&rdquo;
+                        {item.noteOrder.id !== item.latestOrder?.id && (
+                          <span className="not-italic text-txt2">
+                            {" "}
+                            &mdash;{" "}
+                            {ordererNames[item.noteOrder.ordered_by] ||
+                              "curator"}
+                          </span>
+                        )}
                       </p>
                     )}
                     <div className="flex items-center gap-3 text-2xs text-txt2 flex-wrap">
@@ -1259,13 +1454,26 @@ export default function RestaurantDetailPage({ params }: Props) {
                     )}
                   </div>
                   {item.latestPhotoUrl && (
-                    <img
-                      src={item.latestPhotoUrl}
-                      alt={item.menuItem.name}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
-                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openDishLightbox(
+                          item.orders,
+                          item.menuItem.name,
+                          item.latestPhotoUrl!,
+                        )
+                      }
+                      className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
+                      aria-label={`View photos of ${item.menuItem.name}`}
+                    >
+                      <img
+                        src={item.latestPhotoUrl}
+                        alt={item.menuItem.name}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
+                      />
+                    </button>
                   )}
                 </div>
               );
@@ -1401,50 +1609,172 @@ export default function RestaurantDetailPage({ params }: Props) {
           {historyView === "by-dish" ? (
             <div className="space-y-3">
               {curatorDishes.map((group) => {
+                const isSingle = group.orderCount === 1;
                 const expanded = expandedDishId === group.menuItem.id;
+                const latest = group.latestOrder;
+                const latestCurator = latest
+                  ? ordererNames[latest.ordered_by] || "curator"
+                  : null;
                 return (
                   <div
                     key={group.menuItem.id}
                     className="border-[1.5px] border-brd"
                   >
-                    <button
-                      onClick={() =>
-                        setExpandedDishId(expanded ? null : group.menuItem.id)
-                      }
-                      className="w-full text-left p-3 flex items-start justify-between gap-3 bg-transparent cursor-pointer"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <p className="font-display text-lg leading-tight">
-                            {group.menuItem.name}
-                          </p>
-                          {group.menuItem.category && (
-                            <span className="text-2xs text-txt2 capitalize">
-                              {group.menuItem.category}
-                            </span>
+                    {isSingle ? (
+                      <div className="p-3 flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="font-display text-lg leading-tight">
+                              {group.menuItem.name}
+                            </p>
+                            {group.menuItem.category && (
+                              <span className="text-2xs text-txt2 capitalize">
+                                {group.menuItem.category}
+                              </span>
+                            )}
+                          </div>
+                          {latest && (
+                            <p className="text-2xs text-txt2 mb-1">
+                              {formatDate(latest.ordered_at)} · by{" "}
+                              {latestCurator}
+                            </p>
                           )}
-                          <Chevron open={expanded} className="text-txt2" />
+                          {latest?.notes && (
+                            <p className="text-sm text-txt italic mb-1">
+                              {latest.notes}
+                            </p>
+                          )}
+                          {latest?.drink_details && (
+                            <p className="text-2xs text-txt2">
+                              {formatDrinkSummary(
+                                latest.drink_details as DrinkDetails,
+                              )}
+                            </p>
+                          )}
+                          {isAdmin && latest && (
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={() => handleEditOrder(latest)}
+                                className="btn-outline !py-1 !px-2 !text-2xs !border-txt !text-txt"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleDeleteOrderClick(latest.id)
+                                }
+                                disabled={deletingOrderId === latest.id}
+                                className="btn-outline !py-1 !px-2 !text-2xs !border-accent !text-accent hover:!bg-accent hover:!text-white"
+                              >
+                                {deletingOrderId === latest.id
+                                  ? "Deleting..."
+                                  : "Delete"}
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-2xs text-txt2 mb-1">
-                          {group.orderCount} order
-                          {group.orderCount !== 1 ? "s" : ""}
-                        </p>
-                        {group.latestNote && (
-                          <p className="text-xs text-txt italic mb-2">
-                            Latest: &ldquo;{group.latestNote}&rdquo;
-                          </p>
+                        {group.latestPhotoUrl && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openDishLightbox(
+                                group.orders,
+                                group.menuItem.name,
+                                group.latestPhotoUrl!,
+                              )
+                            }
+                            className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
+                            aria-label={`View photo of ${group.menuItem.name}`}
+                          >
+                            <img
+                              src={group.latestPhotoUrl}
+                              alt={group.menuItem.name}
+                              loading="lazy"
+                              decoding="async"
+                              className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
+                            />
+                          </button>
                         )}
                       </div>
-                      {group.latestPhotoUrl && (
-                        <img
-                          src={group.latestPhotoUrl}
-                          alt={group.menuItem.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
-                        />
-                      )}
-                    </button>
+                    ) : (
+                      <div className="p-3 flex items-start justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedDishId(
+                              expanded ? null : group.menuItem.id,
+                            )
+                          }
+                          className="flex-1 min-w-0 text-left bg-transparent border-none cursor-pointer p-0"
+                        >
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="font-display text-lg leading-tight">
+                              {group.menuItem.name}
+                            </p>
+                            {group.menuItem.category && (
+                              <span className="text-2xs text-txt2 capitalize">
+                                {group.menuItem.category}
+                              </span>
+                            )}
+                            <Chevron open={expanded} className="text-txt2" />
+                          </div>
+                          <p className="text-2xs text-txt2 mb-1">
+                            {group.orderCount} orders
+                            {latest && (
+                              <>
+                                {" · last "}
+                                {formatDate(latest.ordered_at)} by{" "}
+                                {latestCurator}
+                              </>
+                            )}
+                          </p>
+                          {group.noteOrder && (
+                            <p className="text-xs text-txt italic mb-2">
+                              {group.noteOrder.id === group.latestOrder?.id ? (
+                                <>&ldquo;{group.noteOrder.notes}&rdquo;</>
+                              ) : (
+                                <>
+                                  <span className="not-italic text-txt2">
+                                    Latest note (from{" "}
+                                    {formatDate(group.noteOrder.ordered_at)}):{" "}
+                                  </span>
+                                  &ldquo;{group.noteOrder.notes}&rdquo;
+                                  <span className="not-italic text-txt2">
+                                    {" "}
+                                    &mdash;{" "}
+                                    {ordererNames[
+                                      group.noteOrder.ordered_by
+                                    ] || "curator"}
+                                  </span>
+                                </>
+                              )}
+                            </p>
+                          )}
+                        </button>
+                        {group.latestPhotoUrl && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openDishLightbox(
+                                group.orders,
+                                group.menuItem.name,
+                                group.latestPhotoUrl!,
+                              )
+                            }
+                            className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
+                            aria-label={`View photos of ${group.menuItem.name}`}
+                          >
+                            <img
+                              src={group.latestPhotoUrl}
+                              alt={group.menuItem.name}
+                              loading="lazy"
+                              decoding="async"
+                              className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
+                            />
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <div className="px-3 pb-3 -mt-1">
                       <MenuItemRecommendToggle
                         menuItemId={group.menuItem.id}
@@ -1453,7 +1783,7 @@ export default function RestaurantDetailPage({ params }: Props) {
                         onChange={reloadOrders}
                       />
                     </div>
-                    {expanded && (
+                    {!isSingle && expanded && (
                       <div className="border-t border-brd p-3 space-y-3 bg-bg2">
                         {group.orders.map((order) => (
                           <div
@@ -1502,17 +1832,31 @@ export default function RestaurantDetailPage({ params }: Props) {
                               )}
                             </div>
                             {order.photo_url && (
-                              <img
-                                src={order.photo_url}
-                                alt={group.menuItem.name}
-                                loading="lazy"
-                                decoding="async"
-                                className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display =
-                                    "none";
-                                }}
-                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openDishLightbox(
+                                    group.orders,
+                                    group.menuItem.name,
+                                    order.photo_url!,
+                                  )
+                                }
+                                className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
+                                aria-label={`View photo of ${group.menuItem.name}`}
+                              >
+                                <img
+                                  src={order.photo_url}
+                                  alt={group.menuItem.name}
+                                  loading="lazy"
+                                  decoding="async"
+                                  className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
+                                  onError={(e) => {
+                                    (
+                                      e.target as HTMLImageElement
+                                    ).style.display = "none";
+                                  }}
+                                />
+                              </button>
                             )}
                           </div>
                         ))}
@@ -1560,17 +1904,35 @@ export default function RestaurantDetailPage({ params }: Props) {
                         )}
                       </div>
                       {order.photo_url && (
-                        <img
-                          src={order.photo_url}
-                          alt={menuItem?.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-16 h-16 object-cover rounded-lg border border-brd shrink-0 bg-bg2"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display =
-                              "none";
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const dishOrders = menuItem
+                              ? itemOrders.filter(
+                                  (o) => o.menu_item_id === menuItem.id,
+                                )
+                              : [order];
+                            openDishLightbox(
+                              dishOrders,
+                              menuItem?.name || "Unknown item",
+                              order.photo_url!,
+                            );
                           }}
-                        />
+                          className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
+                          aria-label={`View photo of ${menuItem?.name || "order"}`}
+                        >
+                          <img
+                            src={order.photo_url}
+                            alt={menuItem?.name}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display =
+                                "none";
+                            }}
+                          />
+                        </button>
                       )}
                     </div>
                     {isAdmin && (
@@ -1731,6 +2093,15 @@ export default function RestaurantDetailPage({ params }: Props) {
           onConfirm={handleCheckIn}
           onClose={() => setShowCheckInModal(false)}
           isAdmin={isAdmin || isSuperuser}
+        />
+      )}
+
+      {/* Photo Lightbox */}
+      {lightbox && (
+        <PhotoLightbox
+          photos={lightbox.photos}
+          startIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
         />
       )}
 
