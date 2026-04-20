@@ -107,7 +107,7 @@ function Card({
     <Link
       href={`/restaurant/${r.id}`}
       onClick={() => onNavigate?.()}
-      className="group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-colors duration-150 hover:bg-bg2 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
+      className="group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-colors duration-150 hover:bg-bg2 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] h-full"
       style={{
         borderLeft: `3px solid ${cuisineColor}`,
       }}
@@ -372,7 +372,7 @@ function FadeUpCard({
   return (
     <div
       ref={ref}
-      className="opacity-0"
+      className="opacity-0 h-full"
       style={{ animationDelay: `${delay}ms` }}
     >
       {children}
@@ -530,7 +530,9 @@ function InfiniteCardGrid({
             />
           );
           return isRestoring ? (
-            <div key={r.id}>{card}</div>
+            <div key={r.id} className="h-full">
+              {card}
+            </div>
           ) : (
             <FadeUpCard key={r.id} delay={(i % BATCH_SIZE) * 50 + baseDelay}>
               {card}
