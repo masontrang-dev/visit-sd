@@ -156,9 +156,9 @@ function ViewsByDayChart({
                     onFocus={() => setHoverIdx(i)}
                     onBlur={() => setHoverIdx(null)}
                     aria-label={`${formatShortDate(d.date)}: ${d.count} views`}
-                    className={`flex-1 min-w-[4px] rounded-t-sm transition-opacity duration-100 outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      isHovered || isPeak ? "opacity-100" : "opacity-80"
-                    } ${isPeak ? "bg-accent" : "bg-accent/70 hover:bg-accent"}`}
+                    className={`flex-1 min-w-[4px] rounded-t-sm bg-accent transition-opacity duration-100 outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                      isHovered || isPeak ? "opacity-100" : "opacity-90 hover:opacity-100"
+                    }`}
                     style={{ height: `${Math.max(h, 1.5)}%` }}
                   />
                 );
