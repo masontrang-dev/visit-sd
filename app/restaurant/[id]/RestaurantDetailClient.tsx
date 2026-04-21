@@ -1241,25 +1241,15 @@ export default function RestaurantDetailClient({ params }: Props) {
             open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
           }`;
         const editorBody = (
-          <>
-            <CuratorRatingPanel
-              bare
-              ratings={curatorRatings}
-              profiles={curatorProfiles}
-              userId={user?.id}
-              canEdit={canManageContent}
-              onSave={saveCuratorRating}
-            />
-            <div className="mt-3 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setEditingMyTake(false)}
-                className="btn-secondary text-sm px-3 py-1.5"
-              >
-                Done
-              </button>
-            </div>
-          </>
+          <CuratorRatingPanel
+            bare
+            ratings={curatorRatings}
+            profiles={curatorProfiles}
+            userId={user?.id}
+            canEdit={canManageContent}
+            onSave={saveCuratorRating}
+            onClose={() => setEditingMyTake(false)}
+          />
         );
         return (
           <section

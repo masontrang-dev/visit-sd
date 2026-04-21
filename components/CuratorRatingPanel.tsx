@@ -23,6 +23,8 @@ type Props = {
     note: string | null;
     must_try: boolean;
   }) => Promise<void>;
+  /** Called after Save (post-commit) or Cancel to close the editor. */
+  onClose?: () => void;
   /** When true, drop the panel's outer container styling so it can be
    *  embedded inside a parent card (e.g. the curator-take editor). */
   bare?: boolean;
@@ -72,20 +74,35 @@ export default function CuratorRatingPanel({
   userId,
   canEdit,
   onSave,
+  onClose,
   bare = false,
 }: Props) {
   const myRating = userId ? ratings.find((r) => r.user_id === userId) : null;
   const myValue = myRating?.rating ?? null;
   const savedNote = myRating?.note ?? "";
   const myMustTry = myRating?.must_try ?? false;
+
+  const [ratingDraft, setRatingDraft] = useState<number | null>(myValue);
+  const [mustTryDraft, setMustTryDraft] = useState<boolean>(myMustTry);
   const [noteDraft, setNoteDraft] = useState(savedNote);
   const [saving, setSaving] = useState(false);
 
+  // Resync drafts when the persisted values change (e.g. after a save reload,
+  // or if another tab updated the row).
+  useEffect(() => {
+    setRatingDraft(myValue);
+  }, [myValue]);
+  useEffect(() => {
+    setMustTryDraft(myMustTry);
+  }, [myMustTry]);
   useEffect(() => {
     setNoteDraft(savedNote);
   }, [savedNote]);
 
-  const noteDirty = noteDraft.trim() !== savedNote.trim();
+  const dirty =
+    ratingDraft !== myValue ||
+    mustTryDraft !== myMustTry ||
+    noteDraft.trim() !== savedNote.trim();
 
   // Auto-grow the textarea so the curator can see everything they've typed
   // without a tiny internal scroll bar on mobile.
@@ -97,41 +114,28 @@ export default function CuratorRatingPanel({
     el.style.height = `${el.scrollHeight}px`;
   }, [noteDraft]);
 
-  async function commit(next: {
-    rating: number | null;
-    note: string | null;
-    must_try: boolean;
-  }) {
+  async function handleSave() {
     if (saving) return;
     tap();
-    setSaving(true);
-    await onSave(next);
-    setSaving(false);
+    if (dirty) {
+      setSaving(true);
+      const cleaned = noteDraft.trim();
+      await onSave({
+        rating: ratingDraft,
+        note: cleaned.length > 0 ? cleaned : null,
+        must_try: mustTryDraft,
+      });
+      setSaving(false);
+    }
+    onClose?.();
   }
 
-  async function setRating(next: number | null) {
-    await commit({
-      rating: next,
-      note: savedNote || null,
-      must_try: myMustTry,
-    });
-  }
-
-  async function saveNote() {
-    const cleaned = noteDraft.trim();
-    await commit({
-      rating: myValue,
-      note: cleaned.length > 0 ? cleaned : null,
-      must_try: myMustTry,
-    });
-  }
-
-  async function toggleMustTry() {
-    await commit({
-      rating: myValue,
-      note: savedNote || null,
-      must_try: !myMustTry,
-    });
+  function handleCancel() {
+    if (saving) return;
+    setRatingDraft(myValue);
+    setMustTryDraft(myMustTry);
+    setNoteDraft(savedNote);
+    onClose?.();
   }
 
   const showAllCurators = !bare && ratings.length > 0;
@@ -180,7 +184,7 @@ export default function CuratorRatingPanel({
         <div
           className={`${showAllCurators ? "mt-4 pt-4 border-t border-brd" : ""}`}
         >
-          <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="flex items-end justify-between gap-4 mb-4">
             <div className="min-w-0">
               <div className="text-2xs uppercase tracking-wide text-txt2 mb-2">
                 Your rating
@@ -189,10 +193,13 @@ export default function CuratorRatingPanel({
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
-                    onClick={() => setRating(myValue === star ? null : star)}
+                    onClick={() => {
+                      tap();
+                      setRatingDraft(ratingDraft === star ? null : star);
+                    }}
                     disabled={saving}
                     className={`text-xl bg-transparent border-none cursor-pointer p-1 transition-colors duration-[0.12s] ${
-                      myValue !== null && star <= myValue
+                      ratingDraft !== null && star <= ratingDraft
                         ? "text-accent"
                         : "text-brd"
                     }`}
@@ -200,9 +207,12 @@ export default function CuratorRatingPanel({
                     ★
                   </button>
                 ))}
-                {myValue !== null && (
+                {ratingDraft !== null && (
                   <button
-                    onClick={() => setRating(null)}
+                    onClick={() => {
+                      tap();
+                      setRatingDraft(null);
+                    }}
                     disabled={saving}
                     className="text-2xs text-txt2 ml-2 bg-transparent border-none cursor-pointer hover:text-accent"
                   >
@@ -212,52 +222,50 @@ export default function CuratorRatingPanel({
               </div>
             </div>
 
-            <div className="text-right shrink-0">
-              <div className="text-2xs uppercase tracking-wide text-txt2 mb-2">
-                Must-try
-              </div>
-              <button
-                type="button"
-                onClick={toggleMustTry}
-                disabled={saving}
-                className={`chip ${
-                  myMustTry ? "!bg-accent !text-white !border-accent" : ""
-                }`}
-              >
-                {myMustTry ? "★ Must-try" : "☆ Mark"}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                tap();
+                setMustTryDraft(!mustTryDraft);
+              }}
+              disabled={saving}
+              className={`chip shrink-0 ${
+                mustTryDraft ? "!bg-accent !text-white !border-accent" : ""
+              }`}
+            >
+              {mustTryDraft ? "★ Must-try" : "☆ Must-try"}
+            </button>
           </div>
 
           <div className="text-2xs uppercase tracking-wide text-txt2 mb-2">
-            {getNoteLabels(myValue).label}
+            {getNoteLabels(ratingDraft).label}
           </div>
           <textarea
             ref={textareaRef}
             value={noteDraft}
             onChange={(e) => setNoteDraft(e.target.value)}
-            placeholder={getNoteLabels(myValue).placeholder}
+            placeholder={getNoteLabels(ratingDraft).placeholder}
             rows={3}
             className="input-base resize-none leading-relaxed w-full overflow-hidden"
           />
-          {noteDirty && (
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={saveNote}
-                disabled={saving}
-                className="btn-primary text-sm px-3 py-1.5"
-              >
-                Save note
-              </button>
-              <button
-                onClick={() => setNoteDraft(savedNote)}
-                disabled={saving}
-                className="btn-secondary text-sm px-3 py-1.5"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
+          <div className="flex gap-2 mt-3 justify-end">
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={saving}
+              className="btn-secondary text-sm px-3 py-1.5"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-primary text-sm px-3 py-1.5"
+            >
+              {dirty ? "Save" : "Done"}
+            </button>
+          </div>
         </div>
       )}
     </div>
