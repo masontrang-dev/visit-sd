@@ -15,6 +15,10 @@ export type HomeData = {
   recommendedItems: Record<number, MenuItem[]>;
   restaurantPhotos: Record<number, RestaurantPhoto[]>;
   visits: Record<number, RestaurantVisit[]>;
+  /** Lowercase blob of extra searchable text per restaurant (menu item names,
+   * order notes, curator take notes). Lets the client searchbar match against
+   * data that doesn't live on the restaurant row itself. */
+  searchIndex: Record<number, string>;
   loading: boolean;
   reload: () => Promise<void>;
 };
@@ -28,6 +32,7 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     Record<number, RestaurantPhoto[]>
   >({});
   const [visits, setVisits] = useState<Record<number, RestaurantVisit[]>>({});
+  const [searchIndex, setSearchIndex] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
 
   const loadVisits = useCallback(async () => {
@@ -62,8 +67,15 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     if (rows.length === 0) return;
     const visibleRestaurantIds = rows.map((r) => r.id);
 
-    // Phase 2: recommendations + order photos in parallel.
-    const [recResult, orderResult] = await Promise.all([
+    // Phase 2: recommendations, order photos, and the per-restaurant search
+    // blob (menu names + order notes + curator notes) in parallel.
+    const [
+      recResult,
+      orderResult,
+      allMenuResult,
+      orderNotesResult,
+      curatorNotesResult,
+    ] = await Promise.all([
       supabase
         .from("menu_item_recommendations")
         .select("menu_item_id") as Promise<{
@@ -85,7 +97,43 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
             }[]
           | null;
       }>,
+      supabase
+        .from("menu_items")
+        .select("restaurant_id, name")
+        .in("restaurant_id", visibleRestaurantIds) as Promise<{
+        data: { restaurant_id: number; name: string }[] | null;
+      }>,
+      supabase
+        .from("item_orders")
+        .select("restaurant_id, notes")
+        .in("restaurant_id", visibleRestaurantIds)
+        .not("notes", "is", null) as Promise<{
+        data: { restaurant_id: number; notes: string }[] | null;
+      }>,
+      supabase
+        .from("curator_ratings")
+        .select("restaurant_id, note")
+        .in("restaurant_id", visibleRestaurantIds)
+        .not("note", "is", null) as Promise<{
+        data: { restaurant_id: number; note: string }[] | null;
+      }>,
     ]);
+
+    const index: Record<number, string[]> = {};
+    (allMenuResult.data ?? []).forEach((m) => {
+      (index[m.restaurant_id] ??= []).push(m.name);
+    });
+    (orderNotesResult.data ?? []).forEach((o) => {
+      (index[o.restaurant_id] ??= []).push(o.notes);
+    });
+    (curatorNotesResult.data ?? []).forEach((c) => {
+      (index[c.restaurant_id] ??= []).push(c.note);
+    });
+    const flatIndex: Record<number, string> = {};
+    Object.entries(index).forEach(([id, parts]) => {
+      flatIndex[Number(id)] = parts.join(" ").toLowerCase();
+    });
+    setSearchIndex(flatIndex);
 
     const recRows = recResult.data ?? [];
     const orderRows = orderResult.data ?? [];
@@ -177,6 +225,7 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     recommendedItems,
     restaurantPhotos,
     visits,
+    searchIndex,
     loading,
     reload: load,
   };

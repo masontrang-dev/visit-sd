@@ -18,6 +18,7 @@ import PhotoCarousel, {
 } from "@/components/PhotoCarousel";
 import { CUISINE_COLORS, buildCuisineColorMap } from "@/lib/cuisine-colors";
 import { haversineMiles, formatMiles } from "@/lib/distance";
+import { formatFoodTag } from "@/lib/food-tags";
 
 export type { RestaurantPhoto };
 
@@ -224,6 +225,14 @@ function Card({
               📍 {formatMiles(distance)}
             </span>
           )}
+          {r.food_tags?.map((tag) => (
+            <span
+              key={`food-tag-${tag}`}
+              className="text-2xs font-medium px-2 py-0.5 rounded-pill border border-brd text-txt2 tracking-tight"
+            >
+              {formatFoodTag(tag)}
+            </span>
+          ))}
         </div>
 
         {/* Ratings row */}

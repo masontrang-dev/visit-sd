@@ -14,12 +14,14 @@ import {
   type OpeningHours,
 } from "@/lib/google-types";
 import { OCCASION_SUGGESTIONS } from "@/lib/occasions";
+import { normalizeFoodTag } from "@/lib/food-tags";
 
 type Props = {
   onSave: (entry: Omit<Restaurant, "id" | "created_at">) => Promise<boolean>;
   onClose: () => void;
   editData?: Restaurant | null;
   existingCuisines?: string[];
+  existingFoodTags?: string[];
   onDeleteSuccess?: () => void;
 };
 
@@ -59,6 +61,7 @@ export default function AddModal({
   onClose,
   editData,
   existingCuisines,
+  existingFoodTags,
   onDeleteSuccess,
 }: Props) {
   const { displayName } = useAuth();
@@ -102,6 +105,13 @@ export default function AddModal({
     editData?.occasions ?? [],
   );
   const [occasionInput, setOccasionInput] = useState("");
+  const [foodTags, setFoodTags] = useState<string[]>(
+    editData?.food_tags ?? [],
+  );
+  const [foodTagInput, setFoodTagInput] = useState("");
+  const [foodTagOpen, setFoodTagOpen] = useState(false);
+  const [foodTagHighlight, setFoodTagHighlight] = useState(-1);
+  const foodTagWrapperRef = useRef<HTMLDivElement>(null);
   const [openingHours, setOpeningHours] = useState<OpeningHours>(
     editData?.opening_hours ?? null,
   );
@@ -123,6 +133,26 @@ export default function AddModal({
       (c) => c.toLowerCase() === cuisine.trim().toLowerCase(),
     );
 
+  const foodTagOptions = Array.from(new Set(existingFoodTags ?? [])).sort();
+  const normalizedFoodTagInput = normalizeFoodTag(foodTagInput);
+  const filteredFoodTagOptions = foodTagOptions.filter(
+    (t) =>
+      !foodTags.includes(t) &&
+      (!normalizedFoodTagInput || t.includes(normalizedFoodTagInput)),
+  );
+  const showFoodTagAdd =
+    !!normalizedFoodTagInput &&
+    !foodTags.includes(normalizedFoodTagInput) &&
+    !foodTagOptions.some((t) => t === normalizedFoodTagInput);
+
+  function addFoodTag(tag: string) {
+    const t = normalizeFoodTag(tag);
+    if (!t || foodTags.includes(t)) return;
+    setFoodTags([...foodTags, t]);
+    setFoodTagInput("");
+    setFoodTagHighlight(-1);
+  }
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
@@ -130,6 +160,12 @@ export default function AddModal({
         !cuisineWrapperRef.current.contains(e.target as Node)
       ) {
         setCuisineOpen(false);
+      }
+      if (
+        foodTagWrapperRef.current &&
+        !foodTagWrapperRef.current.contains(e.target as Node)
+      ) {
+        setFoodTagOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -350,6 +386,7 @@ export default function AddModal({
       google_review_count: googleReviewCount,
       my_rating: editData?.my_rating ?? null,
       occasions: occasions.length > 0 ? occasions : null,
+      food_tags: foodTags.length > 0 ? foodTags : null,
       opening_hours: openingHours,
       visibility,
       visibility_changed_at: nextVisibilityChangedAt,
@@ -651,6 +688,88 @@ export default function AddModal({
               </div>
             )}
           </div>
+        </div>
+
+        <div ref={foodTagWrapperRef} className="mb-4 relative">
+          <label className={labelCls}>Food / drink tags</label>
+          <input
+            value={foodTagInput}
+            onChange={(e) => {
+              setFoodTagInput(e.target.value);
+              setFoodTagOpen(true);
+              setFoodTagHighlight(-1);
+            }}
+            onFocus={() => setFoodTagOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setFoodTagHighlight((prev) =>
+                  prev < filteredFoodTagOptions.length - 1 ? prev + 1 : prev,
+                );
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setFoodTagHighlight((prev) => (prev > 0 ? prev - 1 : -1));
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                if (
+                  foodTagHighlight >= 0 &&
+                  filteredFoodTagOptions[foodTagHighlight]
+                ) {
+                  addFoodTag(filteredFoodTagOptions[foodTagHighlight]);
+                } else if (normalizedFoodTagInput) {
+                  addFoodTag(normalizedFoodTagInput);
+                }
+              } else if (e.key === "Escape") {
+                setFoodTagOpen(false);
+              }
+            }}
+            placeholder="Search or add a food/drink tag (e.g. boba, ramen)"
+            className="input-base"
+            autoComplete="off"
+          />
+          {foodTagOpen &&
+            (filteredFoodTagOptions.length > 0 || showFoodTagAdd) && (
+              <ul className="absolute top-full left-0 right-0 z-10 bg-bg border-[1.5px] border-brd border-t-0 max-h-[200px] overflow-y-auto list-none m-0 p-0">
+                {showFoodTagAdd && (
+                  <li
+                    onMouseDown={() => addFoodTag(normalizedFoodTagInput)}
+                    className={`py-2 px-3 text-sm cursor-pointer text-accent font-medium font-body ${filteredFoodTagOptions.length > 0 ? "border-b border-brd" : ""}`}
+                  >
+                    Add &ldquo;{normalizedFoodTagInput}&rdquo;
+                  </li>
+                )}
+                {filteredFoodTagOptions.map((t, i) => (
+                  <li
+                    key={t}
+                    onMouseDown={() => addFoodTag(t)}
+                    className={`py-2 px-3 text-sm cursor-pointer font-body text-txt transition-colors duration-75 hover:bg-bg2 ${i === foodTagHighlight ? "bg-bg2" : "bg-transparent"}`}
+                  >
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            )}
+          {foodTags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {foodTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="text-2xs font-medium px-2.5 py-1 rounded-pill border border-txt text-txt capitalize flex items-center gap-1.5"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFoodTags(foodTags.filter((t) => t !== tag))
+                    }
+                    className="text-txt hover:text-accent transition-colors"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {googleRating !== null && (

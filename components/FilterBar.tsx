@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { formatOccasion } from "@/lib/occasions";
+import { formatFoodTag } from "@/lib/food-tags";
 import type { SortMode } from "@/hooks/useFilterState";
 
 export type ImageDisplayMode = "full" | "compact" | "none";
@@ -43,6 +44,10 @@ type Props = {
   activeOccasions?: string[];
   onOccasionChange?: (f: string[]) => void;
   occasionCounts?: Record<string, number>;
+  foodTags?: string[];
+  activeFoodTags?: string[];
+  onFoodTagChange?: (f: string[]) => void;
+  foodTagCounts?: Record<string, number>;
   priceCounts?: Record<string, number>;
   onAdd?: () => void;
   viewMode?: "list" | "map";
@@ -86,6 +91,10 @@ export default function FilterBar({
   activeOccasions,
   onOccasionChange,
   occasionCounts,
+  foodTags,
+  activeFoodTags,
+  onFoodTagChange,
+  foodTagCounts,
   priceCounts,
   onAdd,
   viewMode,
@@ -111,7 +120,7 @@ export default function FilterBar({
   resultCount,
 }: Props) {
   const [activePanel, setActivePanel] = useState<
-    "cuisine" | "area" | "occasion" | "price" | "sort" | null
+    "cuisine" | "area" | "occasion" | "food-tag" | "price" | "sort" | null
   >(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetView, setSheetView] = useState<"filters" | "sort">("filters");
@@ -214,12 +223,14 @@ export default function FilterBar({
   const hasCuisineFilter = activeCuisines.length > 0;
   const hasAreaFilter = (activeNeighborhoods ?? []).length > 0;
   const hasOccasionFilter = (activeOccasions ?? []).length > 0;
+  const hasFoodTagFilter = (activeFoodTags ?? []).length > 0;
   const hasPriceFilter = (activePrices ?? []).length > 0;
   const panelOpen = activePanel !== null;
   const hasAnyFilter =
     hasCuisineFilter ||
     hasAreaFilter ||
     hasOccasionFilter ||
+    hasFoodTagFilter ||
     hasPriceFilter ||
     mustTryFilter ||
     openNowFilter ||
@@ -228,6 +239,7 @@ export default function FilterBar({
     activeCuisines.length +
     (activeNeighborhoods?.length ?? 0) +
     (activeOccasions?.length ?? 0) +
+    (activeFoodTags?.length ?? 0) +
     (activePrices?.length ?? 0) +
     (mustTryFilter ? 1 : 0) +
     (openNowFilter ? 1 : 0) +
@@ -237,6 +249,7 @@ export default function FilterBar({
     onCuisineChange([]);
     if (onNeighborhoodChange) onNeighborhoodChange([]);
     if (onOccasionChange) onOccasionChange([]);
+    if (onFoodTagChange) onFoodTagChange([]);
     if (onPriceChange) onPriceChange([]);
     if (onMustTryFilterChange) onMustTryFilterChange(false);
     if (onOpenNowFilterChange) onOpenNowFilterChange(false);
@@ -244,7 +257,7 @@ export default function FilterBar({
   }
 
   function removeFilter(
-    type: "cuisine" | "area" | "occasion" | "price",
+    type: "cuisine" | "area" | "occasion" | "food-tag" | "price",
     value: string,
   ) {
     if (type === "cuisine") {
@@ -255,6 +268,8 @@ export default function FilterBar({
       );
     } else if (type === "occasion" && onOccasionChange) {
       onOccasionChange((activeOccasions ?? []).filter((o) => o !== value));
+    } else if (type === "food-tag" && onFoodTagChange) {
+      onFoodTagChange((activeFoodTags ?? []).filter((t) => t !== value));
     } else if (type === "price" && onPriceChange) {
       onPriceChange((activePrices ?? []).filter((p) => p !== value));
     }
@@ -571,6 +586,41 @@ export default function FilterBar({
     );
   }
 
+  function renderFoodTagChips() {
+    if (!foodTags || !onFoodTagChange) return null;
+    return (
+      <div className="flex gap-1.5 flex-wrap items-center">
+        <button
+          className={!hasFoodTagFilter ? "chip-active" : "chip"}
+          onClick={() => onFoodTagChange([])}
+        >
+          All
+        </button>
+        {foodTags.map((t) => {
+          const count = foodTagCounts?.[t] ?? 0;
+          const empty = foodTagCounts && count === 0;
+          return (
+            <button
+              key={t}
+              disabled={empty}
+              className={`${
+                (activeFoodTags ?? []).includes(t) ? "chip-active" : "chip"
+              } ${empty ? "opacity-40 cursor-not-allowed" : ""}`}
+              onClick={() =>
+                onFoodTagChange(toggleItem(activeFoodTags ?? [], t))
+              }
+            >
+              {formatFoodTag(t)}
+              {foodTagCounts && (
+                <span className="ml-1 opacity-60">({count})</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   function renderOccasionChips() {
     if (!occasions || !onOccasionChange) return null;
     return (
@@ -636,6 +686,16 @@ export default function FilterBar({
             className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
           >
             {formatOccasion(occasion)}
+            <span className="text-xs">✕</span>
+          </button>
+        ))}
+        {(activeFoodTags ?? []).map((tag) => (
+          <button
+            key={`pill-food-tag-${tag}`}
+            onClick={() => removeFilter("food-tag", tag)}
+            className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
+          >
+            {formatFoodTag(tag)}
             <span className="text-xs">✕</span>
           </button>
         ))}
@@ -840,6 +900,25 @@ export default function FilterBar({
             </button>
           )}
 
+        {foodTags &&
+          foodTags.length > 0 &&
+          onFoodTagChange &&
+          !hasFoodTagFilter && (
+            <button
+              className={`chip flex items-center gap-1.5 ${activePanel === "food-tag" ? "!border-txt !bg-txt !text-bg" : ""}`}
+              onClick={() =>
+                setActivePanel(activePanel === "food-tag" ? null : "food-tag")
+              }
+            >
+              Food tags
+              <span
+                className={`text-2xs transition-transform duration-[0.12s] ${activePanel === "food-tag" ? "rotate-180" : ""}`}
+              >
+                ▾
+              </span>
+            </button>
+          )}
+
         {onPriceChange && !hasPriceFilter && (
           <button
             className={`chip flex items-center gap-1.5 ${activePanel === "price" ? "!border-txt !bg-txt !text-bg" : ""}`}
@@ -881,9 +960,11 @@ export default function FilterBar({
                     ? "Area"
                     : activePanel === "occasion"
                       ? "Occasion"
-                      : activePanel === "sort"
-                        ? "Sort"
-                        : "Price"}
+                      : activePanel === "food-tag"
+                        ? "Food tags"
+                        : activePanel === "sort"
+                          ? "Sort"
+                          : "Price"}
               </span>
               <button
                 onClick={() => setActivePanel(null)}
@@ -896,6 +977,7 @@ export default function FilterBar({
             {activePanel === "cuisine" && renderCuisineChips()}
             {activePanel === "area" && renderAreaChips()}
             {activePanel === "occasion" && renderOccasionChips()}
+            {activePanel === "food-tag" && renderFoodTagChips()}
             {activePanel === "price" && renderPriceChips()}
             {activePanel === "sort" && renderSortList()}
           </div>
@@ -1047,6 +1129,17 @@ export default function FilterBar({
                       Occasion
                     </span>
                     {renderOccasionChips()}
+                  </section>
+                )}
+
+              {foodTags &&
+                foodTags.length > 0 &&
+                onFoodTagChange && (
+                  <section>
+                    <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                      Food tags
+                    </span>
+                    {renderFoodTagChips()}
                   </section>
                 )}
 

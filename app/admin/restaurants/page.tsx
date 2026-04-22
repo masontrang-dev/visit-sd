@@ -61,7 +61,7 @@ function downloadBlob(content: string, filename: string) {
 }
 
 export default function AdminRestaurantsPage() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { isAdmin, isSuperuser, isLoading: authLoading } = useAuth();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -76,6 +76,8 @@ export default function AdminRestaurantsPage() {
   const [visibilityFilter, setVisibilityFilter] = useState<Visibility | "all">(
     "all",
   );
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   useEffect(() => {
     if (!authLoading && isAdmin) {
@@ -168,6 +170,43 @@ export default function AdminRestaurantsPage() {
     setWorking(false);
   }
 
+  async function hardDeleteSelected() {
+    if (!isSuperuser) return;
+    if (selectedIds.size === 0) return;
+    setWorking(true);
+    setMessage(null);
+    const ids = Array.from(selectedIds);
+    try {
+      const res = await fetch("/api/admin/delete-restaurant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage({
+          kind: "error",
+          text: data.error || "Hard delete failed.",
+        });
+      } else {
+        const n: number = data.deleted ?? ids.length;
+        setMessage({
+          kind: "success",
+          text: `Hard-deleted ${n} restaurant${n === 1 ? "" : "s"}.`,
+        });
+        clearSelection();
+        await load();
+      }
+    } catch (err) {
+      console.error("[admin/restaurants] hardDeleteSelected:", err);
+      setMessage({ kind: "error", text: "Hard delete failed." });
+    } finally {
+      setWorking(false);
+      setDeleteConfirmOpen(false);
+      setDeleteConfirmText("");
+    }
+  }
+
   function exportCsv(scope: "selected" | "filtered" | "all") {
     let rows: Restaurant[];
     if (scope === "selected") {
@@ -204,7 +243,7 @@ export default function AdminRestaurantsPage() {
         <div className="text-center">
           <p className="text-error text-lg mb-4">Access Denied</p>
           <p className="text-txt2 text-sm mb-6">
-            Only admins can access bulk restaurant management.
+            Only admins can access restaurant maintenance.
           </p>
           <Link href="/" className="text-accent hover:underline">
             Back home
@@ -222,11 +261,12 @@ export default function AdminRestaurantsPage() {
           <AdminButton />
         </div>
         <p className="text-xs tracking-wide uppercase text-accent font-medium mb-1.5">
-          Admin · Bulk Restaurant Ops
+          Admin · Restaurant Maintenance
         </p>
         <h1 className="font-display text-5xl mb-2">RESTAURANTS</h1>
         <p className="text-txt2 text-sm">
-          Bulk-change visibility or export as CSV.
+          Bulk-change visibility, export as CSV
+          {isSuperuser ? ", or hard-delete records" : ""}.
         </p>
         <div className="mt-4">
           <Link href="/" className="text-sm text-accent hover:underline">
@@ -327,6 +367,21 @@ export default function AdminRestaurantsPage() {
           >
             Export all
           </button>
+          {isSuperuser && (
+            <>
+              <span className="mx-2 h-5 w-px bg-brd" aria-hidden />
+              <button
+                onClick={() => {
+                  setDeleteConfirmText("");
+                  setDeleteConfirmOpen(true);
+                }}
+                disabled={working || selectedIds.size === 0}
+                className="btn-primary !py-1.5 !px-3 !text-xs !bg-error !border-error !text-white disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Hard delete
+              </button>
+            </>
+          )}
         </div>
 
         {loading ? (
@@ -408,6 +463,66 @@ export default function AdminRestaurantsPage() {
           </div>
         )}
       </div>
+
+      {deleteConfirmOpen && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !working) {
+              setDeleteConfirmOpen(false);
+              setDeleteConfirmText("");
+            }
+          }}
+          className="fixed inset-0 bg-black/55 z-[100] flex items-center justify-center p-4"
+        >
+          <div className="bg-bg border-2 border-error p-6 w-full max-w-[440px]">
+            <p className="font-display text-2xl mb-3 text-error">
+              HARD DELETE
+            </p>
+            <p className="text-sm text-txt mb-3 leading-relaxed">
+              You are about to permanently delete{" "}
+              <span className="font-medium">{selectedIds.size}</span>{" "}
+              restaurant{selectedIds.size === 1 ? "" : "s"} and all related
+              data (visits, menu items, orders, ratings, wishlist entries).
+              This cannot be undone.
+            </p>
+            <p className="text-xs text-txt2 mb-2 uppercase tracking-wide">
+              Type <span className="font-mono text-error">delete</span> to
+              confirm
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              autoFocus
+              disabled={working}
+              className="input-base w-full mb-5"
+              placeholder="delete"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setDeleteConfirmOpen(false);
+                  setDeleteConfirmText("");
+                }}
+                disabled={working}
+                className="btn-outline flex-1 disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={hardDeleteSelected}
+                disabled={
+                  working ||
+                  deleteConfirmText.trim().toLowerCase() !== "delete"
+                }
+                className="btn-primary flex-1 !bg-error !border-error !text-white disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {working ? "Deleting..." : "Delete forever"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

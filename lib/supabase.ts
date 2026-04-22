@@ -26,6 +26,7 @@ export type Restaurant = {
   google_review_count: number | null;
   my_rating: number | null;
   occasions: string[] | null;
+  food_tags: string[] | null;
   opening_hours: OpeningHours;
   visibility: "public" | "private" | "archived";
   visibility_changed_at: string | null;

@@ -19,6 +19,7 @@ export type FilterState = {
   activeCuisines: string[];
   activeNeighborhoods: string[];
   activeOccasions: string[];
+  activeFoodTags: string[];
   mustTryFilter: boolean;
   openNowFilter: boolean;
   wishlistFilter: boolean;
@@ -33,6 +34,7 @@ export type FilterState = {
   setActiveCuisines: (v: string[]) => void;
   setActiveNeighborhoods: (v: string[]) => void;
   setActiveOccasions: (v: string[]) => void;
+  setActiveFoodTags: (v: string[]) => void;
   setMustTryFilter: (v: boolean) => void;
   setOpenNowFilter: (v: boolean) => void;
   setWishlistFilter: (v: boolean) => void;
@@ -57,6 +59,7 @@ type UrlState = {
   cuisines: string[];
   neighborhoods: string[];
   occasions: string[];
+  foodTags: string[];
   mustTry: boolean;
   openNow: boolean;
   wishlist: boolean;
@@ -70,6 +73,7 @@ function buildQs(s: UrlState): string {
   if (s.neighborhoods.length > 0)
     params.set("neighborhood", s.neighborhoods.join(","));
   if (s.occasions.length > 0) params.set("occasion", s.occasions.join(","));
+  if (s.foodTags.length > 0) params.set("food_tag", s.foodTags.join(","));
   if (s.mustTry) params.set("must_try", "true");
   if (s.openNow) params.set("open_now", "true");
   if (s.wishlist) params.set("wishlist", "true");
@@ -94,6 +98,10 @@ export function useFilterState(): FilterState {
   );
   const [activeOccasions, setActiveOccasionsState] = useState<string[]>(() => {
     const param = searchParams.get("occasion");
+    return param ? param.split(",") : [];
+  });
+  const [activeFoodTags, setActiveFoodTagsState] = useState<string[]>(() => {
+    const param = searchParams.get("food_tag");
     return param ? param.split(",") : [];
   });
   const [mustTryFilter, setMustTryFilterState] = useState(
@@ -156,6 +164,7 @@ export function useFilterState(): FilterState {
     cuisines: activeCuisines,
     neighborhoods: activeNeighborhoods,
     occasions: activeOccasions,
+    foodTags: activeFoodTags,
     mustTry: mustTryFilter,
     openNow: openNowFilter,
     wishlist: wishlistFilter,
@@ -166,6 +175,7 @@ export function useFilterState(): FilterState {
     cuisines: activeCuisines,
     neighborhoods: activeNeighborhoods,
     occasions: activeOccasions,
+    foodTags: activeFoodTags,
     mustTry: mustTryFilter,
     openNow: openNowFilter,
     wishlist: wishlistFilter,
@@ -202,6 +212,14 @@ export function useFilterState(): FilterState {
     (v: string[]) => {
       setActiveOccasionsState(v);
       syncUrl({ occasions: v });
+    },
+    [syncUrl],
+  );
+
+  const setActiveFoodTags = useCallback(
+    (v: string[]) => {
+      setActiveFoodTagsState(v);
+      syncUrl({ foodTags: v });
     },
     [syncUrl],
   );
@@ -257,6 +275,7 @@ export function useFilterState(): FilterState {
     setActiveCuisinesState([]);
     setActiveNeighborhoodsState([]);
     setActiveOccasionsState([]);
+    setActiveFoodTagsState([]);
     setMustTryFilterState(false);
     setOpenNowFilterState(false);
     setWishlistFilterState(false);
@@ -267,6 +286,7 @@ export function useFilterState(): FilterState {
       cuisines: [],
       neighborhoods: [],
       occasions: [],
+      foodTags: [],
       mustTry: false,
       openNow: false,
       wishlist: false,
@@ -279,6 +299,7 @@ export function useFilterState(): FilterState {
     activeCuisines.length > 0 ||
     activeNeighborhoods.length > 0 ||
     activeOccasions.length > 0 ||
+    activeFoodTags.length > 0 ||
     mustTryFilter ||
     openNowFilter ||
     wishlistFilter ||
@@ -289,6 +310,7 @@ export function useFilterState(): FilterState {
     activeCuisines,
     activeNeighborhoods,
     activeOccasions,
+    activeFoodTags,
     mustTryFilter,
     openNowFilter,
     wishlistFilter,
@@ -303,6 +325,7 @@ export function useFilterState(): FilterState {
     setActiveCuisines,
     setActiveNeighborhoods,
     setActiveOccasions,
+    setActiveFoodTags,
     setMustTryFilter,
     setOpenNowFilter,
     setWishlistFilter,

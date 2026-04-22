@@ -37,6 +37,7 @@ import { formatDisplayName } from "@/lib/utils";
 import { success } from "@/lib/haptics";
 import SwipeableRow from "@/components/SwipeableRow";
 import { CUISINE_COLORS } from "@/lib/cuisine-colors";
+import { formatFoodTag } from "@/lib/food-tags";
 import { RestaurantDetailProvider } from "./RestaurantDetailContext";
 import StickyHeader from "./StickyHeader";
 import RestaurantActionBar from "./RestaurantActionBar";
@@ -96,6 +97,7 @@ export default function RestaurantDetailClient({ params }: Props) {
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [cuisines, setCuisines] = useState<string[]>([]);
+  const [existingFoodTags, setExistingFoodTags] = useState<string[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemOrders, setItemOrders] = useState<ItemOrder[]>([]);
   const [expandedItem, setExpandedItem] = useState<number | null>(null);
@@ -292,7 +294,7 @@ export default function RestaurantDetailClient({ params }: Props) {
             .select("*")
             .eq("restaurant_id", id)
             .order("ordered_at", { ascending: false }),
-          supabase.from("restaurants").select("cuisine"),
+          supabase.from("restaurants").select("cuisine, food_tags"),
         ]);
 
       setVisits(visitsResult.data ?? []);
@@ -300,11 +302,18 @@ export default function RestaurantDetailClient({ params }: Props) {
       setItemOrders(ordersResult.data ?? []);
 
       if (cuisinesResult.data) {
-        const rows = cuisinesResult.data as { cuisine: string | null }[];
+        const rows = cuisinesResult.data as {
+          cuisine: string | null;
+          food_tags: string[] | null;
+        }[];
         const uniqueCuisines = Array.from(
           new Set(rows.map((r) => r.cuisine).filter(Boolean)),
         ).sort();
         setCuisines(uniqueCuisines as string[]);
+        const uniqueFoodTags = Array.from(
+          new Set(rows.flatMap((r) => r.food_tags ?? [])),
+        ).sort();
+        setExistingFoodTags(uniqueFoodTags);
       }
 
       await Promise.all([
@@ -1134,7 +1143,8 @@ export default function RestaurantDetailClient({ params }: Props) {
             )}
           </div>
           {(restaurant.must_try ||
-            (restaurant.occasions && restaurant.occasions.length > 0)) && (
+            (restaurant.occasions && restaurant.occasions.length > 0) ||
+            (restaurant.food_tags && restaurant.food_tags.length > 0)) && (
             <div className="flex items-center gap-2 flex-wrap mt-3">
               {restaurant.must_try && (
                 <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase">
@@ -1147,6 +1157,14 @@ export default function RestaurantDetailClient({ params }: Props) {
                   className="text-2xs font-medium px-2.5 py-1 rounded-pill border border-brd text-txt2 capitalize"
                 >
                   {occasion}
+                </span>
+              ))}
+              {restaurant.food_tags?.map((tag) => (
+                <span
+                  key={`food-tag-${tag}`}
+                  className="text-2xs font-medium px-2.5 py-1 rounded-pill border border-brd text-txt2"
+                >
+                  {formatFoodTag(tag)}
                 </span>
               ))}
             </div>
@@ -1893,6 +1911,7 @@ export default function RestaurantDetailClient({ params }: Props) {
           }}
           editData={restaurant}
           existingCuisines={cuisines}
+          existingFoodTags={existingFoodTags}
           onDeleteSuccess={() => router.push("/admin")}
         />
       )}

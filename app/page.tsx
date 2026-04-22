@@ -125,6 +125,7 @@ function HomeContent() {
     recommendedItems,
     restaurantPhotos,
     visits,
+    searchIndex,
     loading,
     reload,
   } = useHomeData(isAdmin, user);
@@ -132,6 +133,7 @@ function HomeContent() {
     activeCuisines,
     activeNeighborhoods,
     activeOccasions,
+    activeFoodTags,
     mustTryFilter,
     openNowFilter,
     wishlistFilter,
@@ -146,6 +148,7 @@ function HomeContent() {
     setActiveCuisines,
     setActiveNeighborhoods,
     setActiveOccasions,
+    setActiveFoodTags,
     setMustTryFilter,
     setOpenNowFilter,
     setWishlistFilter,
@@ -323,6 +326,13 @@ function HomeContent() {
       ).sort(),
     [visibilityScoped],
   );
+  const foodTagOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(visibilityScoped.flatMap((r) => r.food_tags ?? [])),
+      ).sort(),
+    [visibilityScoped],
+  );
   const cuisineCounts = useMemo(() => {
     const m: Record<string, number> = {};
     visibilityScoped.forEach((r) => {
@@ -342,6 +352,15 @@ function HomeContent() {
     visibilityScoped.forEach((r) => {
       (r.occasions ?? []).forEach((o) => {
         m[o] = (m[o] ?? 0) + 1;
+      });
+    });
+    return m;
+  }, [visibilityScoped]);
+  const foodTagCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    visibilityScoped.forEach((r) => {
+      (r.food_tags ?? []).forEach((t) => {
+        m[t] = (m[t] ?? 0) + 1;
       });
     });
     return m;
@@ -373,6 +392,10 @@ function HomeContent() {
           const rOccasions = r.occasions ?? [];
           if (!activeOccasions.some((o) => rOccasions.includes(o))) return false;
         }
+        if (activeFoodTags.length > 0) {
+          const rFoodTags = r.food_tags ?? [];
+          if (!activeFoodTags.some((t) => rFoodTags.includes(t))) return false;
+        }
         if (mustTryFilter && !r.must_try) return false;
         if (openNowFilter && isCurrentlyOpen(r.opening_hours) !== true)
           return false;
@@ -381,11 +404,21 @@ function HomeContent() {
           return false;
         if (debouncedSearch.trim()) {
           const q = debouncedSearch.trim().toLowerCase();
-          const searchable = [r.name, r.cuisine, r.neighborhood, r.note]
+          const searchable = [
+            r.name,
+            r.cuisine,
+            r.neighborhood,
+            r.note,
+            r.address,
+            r.added_by,
+            ...(r.occasions ?? []),
+            ...(r.food_tags ?? []),
+          ]
             .filter(Boolean)
             .join(" ")
             .toLowerCase();
-          if (!searchable.includes(q)) return false;
+          const extra = searchIndex[r.id] ?? "";
+          if (!searchable.includes(q) && !extra.includes(q)) return false;
         }
         return true;
       }),
@@ -396,12 +429,14 @@ function HomeContent() {
       activeCuisines,
       activeNeighborhoods,
       activeOccasions,
+      activeFoodTags,
       mustTryFilter,
       openNowFilter,
       wishlistFilter,
       wishlistIds,
       activePrices,
       debouncedSearch,
+      searchIndex,
     ],
   );
 
@@ -585,6 +620,10 @@ function HomeContent() {
         activeOccasions={activeOccasions}
         onOccasionChange={setActiveOccasions}
         occasionCounts={occasionCounts}
+        foodTags={foodTagOptions}
+        activeFoodTags={activeFoodTags}
+        onFoodTagChange={setActiveFoodTags}
+        foodTagCounts={foodTagCounts}
         priceCounts={priceCounts}
         onAdd={isAdmin ? () => setShowAddModal(true) : undefined}
         viewMode={viewMode}
@@ -715,6 +754,7 @@ function HomeContent() {
           onSave={handleAddRestaurant}
           onClose={() => setShowAddModal(false)}
           existingCuisines={cuisines}
+          existingFoodTags={foodTagOptions}
         />
       )}
     </main>
