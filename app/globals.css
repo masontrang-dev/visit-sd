@@ -79,11 +79,16 @@
   }
 
   /* Prevent iOS Safari from auto-zooming on focus — triggers when font-size < 16px
-     and the zoom does not reset on blur. */
-  input,
+     and the zoom does not reset on blur. `!important` is required because this
+     project's Tailwind `text-base` is 15px (not 16px), so any utility class like
+     `text-base` / `text-sm` / `text-[15px]` on an input would otherwise win on
+     specificity and re-introduce the zoom. Exceptions: ranges, checkboxes,
+     radios, and file inputs don't take keyboard focus the same way and iOS
+     doesn't zoom on them. */
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="color"]),
   textarea,
   select {
-    font-size: max(16px, 1em);
+    font-size: max(16px, 1em) !important;
   }
 }
 
@@ -113,8 +118,10 @@
   }
 
   /* ── Inputs ── */
+  /* NOTE: Do not add `text-*` here — form inputs are locked to 16px by the
+     global rule above to prevent iOS Safari's auto-zoom-on-focus. */
   .input-base {
-    @apply w-full py-2 px-3 text-base border-[1.5px] border-brd bg-bg text-txt
+    @apply w-full py-2 px-3 border-[1.5px] border-brd bg-bg text-txt
            rounded-none outline-none font-body transition-[border-color] duration-[0.12s]
            focus:border-accent focus-visible:ring-2 focus-visible:ring-accent
            focus-visible:ring-offset-2 focus-visible:ring-offset-bg;

@@ -61,7 +61,7 @@ export default function CheckInModal({
             type="datetime-local"
             value={visitDateTime}
             onChange={(e) => setVisitDateTime(e.target.value)}
-            className="w-full px-3 py-3 border-[1.5px] border-brd bg-bg text-txt text-base focus:outline-none focus:border-accent transition-colors cursor-pointer hover:border-txt [color-scheme:light] dark:[color-scheme:dark]"
+            className="w-full px-3 py-3 border-[1.5px] border-brd bg-bg text-txt focus:outline-none focus:border-accent transition-colors cursor-pointer hover:border-txt [color-scheme:light] dark:[color-scheme:dark]"
           />
           <p className="text-2xs text-txt2 mt-1.5 opacity-60">
             Click to adjust date and time
