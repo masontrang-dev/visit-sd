@@ -696,7 +696,7 @@ export default function FilterBar({
             value={searchQuery ?? ""}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search restaurants, dishes, areas..."
-            className="input-base !py-2 !px-3.5 !rounded-none !text-sm flex-1 min-w-0 !bg-bg2 !border-brd placeholder:text-txt2 placeholder:opacity-60"
+            className="input-base !py-2 !px-3.5 !rounded-none flex-1 min-w-0 !bg-bg2 !border-brd placeholder:text-txt2 placeholder:opacity-60"
           />
         )}
 

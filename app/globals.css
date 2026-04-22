@@ -77,6 +77,14 @@
   body {
     @apply font-body bg-bg text-txt antialiased;
   }
+
+  /* Prevent iOS Safari from auto-zooming on focus — triggers when font-size < 16px
+     and the zoom does not reset on blur. */
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
 }
 
 @layer components {

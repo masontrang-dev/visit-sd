@@ -81,7 +81,7 @@ export default function CheckInModal({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Add a quick note about your visit..."
-            className="w-full px-3 py-2 border-[1.5px] border-brd bg-bg text-txt text-sm focus:outline-none focus:border-accent transition-colors"
+            className="input-base"
           />
         </div>
 

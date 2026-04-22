@@ -254,7 +254,7 @@ export default function AdminRestaurantsPage() {
             placeholder="Search name, cuisine, area, address..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="input-base !py-2 !px-3 !text-sm flex-1 min-w-[200px]"
+            className="input-base !py-2 !px-3 flex-1 min-w-[200px]"
           />
           <select
             value={visibilityFilter}

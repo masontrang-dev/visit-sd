@@ -125,7 +125,7 @@ export default function RequestAccessModal({
           onChange={(e) => setMessage(e.target.value)}
           rows={3}
           placeholder="Why would you like access?"
-          className="w-full mb-4 p-2 text-sm border border-brd bg-bg text-txt rounded-md resize-none"
+          className="input-base mb-4 resize-none"
         />
 
         {error && <p className="text-error text-sm mb-3">{error}</p>}
