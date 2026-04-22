@@ -31,6 +31,7 @@ export type Restaurant = {
   visibility: "public" | "private" | "archived";
   visibility_changed_at: string | null;
   previous_visibility: string | null;
+  chain_id: number | null;
 };
 
 export type RestaurantVisit = {

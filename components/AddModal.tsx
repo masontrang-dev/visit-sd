@@ -119,6 +119,22 @@ export default function AddModal({
     editData?.storefront_photo_url ?? null,
   );
 
+  type LinkedLocation = {
+    id: number;
+    name: string;
+    neighborhood: string | null;
+    chain_id: number | null;
+  };
+  const [currentChainId, setCurrentChainId] = useState<number | null>(
+    editData?.chain_id ?? null,
+  );
+  const [linkedSiblings, setLinkedSiblings] = useState<LinkedLocation[]>([]);
+  const [linkSearch, setLinkSearch] = useState("");
+  const [linkResults, setLinkResults] = useState<LinkedLocation[]>([]);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [showLinkPanel, setShowLinkPanel] = useState(false);
+
   const cuisineOptions = Array.from(
     new Set([...DEFAULT_CUISINE_OPTIONS, ...(existingCuisines ?? [])]),
   ).sort();
@@ -399,6 +415,7 @@ export default function AddModal({
       visibility,
       visibility_changed_at: nextVisibilityChangedAt,
       previous_visibility: nextPreviousVisibility,
+      chain_id: currentChainId,
     });
 
     setSaving(false);
@@ -444,21 +461,174 @@ export default function AddModal({
     }, 800);
   }
 
+  useEffect(() => {
+    if (!editData || currentChainId == null) {
+      setLinkedSiblings([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("restaurants")
+        .select("id, name, neighborhood, chain_id")
+        .eq("chain_id", currentChainId)
+        .neq("id", editData.id);
+      if (!cancelled) setLinkedSiblings((data as LinkedLocation[]) ?? []);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editData, currentChainId]);
+
+  useEffect(() => {
+    if (!editData) {
+      setLinkResults([]);
+      return;
+    }
+    const q = linkSearch.trim();
+    if (!q) {
+      setLinkResults([]);
+      return;
+    }
+    const handle = setTimeout(async () => {
+      const excludeIds = [editData.id, ...linkedSiblings.map((s) => s.id)];
+      const { data } = await supabase
+        .from("restaurants")
+        .select("id, name, neighborhood, chain_id")
+        .ilike("name", `%${q}%`)
+        .not("id", "in", `(${excludeIds.join(",")})`)
+        .neq("visibility", "archived")
+        .limit(8);
+      setLinkResults((data as LinkedLocation[]) ?? []);
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [linkSearch, linkedSiblings, editData]);
+
+  async function handleLink(target: LinkedLocation) {
+    if (!editData || linkBusy) return;
+    setLinkBusy(true);
+    setLinkError("");
+
+    const selfChain = currentChainId;
+    const targetChain = target.chain_id;
+
+    let sharedChainId: number;
+    if (selfChain != null && targetChain != null) {
+      // Both already in chains — cascade: merge the higher chain_id into the lower
+      sharedChainId = Math.min(selfChain, targetChain);
+      const otherChainId = Math.max(selfChain, targetChain);
+      if (sharedChainId !== otherChainId) {
+        const { error } = await supabase
+          .from("restaurants")
+          .update({ chain_id: sharedChainId })
+          .eq("chain_id", otherChainId);
+        if (error) {
+          setLinkError("Failed to merge chains.");
+          setLinkBusy(false);
+          return;
+        }
+      }
+    } else if (selfChain != null) {
+      sharedChainId = selfChain;
+      const { error } = await supabase
+        .from("restaurants")
+        .update({ chain_id: sharedChainId })
+        .eq("id", target.id);
+      if (error) {
+        setLinkError("Failed to link location.");
+        setLinkBusy(false);
+        return;
+      }
+    } else if (targetChain != null) {
+      sharedChainId = targetChain;
+      const { error } = await supabase
+        .from("restaurants")
+        .update({ chain_id: sharedChainId })
+        .eq("id", editData.id);
+      if (error) {
+        setLinkError("Failed to link location.");
+        setLinkBusy(false);
+        return;
+      }
+    } else {
+      // Neither has a chain — generate one using the lower id
+      sharedChainId = Math.min(editData.id, target.id);
+      const { error } = await supabase
+        .from("restaurants")
+        .update({ chain_id: sharedChainId })
+        .in("id", [editData.id, target.id]);
+      if (error) {
+        setLinkError("Failed to link location.");
+        setLinkBusy(false);
+        return;
+      }
+    }
+
+    setCurrentChainId(sharedChainId);
+    setLinkSearch("");
+    setLinkResults([]);
+    setLinkBusy(false);
+  }
+
+  async function handleUnlinkSibling(siblingId: number) {
+    if (!editData || linkBusy) return;
+    setLinkBusy(true);
+    setLinkError("");
+
+    const { error } = await supabase
+      .from("restaurants")
+      .update({ chain_id: null })
+      .eq("id", siblingId);
+    if (error) {
+      setLinkError("Failed to unlink.");
+      setLinkBusy(false);
+      return;
+    }
+
+    // If this unlink leaves only self in the chain, null self too (no chain-of-one)
+    if (linkedSiblings.length === 1) {
+      const { error: err2 } = await supabase
+        .from("restaurants")
+        .update({ chain_id: null })
+        .eq("id", editData.id);
+      if (err2) {
+        setLinkError("Failed to clean up chain.");
+        setLinkBusy(false);
+        return;
+      }
+      setCurrentChainId(null);
+      setLinkedSiblings([]);
+    } else {
+      setLinkedSiblings(linkedSiblings.filter((s) => s.id !== siblingId));
+    }
+    setLinkBusy(false);
+  }
+
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onClose()}
       className="fixed inset-0 bg-black/55 z-[100] flex items-center justify-center p-4"
     >
       <div className="bg-bg border-2 border-txt p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        <p className="font-display text-2xl mb-5">
-          {success
-            ? editData
-              ? "Spot updated!"
-              : "Spot added!"
-            : editData
-              ? "Edit spot"
-              : "Add a spot"}
-        </p>
+        <div className="sticky top-0 bg-bg z-20 -mx-6 -mt-6 px-6 pt-6 pb-3 mb-3 flex items-start justify-between">
+          <p className="font-display text-2xl leading-none">
+            {success
+              ? editData
+                ? "Spot updated!"
+                : "Spot added!"
+              : editData
+                ? "Edit spot"
+                : "Add a spot"}
+          </p>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            type="button"
+            className="text-txt2 hover:text-txt text-2xl leading-none -mt-0.5"
+          >
+            ×
+          </button>
+        </div>
 
         {success && (
           <p className="text-success text-sm mb-4">
@@ -843,6 +1013,117 @@ export default function AddModal({
             />
           )}
         </div>
+
+        {editData && !showLinkPanel && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => setShowLinkPanel(true)}
+              className="btn-outline w-full text-sm"
+            >
+              {linkedSiblings.length > 0
+                ? `Manage linked locations (${linkedSiblings.length})`
+                : "Link another location"}
+            </button>
+          </div>
+        )}
+
+        {editData && showLinkPanel && (
+          <div className="mb-4 p-3 border border-brd">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <label className={`${labelCls} mb-0`}>Linked locations</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLinkPanel(false);
+                  setLinkSearch("");
+                  setLinkResults([]);
+                }}
+                className="text-txt2 hover:text-txt text-lg leading-none"
+                aria-label="Close linked locations"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-2xs text-txt2 mb-2">
+              Linked locations share menu items and order history on the
+              detail page. Visits stay per-location.
+            </p>
+
+            {linkedSiblings.length > 0 ? (
+              <div className="flex flex-col gap-1.5 mb-3">
+                {linkedSiblings.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between gap-2 px-2 py-1.5 bg-bg2 border border-brd"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm truncate">{s.name}</div>
+                      {s.neighborhood && (
+                        <div className="text-2xs text-txt2 truncate">
+                          {s.neighborhood}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleUnlinkSibling(s.id)}
+                      disabled={linkBusy}
+                      className="text-2xs uppercase tracking-wide text-accent hover:underline disabled:opacity-50"
+                    >
+                      Unlink
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-2xs text-txt2 mb-2 italic">
+                Not linked to any other locations.
+              </p>
+            )}
+
+            <div className="relative">
+              <input
+                value={linkSearch}
+                onChange={(e) => setLinkSearch(e.target.value)}
+                placeholder="Search to link another location…"
+                disabled={linkBusy}
+                className="input-base"
+              />
+              {linkResults.length > 0 && (
+                <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-bg border border-brd max-h-[200px] overflow-y-auto">
+                  {linkResults.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => handleLink(r)}
+                      disabled={linkBusy}
+                      className="w-full text-left px-2 py-1.5 hover:bg-bg2 border-b border-brd last:border-b-0 disabled:opacity-50"
+                    >
+                      <div className="text-sm truncate">
+                        {r.name}
+                        {r.chain_id != null && (
+                          <span className="ml-1 text-2xs text-txt2">
+                            (already in a chain)
+                          </span>
+                        )}
+                      </div>
+                      {r.neighborhood && (
+                        <div className="text-2xs text-txt2 truncate">
+                          {r.neighborhood}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {linkError && (
+              <p className="text-error text-2xs mt-2">{linkError}</p>
+            )}
+          </div>
+        )}
 
         {error && <p className="text-error text-sm mb-2">{error}</p>}
 

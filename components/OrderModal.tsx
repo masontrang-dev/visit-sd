@@ -509,15 +509,25 @@ export default function OrderModal({
       className="fixed inset-0 bg-black/55 z-[100] flex items-center justify-center p-4"
     >
       <div className="bg-bg border-2 border-txt p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        <p className="font-display text-2xl mb-5">
-          {success
-            ? isEditing
-              ? "Order updated!"
-              : "Order logged!"
-            : isEditing
-              ? "Edit order"
-              : "Log an order"}
-        </p>
+        <div className="sticky top-0 bg-bg z-20 -mx-6 -mt-6 px-6 pt-6 pb-3 mb-3 flex items-start justify-between">
+          <p className="font-display text-2xl leading-none">
+            {success
+              ? isEditing
+                ? "Order updated!"
+                : "Order logged!"
+              : isEditing
+                ? "Edit order"
+                : "Log an order"}
+          </p>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            type="button"
+            className="text-txt2 hover:text-txt text-2xl leading-none -mt-0.5"
+          >
+            ×
+          </button>
+        </div>
 
         {success && (
           <p className="text-accent2 text-sm mb-4">
@@ -723,7 +733,7 @@ export default function OrderModal({
             type="date"
             value={orderedAt}
             onChange={(e) => setOrderedAt(e.target.value)}
-            className="input-base"
+            className="input-base !w-auto max-w-full [color-scheme:light] dark:[color-scheme:dark]"
           />
         </div>
 

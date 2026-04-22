@@ -10,6 +10,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 type BugReport = {
   id: number;
   user_id: string | null;
+  kind: "bug" | "suggestion";
   title: string;
   description: string;
   url: string | null;
@@ -272,6 +273,9 @@ export default function BugsPage() {
                         }`}
                       >
                         {bug.status}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wide bg-txt/10 text-txt">
+                        {bug.kind ?? "bug"}
                       </span>
                       <p className="text-xs text-txt2">
                         #{bug.id} · {bug.reporter_name || "Anonymous"} ·{" "}

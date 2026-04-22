@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase-client";
 import { useAuth } from "@/lib/auth-context";
 
+type Kind = "bug" | "suggestion";
+
 export default function BugReportModal({
   onClose,
 }: {
@@ -12,6 +14,7 @@ export default function BugReportModal({
 }) {
   const { user } = useAuth();
   const supabase = useMemo(() => createClient(), []);
+  const [kind, setKind] = useState<Kind>("bug");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -37,6 +40,7 @@ export default function BugReportModal({
 
     const { error: insertErr } = await supabase.from("bug_reports").insert({
       user_id: user.id,
+      kind,
       title: title.trim(),
       description: description.trim(),
       url: typeof window !== "undefined" ? window.location.href : null,
@@ -54,6 +58,19 @@ export default function BugReportModal({
     setSubmitting(false);
   }
 
+  const isBug = kind === "bug";
+  const heading = "MAKE A SUGGESTION / REPORT A BUG";
+  const subheading = isBug
+    ? "Something broken or confusing? Let us know."
+    : "Got an idea to make this better? Tell us.";
+  const descriptionLabel = isBug ? "What happened?" : "What’s your idea?";
+  const descriptionPlaceholder = isBug
+    ? "Steps to reproduce, what you expected, what happened instead."
+    : "Describe the suggestion and why it would help.";
+  const successCopy = isBug
+    ? "Thanks — your report has been filed. We’ll take a look."
+    : "Thanks — your suggestion has been filed. We’ll take a look.";
+
   return createPortal(
     <div
       className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4"
@@ -65,10 +82,8 @@ export default function BugReportModal({
       >
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="font-display text-3xl leading-none">REPORT A BUG</h2>
-            <p className="text-txt2 text-sm mt-1">
-              Something broken or confusing? Let us know.
-            </p>
+            <h2 className="font-display text-3xl leading-none">{heading}</h2>
+            <p className="text-txt2 text-sm mt-1">{subheading}</p>
           </div>
           <button
             onClick={onClose}
@@ -81,9 +96,7 @@ export default function BugReportModal({
 
         {submitted ? (
           <>
-            <p className="text-accent2 text-sm mb-4">
-              Thanks — your report has been filed. We’ll take a look.
-            </p>
+            <p className="text-accent2 text-sm mb-4">{successCopy}</p>
             <button
               onClick={onClose}
               className="btn-secondary w-full text-sm"
@@ -93,6 +106,32 @@ export default function BugReportModal({
           </>
         ) : (
           <>
+            <span className="block text-xs uppercase tracking-wide text-txt2 mb-1">
+              Type
+            </span>
+            <div
+              role="radiogroup"
+              aria-label="Type"
+              className="flex gap-2 mb-4"
+            >
+              {(["bug", "suggestion"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="radio"
+                  aria-checked={kind === k}
+                  onClick={() => setKind(k)}
+                  className={`px-3 py-1.5 text-xs font-medium uppercase tracking-wide border-[1.5px] transition-colors ${
+                    kind === k
+                      ? "border-txt bg-txt text-bg"
+                      : "border-brd text-txt2 hover:border-txt"
+                  }`}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+
             <label
               htmlFor="bug-title"
               className="block text-xs uppercase tracking-wide text-txt2 mb-1"
@@ -112,14 +151,14 @@ export default function BugReportModal({
               htmlFor="bug-description"
               className="block text-xs uppercase tracking-wide text-txt2 mb-1"
             >
-              What happened?
+              {descriptionLabel}
             </label>
             <textarea
               id="bug-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={5}
-              placeholder="Steps to reproduce, what you expected, what happened instead."
+              placeholder={descriptionPlaceholder}
               className="input-base resize-none mb-3"
             />
 

@@ -165,7 +165,7 @@ export default function AdminButton() {
             }}
             className="w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
           >
-            Report a bug
+            Make suggestion / report bug
           </button>
           <button
             onClick={async () => {

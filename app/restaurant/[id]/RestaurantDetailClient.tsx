@@ -277,6 +277,21 @@ export default function RestaurantDetailClient({ params }: Props) {
       setRestaurant(restaurantData);
       setLoading(false);
 
+      // If this restaurant is part of a chain, merge menu_items and item_orders
+      // from all sibling locations. Visits/checkins stay location-specific.
+      let chainRestaurantIds: number[] = [id];
+      if (restaurantData.chain_id != null) {
+        const { data: siblings } = await supabase
+          .from("restaurants")
+          .select("id")
+          .eq("chain_id", restaurantData.chain_id);
+        if (siblings && siblings.length > 0) {
+          chainRestaurantIds = Array.from(
+            new Set([id, ...siblings.map((s: { id: number }) => s.id)]),
+          );
+        }
+      }
+
       const [visitsResult, menuResult, ordersResult, cuisinesResult] =
         await Promise.all([
           supabase
@@ -287,12 +302,12 @@ export default function RestaurantDetailClient({ params }: Props) {
           supabase
             .from("menu_items")
             .select("*")
-            .eq("restaurant_id", id)
+            .in("restaurant_id", chainRestaurantIds)
             .order("name"),
           supabase
             .from("item_orders")
             .select("*")
-            .eq("restaurant_id", id)
+            .in("restaurant_id", chainRestaurantIds)
             .order("ordered_at", { ascending: false }),
           supabase.from("restaurants").select("cuisine, food_tags"),
         ]);
