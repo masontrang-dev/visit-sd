@@ -217,9 +217,7 @@ function HomeContent() {
     if (visitError) {
       console.error("Failed to log visit:", visitError);
       if (/row-level security/i.test(visitError.message)) {
-        setAddOpError(
-          "You've already checked in here in the last 24 hours.",
-        );
+        setAddOpError("You've already checked in here in the last 24 hours.");
       }
       setVisitingId(null);
       return;
@@ -390,7 +388,8 @@ function HomeContent() {
           return false;
         if (activeOccasions.length > 0) {
           const rOccasions = r.occasions ?? [];
-          if (!activeOccasions.some((o) => rOccasions.includes(o))) return false;
+          if (!activeOccasions.some((o) => rOccasions.includes(o)))
+            return false;
         }
         if (activeFoodTags.length > 0) {
           const rFoodTags = r.food_tags ?? [];
@@ -410,7 +409,6 @@ function HomeContent() {
             r.neighborhood,
             r.note,
             r.address,
-            r.added_by,
             ...(r.occasions ?? []),
             ...(r.food_tags ?? []),
           ]
@@ -493,13 +491,11 @@ function HomeContent() {
   // Pills at the top describe the full dataset, not the current filter view,
   // so they stay steady when the admin toggles between visibility filters.
   const cuisineCount = useMemo(
-    () =>
-      new Set(restaurants.map((r) => r.cuisine).filter(Boolean)).size,
+    () => new Set(restaurants.map((r) => r.cuisine).filter(Boolean)).size,
     [restaurants],
   );
   const neighborhoodCount = useMemo(
-    () =>
-      new Set(restaurants.map((r) => r.neighborhood).filter(Boolean)).size,
+    () => new Set(restaurants.map((r) => r.neighborhood).filter(Boolean)).size,
     [restaurants],
   );
 
@@ -595,10 +591,7 @@ function HomeContent() {
         </header>
       ) : (
         <div className="flex items-center justify-between gap-3 px-6 pt-3 pb-2 border-b-2 border-txt bg-bg">
-          <ContextHeader
-            matchCount={filtered.length}
-            totalCount={totalCount}
-          />
+          <ContextHeader matchCount={filtered.length} totalCount={totalCount} />
           <div className="flex gap-2 shrink-0">
             <ThemeToggle />
             <ActivityFeed />

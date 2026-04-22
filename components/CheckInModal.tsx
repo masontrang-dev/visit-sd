@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type CheckInModalProps = {
   restaurantName: string;
@@ -29,6 +29,14 @@ export default function CheckInModal({
   const [visitDateTime, setVisitDateTime] = useState(localDateTime);
   const [note, setNote] = useState("");
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   function handleConfirm(logOrder: boolean) {
     const selectedDate = new Date(visitDateTime);
     onConfirm(selectedDate.toISOString(), logOrder, note);
@@ -40,7 +48,7 @@ export default function CheckInModal({
       onClick={onClose}
     >
       <div
-        className="bg-bg border-2 border-txt max-w-md w-full p-6"
+        className="bg-bg border-2 border-txt max-w-md w-full p-6 overflow-x-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="font-display text-4xl mb-4 tracking-tight">Check In</h2>

@@ -99,9 +99,11 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
       }>,
       supabase
         .from("menu_items")
-        .select("restaurant_id, name")
+        .select("restaurant_id, name, category")
         .in("restaurant_id", visibleRestaurantIds) as Promise<{
-        data: { restaurant_id: number; name: string }[] | null;
+        data:
+          | { restaurant_id: number; name: string; category: string | null }[]
+          | null;
       }>,
       supabase
         .from("item_orders")
@@ -122,6 +124,7 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     const index: Record<number, string[]> = {};
     (allMenuResult.data ?? []).forEach((m) => {
       (index[m.restaurant_id] ??= []).push(m.name);
+      if (m.category) (index[m.restaurant_id] ??= []).push(m.category);
     });
     (orderNotesResult.data ?? []).forEach((o) => {
       (index[o.restaurant_id] ??= []).push(o.notes);

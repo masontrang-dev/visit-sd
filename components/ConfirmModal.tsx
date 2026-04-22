@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect } from "react";
+
 type Props = {
   title: string;
   message: string;
@@ -15,6 +19,14 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
 }: Props) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onCancel()}

@@ -154,6 +154,14 @@ export default function AddModal({
   }
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
         cuisineWrapperRef.current &&
@@ -441,7 +449,7 @@ export default function AddModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
       className="fixed inset-0 bg-black/55 z-[100] flex items-center justify-center p-4"
     >
-      <div className="bg-bg border-2 border-txt p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto">
+      <div className="bg-bg border-2 border-txt p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <p className="font-display text-2xl mb-5">
           {success
             ? editData
