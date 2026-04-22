@@ -4,11 +4,13 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { usePathname } from "next/navigation";
 import RequestAccessModal from "./RequestAccessModal";
+import BugReportModal from "./BugReportModal";
 
 export default function AdminButton() {
   const { isAdmin, isSuperuser, user, signOut, avatarUrl } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
+  const [showBugModal, setShowBugModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const isAdminPage = pathname === "/admin";
@@ -103,13 +105,22 @@ export default function AdminButton() {
       {showMenu && (
         <div className="absolute right-0 top-full mt-2 bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[140px] z-50">
           {isAdmin && (
-            <a
-              href="/admin/restaurants"
-              className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
-              onClick={() => setShowMenu(false)}
-            >
-              Bulk Restaurants
-            </a>
+            <>
+              <a
+                href="/admin/restaurants"
+                className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
+                onClick={() => setShowMenu(false)}
+              >
+                Bulk Restaurants
+              </a>
+              <a
+                href="/admin/bugs"
+                className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
+                onClick={() => setShowMenu(false)}
+              >
+                View Bugs
+              </a>
+            </>
           )}
           {isSuperuser && (
             <>
@@ -148,6 +159,15 @@ export default function AdminButton() {
             </button>
           )}
           <button
+            onClick={() => {
+              setShowBugModal(true);
+              setShowMenu(false);
+            }}
+            className="w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
+          >
+            Report a bug
+          </button>
+          <button
             onClick={async () => {
               await signOut();
               setShowMenu(false);
@@ -161,6 +181,9 @@ export default function AdminButton() {
       )}
       {showRequestModal && (
         <RequestAccessModal onClose={() => setShowRequestModal(false)} />
+      )}
+      {showBugModal && (
+        <BugReportModal onClose={() => setShowBugModal(false)} />
       )}
     </div>
   );
