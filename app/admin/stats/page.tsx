@@ -22,25 +22,25 @@ function niceMax(value: number) {
 
 function StatsSkeleton() {
   return (
-    <div className="animate-pulse">
+    <div>
       <div className="flex gap-4 mb-6 flex-wrap">
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
             className="p-4 pr-5 border-[1.5px] border-brd min-w-[140px]"
           >
-            <div className="h-3 w-20 bg-bg2 mb-2" />
-            <div className="h-8 w-16 bg-bg2" />
+            <div className="h-3 w-20 skeleton mb-2" />
+            <div className="h-8 w-16 skeleton" />
           </div>
         ))}
       </div>
       <div className="mb-6">
-        <div className="h-3 w-48 bg-bg2 mb-2" />
+        <div className="h-3 w-48 skeleton mb-2" />
         <div className="flex items-end gap-0.5 h-32 border-b border-brd pb-1">
           {Array.from({ length: 30 }).map((_, i) => (
             <div
               key={i}
-              className="flex-1 min-w-[4px] bg-bg2"
+              className="flex-1 min-w-[4px] skeleton"
               style={{ height: `${20 + ((i * 37) % 70)}%` }}
             />
           ))}
@@ -48,14 +48,14 @@ function StatsSkeleton() {
       </div>
       {Array.from({ length: 3 }).map((_, section) => (
         <div key={section} className="mb-6">
-          <div className="h-3 w-32 bg-bg2 mb-2" />
+          <div className="h-3 w-32 skeleton mb-2" />
           {Array.from({ length: 4 }).map((_, row) => (
             <div
               key={row}
               className="flex justify-between py-1.5 border-b border-brd"
             >
-              <div className="h-4 w-1/2 bg-bg2" />
-              <div className="h-4 w-8 bg-bg2" />
+              <div className="h-4 w-1/2 skeleton" />
+              <div className="h-4 w-8 skeleton" />
             </div>
           ))}
         </div>
@@ -156,7 +156,7 @@ function ViewsByDayChart({
                     onFocus={() => setHoverIdx(i)}
                     onBlur={() => setHoverIdx(null)}
                     aria-label={`${formatShortDate(d.date)}: ${d.count} views`}
-                    className={`flex-1 min-w-[4px] rounded-t-sm bg-accent transition-opacity duration-100 outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    className={`flex-1 min-w-[4px] rounded-none bg-accent transition-opacity duration-100 outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                       isHovered || isPeak ? "opacity-100" : "opacity-90 hover:opacity-100"
                     }`}
                     style={{ height: `${Math.max(h, 1.5)}%` }}
@@ -168,7 +168,7 @@ function ViewsByDayChart({
             {/* Tooltip */}
             {hover && (
               <div
-                className="absolute -top-10 px-2 py-1 bg-txt text-bg text-2xs font-medium rounded-sm pointer-events-none shadow-md z-10 whitespace-nowrap"
+                className="absolute -top-10 px-2 py-1 bg-txt text-bg text-2xs font-medium rounded-none pointer-events-none shadow-md z-10 whitespace-nowrap"
                 style={{
                   left: `${((hoverIdx! + 0.5) / data.length) * 100}%`,
                   transform: "translateX(-50%)",

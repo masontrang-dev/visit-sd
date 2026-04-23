@@ -507,9 +507,12 @@ export default function OrderModal({
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      className="fixed inset-0 bg-txt/20 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={isEditing ? "Edit order" : "Log an order"}
+      className="fixed inset-0 bg-overlay-bg backdrop-blur-sm z-[100] flex items-center justify-center p-4 motion-safe:animate-backdrop-in"
     >
-      <div className="bg-bg border-2 border-txt p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
+      <div className="bg-bg border-[1.5px] border-txt p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto overflow-x-hidden shadow-xl motion-safe:animate-modal-in">
         <div className="sticky top-0 bg-bg z-20 -mx-6 -mt-6 px-6 pt-6 pb-3 mb-3 flex items-start justify-between">
           <p className="font-display text-2xl leading-none">
             {success

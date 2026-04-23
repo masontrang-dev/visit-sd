@@ -27,6 +27,13 @@ module.exports = {
         "closed-txt": "var(--closed-txt)",
         "pick-bg": "var(--pick-bg)",
         "pick-txt": "var(--pick-txt)",
+        "overlay-bg": "var(--overlay-bg)",
+      },
+      boxShadow: {
+        sm: "var(--shadow-sm)",
+        md: "var(--shadow-md)",
+        lg: "var(--shadow-lg)",
+        xl: "var(--shadow-xl)",
       },
       fontFamily: {
         display: ["var(--font-display)"],
@@ -92,6 +99,21 @@ module.exports = {
           from: { opacity: "1" },
           to: { opacity: "0" },
         },
+        "modal-in": {
+          from: { opacity: "0", transform: "translateY(8px) scale(0.98)" },
+          to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        "modal-out": {
+          from: { opacity: "1", transform: "translateY(0) scale(1)" },
+          to: { opacity: "0", transform: "translateY(4px) scale(0.98)" },
+        },
+        "heart-pulse": {
+          "0%": { transform: "scale(1)" },
+          "30%": { transform: "scale(1.28)" },
+          "55%": { transform: "scale(0.92)" },
+          "80%": { transform: "scale(1.06)" },
+          "100%": { transform: "scale(1)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.4s ease-out both",
@@ -105,6 +127,9 @@ module.exports = {
         "sheet-out": "sheet-out 260ms cubic-bezier(0.55, 0, 0.7, 0.2) forwards",
         "backdrop-in": "backdrop-in 300ms ease-out forwards",
         "backdrop-out": "backdrop-out 220ms ease-in forwards",
+        "modal-in": "modal-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "modal-out": "modal-out 160ms cubic-bezier(0.55, 0, 0.7, 0.2) both",
+        "heart-pulse": "heart-pulse 420ms cubic-bezier(0.22, 1, 0.36, 1)",
       },
     },
   },

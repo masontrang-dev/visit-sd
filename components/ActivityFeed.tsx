@@ -437,7 +437,7 @@ export default function ActivityFeed() {
         <div
           aria-hidden
           onClick={() => setOpen(false)}
-          className="fixed inset-0 z-[999] bg-black/20 backdrop-blur-[1px]"
+          className="fixed inset-0 z-[999] bg-overlay-bg backdrop-blur-[1px]"
         />
         <div
           ref={popoverRef}
@@ -448,7 +448,7 @@ export default function ActivityFeed() {
             right: anchor.right,
             width: anchor.width,
           }}
-          className="fixed max-h-[min(70vh,640px)] bg-bg border-[1.5px] border-txt z-[1000] flex flex-col shadow-[0_24px_48px_-12px_rgba(0,0,0,0.35),0_8px_16px_-8px_rgba(0,0,0,0.25)]"
+          className="fixed max-h-[min(70vh,640px)] bg-bg border-[1.5px] border-txt z-[1000] flex flex-col shadow-xl motion-safe:animate-modal-in"
         >
           <div className="h-1 bg-accent shrink-0" aria-hidden />
           <div className="px-4 py-2.5 border-b border-brd flex items-center justify-between shrink-0">
@@ -507,7 +507,7 @@ export default function ActivityFeed() {
         ref={buttonRef}
         onClick={handleOpen}
         aria-label="Activity feed"
-        className="relative w-9 h-9 flex items-center justify-center rounded-full border border-brd bg-bg text-txt2 hover:text-txt transition-colors duration-150"
+        className="relative w-11 h-11 flex items-center justify-center rounded-full border-[1.5px] border-brd bg-bg text-txt2 hover:text-txt hover:border-txt transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
       >
         <svg
           width="18"

@@ -414,7 +414,7 @@ export default function FilterBar({
       <div
         role="radiogroup"
         aria-label="Sort order"
-        className="flex flex-col rounded-md border-[1.5px] border-brd overflow-hidden"
+        className="flex flex-col border-[1.5px] border-brd overflow-hidden"
       >
         {SORT_OPTIONS.map((opt, i) => {
           const active = current === opt.value;
@@ -1008,7 +1008,7 @@ export default function FilterBar({
             type="button"
             aria-label="Close filters"
             onClick={closeSheet}
-            className={`absolute inset-0 w-full h-full bg-black/55 cursor-pointer border-none p-0 ${
+            className={`absolute inset-0 w-full h-full bg-overlay-bg backdrop-blur-sm cursor-pointer border-none p-0 ${
               sheetOpen
                 ? "motion-safe:animate-backdrop-in"
                 : "motion-safe:animate-backdrop-out opacity-0"

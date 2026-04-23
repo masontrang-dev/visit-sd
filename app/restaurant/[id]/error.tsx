@@ -35,7 +35,7 @@ export default function RestaurantError({
         </p>
         <button
           onClick={reset}
-          className="py-2.5 px-5 rounded-lg text-sm font-medium bg-accent text-white transition-opacity hover:opacity-90"
+          className="py-2.5 px-5 rounded-none text-sm font-medium bg-accent text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           Try again
         </button>

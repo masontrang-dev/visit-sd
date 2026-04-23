@@ -38,42 +38,61 @@ export default function RestaurantActionBar() {
     }
   }
 
+  // Sharp corners + reliable 44px touch target on every control.
+  const baseBtn =
+    "min-h-[44px] py-3 px-4 text-sm font-medium text-center rounded-none transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg";
+
+  const checkedIn = !canCheckIn;
+  const checkingIn = visitingId === restaurant.id;
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-bg border-t-2 border-txt p-4 z-40">
-      <div className="max-w-4xl mx-auto flex gap-3">
+    <div
+      className="fixed bottom-0 left-0 right-0 bg-bg border-t-[1.5px] border-txt px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-40 shadow-lg"
+    >
+      <div className="max-w-4xl mx-auto flex gap-2 items-stretch">
         {restaurant.google_maps_url ? (
           <a
             href={restaurant.google_maps_url}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => trackEvent("outbound_click", "google_maps")}
-            className="flex-1 py-3 px-4 rounded-lg text-sm font-medium text-center bg-accent text-white no-underline transition-opacity hover:opacity-90"
+            className={`${baseBtn} flex-1 bg-accent text-white no-underline hover:opacity-90 flex items-center justify-center gap-1.5`}
           >
-            View on Maps
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            <span>Maps</span>
           </a>
         ) : (
           <button
             disabled
-            className="flex-1 py-3 px-4 rounded-lg text-sm font-medium text-center bg-brd text-txt2 cursor-not-allowed"
+            className={`${baseBtn} flex-1 bg-brd text-txt2 cursor-not-allowed`}
           >
-            View on Maps
+            Maps
           </button>
         )}
         {displayName && (
           <button
             onClick={() => setShowCheckInModal(true)}
-            disabled={visitingId === restaurant.id || !canCheckIn}
-            className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium text-center transition-opacity ${
-              visitingId === restaurant.id || !canCheckIn
+            disabled={checkingIn || checkedIn}
+            className={`${baseBtn} flex-1 ${
+              checkingIn || checkedIn
                 ? "bg-txt2 text-white cursor-not-allowed opacity-50"
                 : "bg-accent2 text-white hover:opacity-90"
             }`}
           >
-            {visitingId === restaurant.id
-              ? "Checking in..."
-              : !canCheckIn
-                ? "✓ Checked In"
-                : "Check in"}
+            {checkingIn ? "..." : checkedIn ? "✓ Checked in" : "Check in"}
           </button>
         )}
         {canManageContent && (
@@ -83,29 +102,28 @@ export default function RestaurantActionBar() {
               setEditingMenuItem(null);
               setShowOrderModal(true);
             }}
-            className="flex-1 py-3 px-4 rounded-lg text-sm font-medium text-center bg-accent text-white transition-opacity hover:opacity-90"
+            className={`${baseBtn} flex-1 bg-accent text-white hover:opacity-90 hidden sm:inline-flex items-center justify-center`}
           >
             Log order
           </button>
         )}
-        <div className="py-1 flex items-center">
+        <div className="shrink-0 flex items-center">
           <WishlistToggle restaurantId={restaurant.id} variant="icon" />
         </div>
         <button
           onClick={handleShare}
-          className="py-3 px-4 rounded-lg text-sm font-medium text-center bg-bg2 text-txt border-[1.5px] border-brd transition-colors hover:border-txt"
+          className={`${baseBtn} shrink-0 w-11 bg-bg2 text-txt border-[1.5px] border-brd hover:border-txt inline-flex items-center justify-center`}
           aria-label="Share"
         >
           <svg
-            width="20"
-            height="20"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="mx-auto"
           >
             <circle cx="18" cy="5" r="3" />
             <circle cx="6" cy="12" r="3" />
@@ -115,6 +133,20 @@ export default function RestaurantActionBar() {
           </svg>
         </button>
       </div>
+      {canManageContent && (
+        <div className="max-w-4xl mx-auto mt-2 sm:hidden">
+          <button
+            onClick={() => {
+              setEditingOrder(null);
+              setEditingMenuItem(null);
+              setShowOrderModal(true);
+            }}
+            className={`${baseBtn} w-full bg-accent text-white hover:opacity-90`}
+          >
+            Log order
+          </button>
+        </div>
+      )}
     </div>
   );
 }

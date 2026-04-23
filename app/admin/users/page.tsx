@@ -299,13 +299,13 @@ export default function UsersPage() {
 
       <div className="p-6 max-w-6xl mx-auto">
         {error && (
-          <div className="mb-4 p-4 bg-error/10 border border-error rounded-lg">
+          <div className="mb-4 p-4 bg-error/10 border border-error rounded-none">
             <p className="text-error text-sm">{error}</p>
           </div>
         )}
 
         {success && (
-          <div className="mb-4 p-4 bg-accent/10 border border-accent rounded-lg">
+          <div className="mb-4 p-4 bg-accent/10 border border-accent rounded-none">
             <p className="text-accent text-sm">{success}</p>
           </div>
         )}
@@ -317,7 +317,7 @@ export default function UsersPage() {
               {requests.map((req) => (
                 <div
                   key={req.id}
-                  className="border border-accent rounded-lg p-4 bg-accent/5"
+                  className="border border-accent rounded-none p-4 bg-accent/5"
                 >
                   <div className="flex items-start justify-between mb-2 gap-3">
                     <div>
@@ -370,7 +370,7 @@ export default function UsersPage() {
             {users.map((u) => (
               <div
                 key={u.id}
-                className="border border-brd rounded-lg p-4 bg-bg"
+                className="border border-brd rounded-none p-4 bg-bg"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
@@ -385,7 +385,7 @@ export default function UsersPage() {
                     {u.roles.map((role) => (
                       <span
                         key={role}
-                        className={`px-2 py-1 rounded text-xs font-medium ${
+                        className={`px-2 py-0.5 rounded-pill text-2xs font-medium uppercase tracking-wide ${
                           role === "superuser"
                             ? "bg-error/20 text-error"
                             : role === "admin" || role === "curator"

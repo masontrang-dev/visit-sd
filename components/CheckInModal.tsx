@@ -44,11 +44,14 @@ export default function CheckInModal({
 
   return (
     <div
-      className="fixed inset-0 bg-txt/20 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Check in"
+      className="fixed inset-0 bg-overlay-bg backdrop-blur-sm z-[100] flex items-center justify-center p-4 motion-safe:animate-backdrop-in"
       onClick={onClose}
     >
       <div
-        className="bg-bg border-2 border-txt max-w-md w-full p-6 overflow-x-hidden"
+        className="bg-bg border-[1.5px] border-txt max-w-md w-full p-6 overflow-x-hidden shadow-xl motion-safe:animate-modal-in"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="font-display text-4xl mb-4 tracking-tight">Check In</h2>
@@ -97,14 +100,14 @@ export default function CheckInModal({
           {isAdmin && (
             <button
               onClick={() => handleConfirm(true)}
-              className="w-full py-3 px-4 bg-accent text-white text-sm font-medium border-2 border-accent transition-all hover:opacity-90"
+              className="w-full py-3 px-4 bg-accent text-white text-sm font-medium border-[1.5px] border-accent transition-all hover:opacity-90"
             >
               Check in & log order →
             </button>
           )}
           <button
             onClick={() => handleConfirm(false)}
-            className={`w-full py-3 px-4 text-sm font-medium border-2 transition-all hover:opacity-90 ${
+            className={`w-full py-3 px-4 text-sm font-medium border-[1.5px] transition-all hover:opacity-90 ${
               isAdmin
                 ? "bg-transparent text-txt border-txt"
                 : "bg-accent text-white border-accent"

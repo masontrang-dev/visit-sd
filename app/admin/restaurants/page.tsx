@@ -472,7 +472,7 @@ export default function AdminRestaurantsPage() {
               setDeleteConfirmText("");
             }
           }}
-          className="fixed inset-0 bg-black/55 z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-overlay-bg backdrop-blur-sm z-[100] flex items-center justify-center p-4 motion-safe:animate-backdrop-in"
         >
           <div className="bg-bg border-2 border-error p-6 w-full max-w-[440px]">
             <p className="font-display text-2xl mb-3 text-error">

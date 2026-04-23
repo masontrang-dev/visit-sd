@@ -70,7 +70,7 @@ function LoginPageInner() {
         {errorMessage && (
           <div
             role="alert"
-            className="mb-4 p-3 border border-error bg-error/10 rounded-md text-error text-sm"
+            className="mb-4 p-3 border-[1.5px] border-error bg-error/10 rounded-none text-error text-sm"
           >
             {errorMessage}
           </div>

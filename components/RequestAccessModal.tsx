@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase-client";
 import { useAuth } from "@/lib/auth-context";
+import Modal, { ModalHeader } from "./Modal";
 
 type RoleRequest = {
   id: number;
@@ -25,14 +25,6 @@ export default function RequestAccessModal({
     null,
   );
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -74,38 +66,18 @@ export default function RequestAccessModal({
     setSubmitting(null);
   }
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-bg border-2 border-txt rounded-md max-w-md w-full p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h2 className="font-display text-3xl leading-none">
-              REQUEST ACCESS
-            </h2>
-            <p className="text-txt2 text-sm mt-1">
-              Ask a superuser to grant you admin or curator privileges.
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="text-txt2 hover:text-txt text-xl leading-none"
-          >
-            ×
-          </button>
-        </div>
-
+  return (
+    <Modal open onClose={onClose} size="md" ariaLabel="Request access">
+      <ModalHeader
+        title="REQUEST ACCESS"
+        subtitle="Ask a superuser to grant you admin or curator privileges."
+        onClose={onClose}
+      />
+      <div className="p-6 pt-4">
         {pending.length > 0 && (
-          <div className="mb-4 p-3 border border-accent bg-accent/10 rounded-md">
+          <div className="mb-4 p-3 border-[1.5px] border-accent bg-accent/10">
             <p className="text-accent text-sm font-medium">
-              Pending:{" "}
-              {pending.map((r) => r.requested_role).join(", ")}
+              Pending: {pending.map((r) => r.requested_role).join(", ")}
             </p>
             <p className="text-txt2 text-xs mt-1">
               A superuser will review shortly.
@@ -155,7 +127,6 @@ export default function RequestAccessModal({
           </button>
         </div>
       </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }

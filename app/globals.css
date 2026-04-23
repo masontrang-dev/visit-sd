@@ -37,6 +37,16 @@
     --closed-txt: #5f5e5a;
     --pick-bg: #e1f5ee;
     --pick-txt: #085041;
+
+    /* Elevation — dark-aware shadow scale. Kept subtle in light mode
+       (low opacity), stronger blur + higher opacity in dark mode. */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 1px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+    --shadow-lg: 0 12px 32px -8px rgba(0, 0, 0, 0.18), 0 4px 8px -4px rgba(0, 0, 0, 0.08);
+    --shadow-xl: 0 24px 48px -12px rgba(0, 0, 0, 0.28), 0 8px 16px -8px rgba(0, 0, 0, 0.12);
+
+    /* Overlay/backdrop — shared between all modals */
+    --overlay-bg: rgba(26, 26, 24, 0.32);
   }
 
   .dark {
@@ -72,6 +82,15 @@
     --closed-txt: #a8a7a3;
     --pick-bg: rgba(20, 72, 56, 0.85);
     --pick-txt: #9fe3ca;
+
+    /* Elevation — heavier in dark mode to read against low-contrast surfaces */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 1px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 12px 32px -8px rgba(0, 0, 0, 0.55), 0 4px 8px -4px rgba(0, 0, 0, 0.35);
+    --shadow-xl: 0 24px 48px -12px rgba(0, 0, 0, 0.7), 0 8px 16px -8px rgba(0, 0, 0, 0.45);
+
+    /* Darker overlay in dark mode so the modal surface still pops */
+    --overlay-bg: rgba(0, 0, 0, 0.55);
   }
 
   body {
@@ -218,6 +237,28 @@
   }
 }
 
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modal-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+
 @keyframes word-reveal {
   from {
     opacity: 0;
@@ -226,6 +267,24 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes heart-pulse {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.28);
+  }
+  55% {
+    transform: scale(0.92);
+  }
+  80% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 
@@ -276,6 +335,31 @@
   ::view-transition-new(root) {
     animation-duration: 220ms;
     animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+/* ── Skeleton shimmer — premium alternative to animate-pulse ── */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg2);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--bg) 60%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
   }
 }
 

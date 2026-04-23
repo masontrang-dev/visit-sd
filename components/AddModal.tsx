@@ -682,9 +682,12 @@ export default function AddModal({
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      className="fixed inset-0 bg-txt/20 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={editData ? "Edit spot" : "Add a spot"}
+      className="fixed inset-0 bg-overlay-bg backdrop-blur-sm z-[100] flex items-center justify-center p-4 motion-safe:animate-backdrop-in"
     >
-      <div className="bg-bg border-2 border-txt w-full max-w-[480px] max-h-[90vh] flex flex-col">
+      <div className="bg-bg border-[1.5px] border-txt w-full max-w-[480px] max-h-[90vh] flex flex-col shadow-xl motion-safe:animate-modal-in">
         <div className="flex-shrink-0 px-6 pt-6 pb-3 flex items-start justify-between border-b border-brd">
           <p className="font-display text-2xl leading-none">
             {success

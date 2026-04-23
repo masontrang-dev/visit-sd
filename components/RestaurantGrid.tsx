@@ -94,7 +94,7 @@ function Card({
     <Link
       href={`/restaurant/${r.id}`}
       onClick={() => onNavigate?.()}
-      className="group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-colors duration-150 hover:bg-bg2 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] h-full"
+      className="group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-[background-color,box-shadow,transform] duration-200 hover:bg-bg2 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm motion-reduce:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg h-full"
       style={{
         borderLeft: `3px solid ${cuisineColor}`,
       }}

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase-client";
 import { useAuth } from "@/lib/auth-context";
+import Modal, { ModalHeader } from "./Modal";
 
 type Kind = "bug" | "suggestion";
 
@@ -20,14 +20,6 @@ export default function BugReportModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
-
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, []);
 
   async function submit() {
     if (!user) return;
@@ -59,7 +51,6 @@ export default function BugReportModal({
   }
 
   const isBug = kind === "bug";
-  const heading = "MAKE A SUGGESTION / REPORT A BUG";
   const subheading = isBug
     ? "Something broken or confusing? Let us know."
     : "Got an idea to make this better? Tell us.";
@@ -71,29 +62,14 @@ export default function BugReportModal({
     ? "Thanks — your report has been filed. We’ll take a look."
     : "Thanks — your suggestion has been filed. We’ll take a look.";
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-bg border-2 border-txt rounded-md max-w-md w-full p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h2 className="font-display text-3xl leading-none">{heading}</h2>
-            <p className="text-txt2 text-sm mt-1">{subheading}</p>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="text-txt2 hover:text-txt text-xl leading-none"
-          >
-            ×
-          </button>
-        </div>
-
+  return (
+    <Modal open onClose={onClose} size="md" ariaLabel="Report or suggestion">
+      <ModalHeader
+        title="REPORT / SUGGEST"
+        subtitle={subheading}
+        onClose={onClose}
+      />
+      <div className="p-6 pt-4">
         {submitted ? (
           <>
             <p className="text-accent2 text-sm mb-4">{successCopy}</p>
@@ -179,7 +155,6 @@ export default function BugReportModal({
           </>
         )}
       </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }

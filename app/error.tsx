@@ -30,13 +30,13 @@ export default function Error({
         <div className="flex gap-3 justify-center flex-wrap">
           <button
             onClick={reset}
-            className="py-3 px-6 rounded-lg text-sm font-medium bg-accent text-white transition-opacity hover:opacity-90"
+            className="py-3 px-6 rounded-none text-sm font-medium bg-accent text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             Try again
           </button>
           <Link
             href="/"
-            className="py-3 px-6 rounded-lg text-sm font-medium bg-bg2 text-txt border-[1.5px] border-brd no-underline transition-colors hover:border-txt"
+            className="py-3 px-6 rounded-none text-sm font-medium bg-bg2 text-txt border-[1.5px] border-brd no-underline transition-colors hover:border-txt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             Home
           </Link>

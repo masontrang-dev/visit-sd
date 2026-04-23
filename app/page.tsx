@@ -27,11 +27,11 @@ import { haversineMiles } from "@/lib/distance";
 function SkeletonCard() {
   return (
     <div className="bg-bg border-b border-brd">
-      <div className="w-full aspect-[3/2] bg-bg2 animate-pulse" />
+      <div className="w-full aspect-[3/2] skeleton" />
       <div className="p-5">
-        <div className="h-3 w-16 bg-bg2 rounded-pill animate-pulse mb-2" />
-        <div className="h-7 w-3/4 bg-bg2 animate-pulse mb-2" />
-        <div className="h-4 w-1/3 bg-bg2 animate-pulse" />
+        <div className="h-3 w-16 rounded-pill skeleton mb-2" />
+        <div className="h-7 w-3/4 skeleton mb-2" />
+        <div className="h-4 w-1/3 skeleton" />
       </div>
     </div>
   );

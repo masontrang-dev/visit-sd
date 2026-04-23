@@ -218,12 +218,12 @@ export default function BugsPage() {
 
       <div className="p-6 max-w-4xl mx-auto">
         {error && (
-          <div className="mb-4 p-4 bg-error/10 border border-error rounded-lg">
+          <div className="mb-4 p-4 bg-error/10 border border-error rounded-none">
             <p className="text-error text-sm">{error}</p>
           </div>
         )}
         {success && (
-          <div className="mb-4 p-4 bg-accent/10 border border-accent rounded-lg">
+          <div className="mb-4 p-4 bg-accent/10 border border-accent rounded-none">
             <p className="text-accent text-sm">{success}</p>
           </div>
         )}
@@ -258,7 +258,7 @@ export default function BugsPage() {
             {visible.map((bug) => (
               <div
                 key={bug.id}
-                className={`border rounded-lg p-4 bg-bg ${
+                className={`border rounded-none p-4 bg-bg ${
                   bug.status === "open" ? "border-accent" : "border-brd"
                 }`}
               >

@@ -69,7 +69,7 @@ export default function AdminButton() {
     return (
       <div
         aria-hidden
-        className="w-9 h-9 rounded-full border border-brd bg-bg opacity-30"
+        className="w-11 h-11 rounded-full border border-brd bg-bg opacity-30"
       />
     );
   }
@@ -80,7 +80,7 @@ export default function AdminButton() {
       <a
         href="/login"
         aria-label="Login"
-        className="w-9 h-9 flex items-center justify-center rounded-full border border-brd bg-bg text-txt2 hover:text-txt transition-colors duration-150 no-underline"
+        className="w-11 h-11 flex items-center justify-center rounded-full border border-brd bg-bg text-txt2 hover:text-txt transition-colors duration-150 no-underline"
       >
         <svg
           width="18"
@@ -106,7 +106,7 @@ export default function AdminButton() {
       <div
         ref={menuRef}
         style={{ top: anchor.top, right: anchor.right }}
-        className="fixed bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[140px] z-[1000]"
+        className="fixed bg-bg border-[1.5px] border-brd shadow-lg min-w-[180px] z-[1000] motion-safe:animate-modal-in"
       >
         {isAdmin && (
           <>
@@ -190,7 +190,7 @@ export default function AdminButton() {
         ref={buttonRef}
         onClick={() => setShowMenu(!showMenu)}
         aria-label={isAdmin ? "Admin menu" : "User menu"}
-        className={`w-9 h-9 flex items-center justify-center rounded-full border hover:opacity-90 transition-opacity duration-150 text-sm font-medium overflow-hidden ${
+        className={`w-11 h-11 flex items-center justify-center rounded-full border hover:opacity-90 transition-opacity duration-150 text-sm font-medium overflow-hidden ${
           isAdmin ? "border-accent" : "border-txt"
         }`}
       >
