@@ -13,7 +13,6 @@ import {
   type MenuItemRecommendation,
   type CuratorRating,
 } from "@/lib/supabase";
-import IllustrationNoVisits from "@/components/IllustrationNoVisits";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/Toast";
 import AddModal from "@/components/AddModal";
@@ -41,7 +40,7 @@ import { RestaurantDetailProvider } from "./RestaurantDetailContext";
 import StickyHeader from "./StickyHeader";
 import RestaurantActionBar from "./RestaurantActionBar";
 import VisitHistorySection from "./VisitHistorySection";
-import { formatDate, formatTime } from "./formatters";
+import { formatDate } from "./formatters";
 
 function Chevron({
   open,
@@ -89,19 +88,18 @@ export default function RestaurantDetailClient({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [visitingId, setVisitingId] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [, setDeletingId] = useState<number | null>(null);
   const [showVisitHistory, setShowVisitHistory] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [showCheckInModal, setShowCheckInModal] = useState(false);
-  const [saveError, setSaveError] = useState("");
+  const [, setSaveError] = useState("");
   const [cuisines, setCuisines] = useState<string[]>([]);
   const [existingFoodTags, setExistingFoodTags] = useState<string[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemOrders, setItemOrders] = useState<ItemOrder[]>([]);
   const [chainRestaurantIds, setChainRestaurantIds] = useState<number[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [expandedItem, setExpandedItem] = useState<number | null>(null);
   const [editingOrder, setEditingOrder] = useState<ItemOrder | null>(null);
   const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<number | null>(null);

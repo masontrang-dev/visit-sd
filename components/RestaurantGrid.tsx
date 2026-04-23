@@ -8,7 +8,6 @@ import {
   type RestaurantVisit,
   type MenuItem,
 } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth-context";
 import IllustrationEmpty from "@/components/IllustrationEmpty";
 import { formatRecencyTag, formatDisplayName } from "@/lib/utils";
 import { isCurrentlyOpen } from "@/lib/google-types";
@@ -46,8 +45,6 @@ function Card({
   cuisineColor,
   onEdit,
   onOrder,
-  onCheckIn,
-  visitingId,
   visits,
   recommendedItems,
   restaurantPhotos,
