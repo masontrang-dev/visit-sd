@@ -110,52 +110,45 @@ export default function ActivityFeed() {
       Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000,
     ).toISOString();
 
-    const [
-      visitsRes,
-      ordersRes,
-      ratingsRes,
-      recsRes,
-      restaurantEventsRes,
-    ] = await Promise.all([
-      supabase
-        .from("restaurant_visits")
-        .select("id, restaurant_id, visited_by, visited_at")
-        .gte("visited_at", since)
-        .order("visited_at", { ascending: false })
-        .limit(MAX_EVENTS),
-      supabase
-        .from("item_orders")
-        .select(
-          "id, restaurant_id, menu_item_id, ordered_by, created_at, ordered_at",
-        )
-        .gte("created_at", since)
-        .order("created_at", { ascending: false })
-        .limit(MAX_EVENTS),
-      supabase
-        .from("curator_ratings")
-        .select(
-          "id, restaurant_id, user_id, rating, previous_rating, must_try, must_try_since, created_at, updated_at",
-        )
-        .gte("updated_at", since)
-        .order("updated_at", { ascending: false })
-        .limit(MAX_EVENTS),
-      supabase
-        .from("menu_item_recommendations")
-        .select("id, menu_item_id, user_id, created_at")
-        .gte("created_at", since)
-        .order("created_at", { ascending: false })
-        .limit(MAX_EVENTS),
-      supabase
-        .from("restaurants")
-        .select(
-          "id, name, created_at, visibility, previous_visibility, visibility_changed_at, added_by",
-        )
-        .or(
-          `created_at.gte.${since},visibility_changed_at.gte.${since}`,
-        )
-        .order("created_at", { ascending: false })
-        .limit(MAX_EVENTS * 2),
-    ]);
+    const [visitsRes, ordersRes, ratingsRes, recsRes, restaurantEventsRes] =
+      await Promise.all([
+        supabase
+          .from("restaurant_visits")
+          .select("id, restaurant_id, visited_by, visited_at")
+          .gte("visited_at", since)
+          .order("visited_at", { ascending: false })
+          .limit(MAX_EVENTS),
+        supabase
+          .from("item_orders")
+          .select(
+            "id, restaurant_id, menu_item_id, ordered_by, created_at, ordered_at",
+          )
+          .gte("created_at", since)
+          .order("created_at", { ascending: false })
+          .limit(MAX_EVENTS),
+        supabase
+          .from("curator_ratings")
+          .select(
+            "id, restaurant_id, user_id, rating, previous_rating, must_try, must_try_since, created_at, updated_at",
+          )
+          .gte("updated_at", since)
+          .order("updated_at", { ascending: false })
+          .limit(MAX_EVENTS),
+        supabase
+          .from("menu_item_recommendations")
+          .select("id, menu_item_id, user_id, created_at")
+          .gte("created_at", since)
+          .order("created_at", { ascending: false })
+          .limit(MAX_EVENTS),
+        supabase
+          .from("restaurants")
+          .select(
+            "id, name, created_at, visibility, previous_visibility, visibility_changed_at, added_by, visibility_changed_by",
+          )
+          .or(`created_at.gte.${since},visibility_changed_at.gte.${since}`)
+          .order("created_at", { ascending: false })
+          .limit(MAX_EVENTS * 2),
+      ]);
 
     const visits = visitsRes.data ?? [];
     const orders = ordersRes.data ?? [];
@@ -316,7 +309,7 @@ export default function ActivityFeed() {
           at: r.visibility_changed_at,
           restaurantId: r.id,
           restaurantName: r.name,
-          actorLabel: r.added_by ?? null,
+          actorLabel: r.visibility_changed_by ?? r.added_by ?? null,
           primary: visibilityPhrase(
             r.previous_visibility,
             r.visibility,
@@ -377,10 +370,7 @@ export default function ActivityFeed() {
     if (!open) return;
     function onClick(e: MouseEvent) {
       const t = e.target as Node;
-      if (
-        buttonRef.current?.contains(t) ||
-        popoverRef.current?.contains(t)
-      ) {
+      if (buttonRef.current?.contains(t) || popoverRef.current?.contains(t)) {
         return;
       }
       setOpen(false);
@@ -493,7 +483,9 @@ export default function ActivityFeed() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-txt leading-snug">
                       {e.actorLabel && (
-                        <span className="font-medium">{formatDisplayName(e.actorLabel)} </span>
+                        <span className="font-medium">
+                          {formatDisplayName(e.actorLabel)}{" "}
+                        </span>
                       )}
                       {e.primary}
                     </p>

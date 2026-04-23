@@ -402,20 +402,22 @@ function HomeContent() {
         if (activePrices.length > 0 && !activePrices.includes(r.price || ""))
           return false;
         if (debouncedSearch.trim()) {
-          const q = debouncedSearch.trim().toLowerCase();
-          const searchable = [
-            r.name,
-            r.cuisine,
-            r.neighborhood,
-            r.note,
-            r.address,
-            ...(r.occasions ?? []),
-            ...(r.food_tags ?? []),
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-          const extra = searchIndex[r.id] ?? "";
+          const normalize = (s: string) =>
+            s.toLowerCase().replace(/[^\w\s]/g, "");
+          const q = normalize(debouncedSearch.trim());
+          const searchable = normalize(
+            [
+              r.name,
+              r.cuisine,
+              r.neighborhood,
+              r.address,
+              ...(r.occasions ?? []),
+              ...(r.food_tags ?? []),
+            ]
+              .filter(Boolean)
+              .join(" "),
+          );
+          const extra = normalize(searchIndex[r.id] ?? "");
           if (!searchable.includes(q) && !extra.includes(q)) return false;
         }
         return true;

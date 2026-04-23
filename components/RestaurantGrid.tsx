@@ -260,16 +260,6 @@ function Card({
           </div>
         )}
 
-        {/* Note (truncated) */}
-        {r.note && (
-          <p
-            className="mt-2 text-xs text-txt2 leading-relaxed italic line-clamp-2 border-l-2 pl-2"
-            style={{ borderColor: cuisineColor }}
-          >
-            {r.note}
-          </p>
-        )}
-
         {/* Recommended dishes */}
         {topDishes.length > 0 && (
           <div className="flex gap-1.5 mt-2 flex-wrap">

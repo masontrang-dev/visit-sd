@@ -8,7 +8,6 @@ export type Restaurant = {
   neighborhood: string;
   cuisine: string;
   price: string;
-  note: string;
   created_at: string;
   added_by: string | null;
   address: string | null;
@@ -31,6 +30,7 @@ export type Restaurant = {
   visibility: "public" | "private" | "archived";
   visibility_changed_at: string | null;
   previous_visibility: string | null;
+  visibility_changed_by: string | null;
   chain_id: number | null;
 };
 

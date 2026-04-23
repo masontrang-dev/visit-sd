@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useRouter } from "next/navigation";
 import {
   supabase,
@@ -27,9 +28,7 @@ import MenuItemRecommendToggle from "@/components/MenuItemRecommendToggle";
 import PhotoCarousel, {
   type RestaurantPhoto,
 } from "@/components/PhotoCarousel";
-import PhotoLightbox, {
-  type LightboxPhoto,
-} from "@/components/PhotoLightbox";
+import PhotoLightbox, { type LightboxPhoto } from "@/components/PhotoLightbox";
 import Link from "next/link";
 import { isCurrentlyOpen } from "@/lib/google-types";
 import { trackEvent } from "@/lib/analytics";
@@ -100,6 +99,8 @@ export default function RestaurantDetailClient({ params }: Props) {
   const [existingFoodTags, setExistingFoodTags] = useState<string[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemOrders, setItemOrders] = useState<ItemOrder[]>([]);
+  const [chainRestaurantIds, setChainRestaurantIds] = useState<number[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [expandedItem, setExpandedItem] = useState<number | null>(null);
   const [editingOrder, setEditingOrder] = useState<ItemOrder | null>(null);
   const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
@@ -279,18 +280,21 @@ export default function RestaurantDetailClient({ params }: Props) {
 
       // If this restaurant is part of a chain, merge menu_items and item_orders
       // from all sibling locations. Visits/checkins stay location-specific.
-      let chainRestaurantIds: number[] = [id];
+      // Storefront and hero photos stay per-location (photo_url /
+      // storefront_photo_url are not shared across the chain).
+      let nextChainIds: number[] = [id];
       if (restaurantData.chain_id != null) {
         const { data: siblings } = await supabase
           .from("restaurants")
           .select("id")
           .eq("chain_id", restaurantData.chain_id);
         if (siblings && siblings.length > 0) {
-          chainRestaurantIds = Array.from(
-            new Set([id, ...siblings.map((s: { id: number }) => s.id)]),
-          );
+          const typed = siblings as { id: number }[];
+          nextChainIds = Array.from(new Set([id, ...typed.map((s) => s.id)]));
         }
       }
+      setChainRestaurantIds(nextChainIds);
+      const chainRestaurantIds = nextChainIds;
 
       const [visitsResult, menuResult, ordersResult, cuisinesResult] =
         await Promise.all([
@@ -336,18 +340,26 @@ export default function RestaurantDetailClient({ params }: Props) {
           menuResult.data ?? [],
           ordersResult.data ?? [],
         ),
-        loadCuratorRatings(id),
+        loadCuratorRatings(chainRestaurantIds),
       ]);
     }
     fetchData();
-  }, [params]);
+  }, [params, refreshKey]);
 
-  async function loadCuratorRatings(restaurantId: number) {
+  async function loadCuratorRatings(restaurantIds: number[]) {
     const { data: ratingsData } = await supabase
       .from("curator_ratings")
       .select("*")
-      .eq("restaurant_id", restaurantId);
-    const rows = (ratingsData ?? []) as CuratorRating[];
+      .in("restaurant_id", restaurantIds);
+    // Dedupe across chain siblings: keep the newest row per user.
+    const byUser = new Map<string, CuratorRating>();
+    for (const row of (ratingsData ?? []) as CuratorRating[]) {
+      const existing = byUser.get(row.user_id);
+      if (!existing || row.updated_at > existing.updated_at) {
+        byUser.set(row.user_id, row);
+      }
+    }
+    const rows = Array.from(byUser.values());
     setCuratorRatings(rows);
 
     if (rows.length > 0) {
@@ -412,41 +424,49 @@ export default function RestaurantDetailClient({ params }: Props) {
     }
 
     // Recompute the cached rollup on restaurants so the home grid/filters stay
-    // consistent with the per-curator flags.
+    // consistent with the per-curator flags. For chained locations, the rollup
+    // considers curator_ratings from every sibling and writes the result to
+    // every sibling so the home grid stays uniform across the chain.
+    const rollupIds =
+      chainRestaurantIds.length > 0 ? chainRestaurantIds : [restaurant.id];
     const { data: refreshed } = await supabase
       .from("curator_ratings")
       .select("must_try, must_try_since")
-      .eq("restaurant_id", restaurant.id);
+      .in("restaurant_id", rollupIds);
     const flagged = (refreshed ?? []).filter(
       (r: { must_try: boolean; must_try_since: string | null }) =>
         r.must_try && r.must_try_since,
     ) as { must_try: boolean; must_try_since: string }[];
     const nextRollupMustTry = flagged.length > 0;
     const nextRollupSince = nextRollupMustTry
-      ? flagged
-          .map((r) => r.must_try_since)
-          .sort()[0]
+      ? flagged.map((r) => r.must_try_since).sort()[0]
       : null;
 
-    if (
+    // When chained, always write so any pre-existing drift on siblings gets
+    // corrected. When standalone, only write on actual change to avoid a
+    // needless round-trip.
+    const isChained = rollupIds.length > 1;
+    const rollupChanged =
       nextRollupMustTry !== restaurant.must_try ||
-      nextRollupSince !== restaurant.must_try_since
-    ) {
+      nextRollupSince !== restaurant.must_try_since;
+    if (isChained || rollupChanged) {
       await supabase
         .from("restaurants")
         .update({
           must_try: nextRollupMustTry,
           must_try_since: nextRollupSince,
         })
-        .eq("id", restaurant.id);
-      setRestaurant({
-        ...restaurant,
-        must_try: nextRollupMustTry,
-        must_try_since: nextRollupSince,
-      });
+        .in("id", rollupIds);
+      if (rollupChanged) {
+        setRestaurant({
+          ...restaurant,
+          must_try: nextRollupMustTry,
+          must_try_since: nextRollupSince,
+        });
+      }
     }
 
-    await loadCuratorRatings(restaurant.id);
+    await loadCuratorRatings(rollupIds);
   }
 
   async function loadRecommendationsAndNames(
@@ -565,11 +585,6 @@ export default function RestaurantDetailClient({ params }: Props) {
     }
   }
 
-  function handleDelete() {
-    if (!restaurant) return;
-    setShowDeleteRestaurantConfirm(true);
-  }
-
   async function confirmDeleteRestaurant() {
     if (!restaurant) return;
     setShowDeleteRestaurantConfirm(false);
@@ -611,17 +626,10 @@ export default function RestaurantDetailClient({ params }: Props) {
       return false;
     }
 
-    // Reload restaurant data
-    const { data: restaurantData } = await supabase
-      .from("restaurants")
-      .select("*")
-      .eq("id", restaurant.id)
-      .single();
-
-    if (restaurantData) {
-      setRestaurant(restaurantData);
-    }
-
+    // Trigger a full refetch of the detail page data (restaurant row, chain
+    // siblings, menu, orders, curator_ratings) so any chain write-through or
+    // linking done in the modal is reflected immediately.
+    setRefreshKey((k) => k + 1);
     setShowEditModal(false);
     return true;
   }
@@ -682,6 +690,8 @@ export default function RestaurantDetailClient({ params }: Props) {
   async function handleDeleteOrderConfirm(orderId: number) {
     setDeletingOrderId(orderId);
     setShowDeleteConfirm(null);
+    const orderToDelete = itemOrders.find((o) => o.id === orderId);
+    const menuItemId = orderToDelete?.menu_item_id;
     const { error } = await supabase
       .from("item_orders")
       .delete()
@@ -689,6 +699,17 @@ export default function RestaurantDetailClient({ params }: Props) {
     if (error) {
       setDeletingOrderId(null);
     } else {
+      if (menuItemId !== undefined) {
+        const remainingOrders = itemOrders.filter(
+          (o) => o.menu_item_id === menuItemId && o.id !== orderId,
+        );
+        if (remainingOrders.length === 0) {
+          await supabase
+            .from("menu_item_recommendations")
+            .delete()
+            .eq("menu_item_id", menuItemId);
+        }
+      }
       await reloadOrders();
     }
     setDeletingOrderId(null);
@@ -887,12 +908,16 @@ export default function RestaurantDetailClient({ params }: Props) {
     const slides: RestaurantPhoto[] = [];
     const seen = new Set<string>();
 
-    const storefrontUrl =
-      restaurant.photo_url || restaurant.storefront_photo_url;
-    if (storefrontUrl) {
-      seen.add(storefrontUrl);
+    const storefrontSlides = restaurant.photo_url
+      ? [restaurant.photo_url]
+      : restaurant.storefront_photo_url
+        ? [restaurant.storefront_photo_url]
+        : [];
+    for (const url of storefrontSlides) {
+      if (seen.has(url)) continue;
+      seen.add(url);
       slides.push({
-        url: storefrontUrl,
+        url,
         itemName: null,
         isStorefront: true,
         isRecommended: false,
@@ -958,6 +983,14 @@ export default function RestaurantDetailClient({ params }: Props) {
     return [...slides, ...orderedPhotos];
   }, [restaurant, itemOrders, menuItems, recommendations]);
 
+  const { pullDistance, refreshing, threshold } = usePullToRefresh({
+    onRefresh: async () => {
+      await reloadOrders();
+      success();
+    },
+    enabled: !loading && !!restaurant,
+  });
+
   if (loading) {
     return (
       <main className="min-h-screen">
@@ -1021,331 +1054,408 @@ export default function RestaurantDetailClient({ params }: Props) {
 
   return (
     <RestaurantDetailProvider value={contextValue}>
-    <main className={`min-h-screen pb-24`}>
-      <StickyHeader />
-
-      {/* Breadcrumb */}
-      <div className="sticky top-0 z-10 bg-bg p-6 pb-4 border-b border-brd">
-        <Link
-          href="/"
-          onClick={handleBackClick}
-          className="text-xs tracking-wide uppercase font-medium text-accent2 no-underline"
-        >
-          ← Back to list
-        </Link>
-      </div>
-
-      {/* Visibility banner (admin-only view of non-public restaurants) */}
-      {isAdmin &&
-        restaurant.visibility &&
-        restaurant.visibility !== "public" && (
+      <main className={`min-h-screen pb-24`}>
+        {/* Pull-to-refresh indicator */}
+        {(pullDistance > 0 || refreshing) && (
           <div
-            className={`p-4 text-sm font-medium border-b-2 border-txt ${
-              restaurant.visibility === "private"
-                ? "bg-bg2 text-txt"
-                : "bg-bg2 text-txt2"
-            }`}
-          >
-            {restaurant.visibility === "private"
-              ? "🔒 Private — not shown in the public guide"
-              : "📦 Archived — kept for history, hidden from the public guide"}
-          </div>
-        )}
-
-      {/* Restaurant Header */}
-      <div className="border-b-2 border-txt">
-        {heroPhotos.length > 0 && (
-          <PhotoCarousel
-            photos={heroPhotos}
-            priority
-            aspectClass="aspect-[16/9] max-h-[320px]"
-            heroName={`hero-${restaurant.id}`}
-            onPhotoClick={(i) => {
-              setLightbox({
-                photos: heroPhotos.map((p) => {
-                  const order = itemOrders.find((o) => o.photo_url === p.url);
-                  const subtitle = order
-                    ? `${formatDate(order.ordered_at)} · by ${
-                        ordererNames[order.ordered_by] || "curator"
-                      }`
-                    : null;
-                  return {
-                    url: p.url,
-                    title: p.itemName ?? restaurant.name,
-                    subtitle,
-                  };
-                }),
-                index: i,
-              });
+            className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center pointer-events-none"
+            style={{
+              height: refreshing ? threshold : pullDistance,
+              opacity: refreshing ? 1 : Math.min(pullDistance / threshold, 1),
             }}
-          />
+            aria-hidden="true"
+          >
+            <div
+              className={`w-6 h-6 border-[2px] border-accent border-t-transparent rounded-full ${
+                refreshing ? "animate-spin" : "motion-safe:transition-transform"
+              }`}
+              style={
+                refreshing
+                  ? undefined
+                  : {
+                      transform: `rotate(${Math.min((pullDistance / threshold) * 360, 360)}deg)`,
+                    }
+              }
+            />
+          </div>
         )}
-        <div className="px-6 pt-5 pb-4">
-          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <p className="text-xs tracking-wide uppercase font-medium text-accent">
-              {restaurant.cuisine}
-            </p>
-            {(() => {
-              const openNow = isCurrentlyOpen(restaurant.opening_hours);
-              if (openNow === null) return null;
-              return (
-                <span
-                  className={`text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight ${
-                    openNow
-                      ? "bg-[#EAF3DE] text-[#27500A]"
-                      : "bg-[#F1EFE8] text-[#5F5E5A]"
-                  }`}
-                >
-                  {openNow ? "Open now" : "Closed"}
-                </span>
-              );
-            })()}
-          </div>
-          <h1 className="font-display text-[clamp(44px,7.5vw,64px)] leading-[0.9] tracking-tight mb-2">
-            {restaurant.name}
-          </h1>
-          <div className="flex items-center gap-3 flex-wrap text-base text-txt2 mb-1">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-accent2 shrink-0" />
-              {restaurant.neighborhood}
-            </span>
-            <span className="text-brd">·</span>
-            <span className="font-medium">{restaurant.price}</span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              {restaurant.address && (
-                <>
-                  {restaurant.google_maps_url ? (
-                    <a
-                      href={restaurant.google_maps_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() =>
-                        trackEvent("outbound_click", "google_maps")
-                      }
-                      className="text-xs text-txt2 no-underline hover:text-accent2 transition-colors inline-flex items-center gap-1"
-                    >
-                      <svg
-                        width="11"
-                        height="11"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="shrink-0"
-                      >
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                        <circle cx="12" cy="10" r="3" />
-                      </svg>
-                      {restaurant.address}
-                    </a>
-                  ) : (
-                    <p className="text-xs text-txt2">{restaurant.address}</p>
-                  )}
-                </>
-              )}
-            </div>
-            {isAdmin && (
-              <button
-                onClick={handleEdit}
-                className="btn-outline btn-pill !py-1 !px-2.5 !text-2xs !border-txt !text-txt shrink-0"
-              >
-                Edit
-              </button>
-            )}
-          </div>
-          {(restaurant.must_try ||
-            (restaurant.occasions && restaurant.occasions.length > 0) ||
-            (restaurant.food_tags && restaurant.food_tags.length > 0)) && (
-            <div className="flex items-center gap-2 flex-wrap mt-3">
-              {restaurant.must_try && (
-                <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase">
-                  Must-Try
-                </span>
-              )}
-              {restaurant.occasions?.map((occasion) => (
-                <span
-                  key={occasion}
-                  className="text-2xs font-medium px-2.5 py-1 rounded-pill border border-brd text-txt2 capitalize"
-                >
-                  {occasion}
-                </span>
-              ))}
-              {restaurant.food_tags?.map((tag) => (
-                <span
-                  key={`food-tag-${tag}`}
-                  className="text-2xs font-medium px-2.5 py-1 rounded-pill border border-brd text-txt2"
-                >
-                  {formatFoodTag(tag)}
-                </span>
-              ))}
+        <StickyHeader />
+
+        {/* Breadcrumb */}
+        <div className="sticky top-0 z-10 bg-bg p-6 pb-4 border-b border-brd">
+          <Link
+            href="/"
+            onClick={handleBackClick}
+            className="text-xs tracking-wide uppercase font-medium text-accent2 no-underline"
+          >
+            ← Back to list
+          </Link>
+        </div>
+
+        {/* Visibility banner (admin-only view of non-public restaurants) */}
+        {isAdmin &&
+          restaurant.visibility &&
+          restaurant.visibility !== "public" && (
+            <div
+              className={`p-4 text-sm font-medium border-b-2 border-txt ${
+                restaurant.visibility === "private"
+                  ? "bg-bg2 text-txt"
+                  : "bg-bg2 text-txt2"
+              }`}
+            >
+              {restaurant.visibility === "private"
+                ? "🔒 Private — not shown in the public guide"
+                : "📦 Archived — kept for history, hidden from the public guide"}
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Sentinel for sticky header IntersectionObserver */}
-      <div ref={stickySentinelRef} aria-hidden="true" className="h-px" />
-
-      {/* Ratings Section - Always show 3 columns: Google, My Rating, Check-ins */}
-      <div className="flex items-stretch border-b border-brd">
-        <div className="flex-1 text-center py-3 px-3">
-          <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-txt mb-1">
-            {restaurant.google_rating
-              ? restaurant.google_rating.toFixed(1)
-              : "—"}
-          </div>
-          <div className="text-2xs uppercase tracking-wide text-txt2 mb-0.5">
-            Google rating
-          </div>
-          {restaurant.google_rating && restaurant.google_review_count ? (
-            <div className="text-2xs text-txt2 opacity-60">
-              {restaurant.google_review_count.toLocaleString()} reviews
-            </div>
-          ) : (
-            <div className="text-2xs text-txt2 opacity-60">—</div>
+        {/* Restaurant Header */}
+        <div className="border-b-2 border-txt">
+          {heroPhotos.length > 0 && (
+            <PhotoCarousel
+              photos={heroPhotos}
+              priority
+              aspectClass="aspect-[16/9] max-h-[320px]"
+              heroName={`hero-${restaurant.id}`}
+              onPhotoClick={(i) => {
+                setLightbox({
+                  photos: heroPhotos.map((p) => {
+                    const order = itemOrders.find((o) => o.photo_url === p.url);
+                    const subtitle = order
+                      ? `${formatDate(order.ordered_at)} · by ${
+                          ordererNames[order.ordered_by] || "curator"
+                        }`
+                      : null;
+                    return {
+                      url: p.url,
+                      title: p.itemName ?? restaurant.name,
+                      subtitle,
+                    };
+                  }),
+                  index: i,
+                });
+              }}
+            />
           )}
-        </div>
-        <div className="w-px bg-brd" />
-        <CuratorRatingControl
-          ratingsCount={curatorRatings.length}
-          avg={curatorAvg !== null ? Math.round(curatorAvg * 2) / 2 : null}
-          loaded={curatorRatingsLoaded}
-        />
-        <div className="w-px bg-brd" />
-        <div className="flex-1 text-center py-3 px-3">
-          <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-txt mb-1">
-            {visits.length}
-          </div>
-          <div className="text-2xs uppercase tracking-wide text-txt2 mb-0.5">
-            Check-ins
-          </div>
-          {restaurant.last_visited && (
-            <div className="text-2xs text-txt2 opacity-60">
-              Last:{" "}
+          <div className="px-6 pt-5 pb-4">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <p className="text-xs tracking-wide uppercase font-medium text-accent">
+                {restaurant.cuisine}
+              </p>
               {(() => {
-                if (!restaurant.last_visited) return "";
-                const date = new Date(restaurant.last_visited);
-                const now = new Date();
-                const diffTime = Math.abs(now.getTime() - date.getTime());
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                if (diffDays === 0) return "today";
-                if (diffDays === 1) return "1 day ago";
-                if (diffDays < 7) return `${diffDays} days ago`;
-                if (diffDays < 30)
-                  return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) !== 1 ? "s" : ""} ago`;
-                return formatDate(restaurant.last_visited).replace(
-                  /\d{4}$/,
-                  (y) => y.slice(2),
+                const openNow = isCurrentlyOpen(restaurant.opening_hours);
+                if (openNow === null) return null;
+                return (
+                  <span
+                    className={`text-2xs font-medium px-2 py-0.5 rounded-pill tracking-tight ${
+                      openNow
+                        ? "bg-[#EAF3DE] text-[#27500A]"
+                        : "bg-[#F1EFE8] text-[#5F5E5A]"
+                    }`}
+                  >
+                    {openNow ? "Open now" : "Closed"}
+                  </span>
                 );
               })()}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Curator Take Section — public quotes plus inline edit for the
-          signed-in curator (replaces the old expandable rating panel). */}
-      {(() => {
-        const myRating = user
-          ? curatorRatings.find((r) => r.user_id === user.id)
-          : null;
-        const hasMyRating = !!myRating;
-        const noted = curatorRatings.filter(
-          (r) => r.note && r.note.trim().length > 0,
-        );
-        const showSection =
-          curatorRatings.length > 0 || (canManageContent && !!user);
-        if (!showSection) return null;
-        const sectionLabel =
-          curatorAvg !== null && curatorAvg >= 5
-            ? "Why we love it"
-            : curatorAvg !== null && curatorAvg >= 4
-              ? "Why we like it"
-              : "Our Take";
-        // Animated expand/collapse using a 1fr ↔ 0fr grid row. Both views
-        // (quote + editor, or CTA + editor) stay mounted; the height
-        // transition gives a smooth in-place morph instead of a hard swap.
-        const expandRow = (open: boolean) =>
-          `grid transition-[grid-template-rows] duration-[280ms] ease-out ${
-            open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-          }`;
-        const editorBody = (
-          <CuratorRatingPanel
-            bare
-            ratings={curatorRatings}
-            profiles={curatorProfiles}
-            userId={user?.id}
-            canEdit={canManageContent}
-            onSave={saveCuratorRating}
-            onClose={() => setEditingMyTake(false)}
-          />
-        );
-        return (
-          <section
-            id="our-take"
-            className="px-6 py-7 border-b border-brd scroll-fade-in"
-          >
-            {curatorRatings.length > 0 && (
-              <header className="flex items-baseline justify-between gap-3 mb-5">
-                <h2 className="font-display text-2xl tracking-tight leading-none">
-                  {noted.length > 0 ? sectionLabel : "Our Take"}
-                </h2>
-                <span className="text-2xs uppercase tracking-[0.1em] text-txt2 shrink-0">
-                  {curatorRatings.length} curator
-                  {curatorRatings.length !== 1 ? "s" : ""}
-                </span>
-              </header>
-            )}
-
-            <div className="space-y-3">
-              {curatorRatings.map((r) => {
-                const isOwn = canManageContent && !!user && r.user_id === user.id;
-                const isEditingThis = isOwn && editingMyTake;
-                const hasNote = !!(r.note && r.note.trim().length > 0);
-                const p = curatorProfiles[r.user_id];
-                const name =
-                  formatDisplayName(p?.display_name) || "Curator";
-                return (
-                  <figure
-                    key={r.id}
-                    className="relative bg-bg2 border border-brd p-5"
+            <h1 className="font-display text-[clamp(44px,7.5vw,64px)] leading-[0.9] tracking-tight mb-2">
+              {restaurant.name}
+            </h1>
+            <div className="flex items-center gap-3 flex-wrap text-base text-txt2 mb-1">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-accent2 shrink-0" />
+                {restaurant.neighborhood}
+              </span>
+              <span className="text-brd">·</span>
+              <span className="font-medium">{restaurant.price}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                {restaurant.address && (
+                  <>
+                    {restaurant.google_maps_url ? (
+                      <a
+                        href={restaurant.google_maps_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() =>
+                          trackEvent("outbound_click", "google_maps")
+                        }
+                        className="text-xs text-txt2 no-underline hover:text-accent2 transition-colors inline-flex items-center gap-1"
+                      >
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="shrink-0"
+                        >
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                          <circle cx="12" cy="10" r="3" />
+                        </svg>
+                        {restaurant.address}
+                      </a>
+                    ) : (
+                      <p className="text-xs text-txt2">{restaurant.address}</p>
+                    )}
+                  </>
+                )}
+              </div>
+              {isAdmin && (
+                <button
+                  onClick={handleEdit}
+                  className="btn-outline btn-pill !py-1 !px-2.5 !text-2xs !border-txt !text-txt shrink-0"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+            {(restaurant.must_try ||
+              (restaurant.occasions && restaurant.occasions.length > 0) ||
+              (restaurant.food_tags && restaurant.food_tags.length > 0)) && (
+              <div className="flex items-center gap-2 flex-wrap mt-3">
+                {restaurant.must_try && (
+                  <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase">
+                    Must-Try
+                  </span>
+                )}
+                {restaurant.occasions?.map((occasion) => (
+                  <span
+                    key={occasion}
+                    className="text-2xs font-medium px-2.5 py-1 rounded-pill border border-brd text-txt2 capitalize"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium text-sm text-txt truncate">
-                          {name}
-                        </div>
-                        {!isEditingThis && (
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            {r.rating !== null && (
-                              <span
-                                className="text-accent text-xs leading-none"
-                                aria-label={`${r.rating} out of 5 stars`}
-                              >
-                                {"★".repeat(r.rating)}
-                                <span className="text-brd">
-                                  {"★".repeat(5 - r.rating)}
-                                </span>
-                              </span>
-                            )}
-                            {r.must_try && (
-                              <span className="text-2xs font-medium px-1.5 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase leading-none">
-                                ★ Must-Try
-                              </span>
-                            )}
+                    {occasion}
+                  </span>
+                ))}
+                {restaurant.food_tags?.map((tag) => (
+                  <span
+                    key={`food-tag-${tag}`}
+                    className="text-2xs font-medium px-2.5 py-1 rounded-pill border border-brd text-txt2"
+                  >
+                    {formatFoodTag(tag)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Sentinel for sticky header IntersectionObserver */}
+        <div ref={stickySentinelRef} aria-hidden="true" className="h-px" />
+
+        {/* Ratings Section - Always show 3 columns: Google, My Rating, Check-ins */}
+        <div className="flex items-stretch border-b border-brd">
+          <div className="flex-1 text-center py-3 px-3">
+            <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-txt mb-1">
+              {restaurant.google_rating
+                ? restaurant.google_rating.toFixed(1)
+                : "—"}
+            </div>
+            <div className="text-2xs uppercase tracking-wide text-txt2 mb-0.5">
+              Google rating
+            </div>
+            {restaurant.google_rating && restaurant.google_review_count ? (
+              <div className="text-2xs text-txt2 opacity-60">
+                {restaurant.google_review_count.toLocaleString()} reviews
+              </div>
+            ) : (
+              <div className="text-2xs text-txt2 opacity-60">—</div>
+            )}
+          </div>
+          <div className="w-px bg-brd" />
+          <CuratorRatingControl
+            ratingsCount={curatorRatings.length}
+            avg={curatorAvg !== null ? Math.round(curatorAvg * 2) / 2 : null}
+            loaded={curatorRatingsLoaded}
+          />
+          <div className="w-px bg-brd" />
+          <div className="flex-1 text-center py-3 px-3">
+            <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-txt mb-1">
+              {visits.length}
+            </div>
+            <div className="text-2xs uppercase tracking-wide text-txt2 mb-0.5">
+              Check-ins
+            </div>
+            {restaurant.last_visited && (
+              <div className="text-2xs text-txt2 opacity-60">
+                Last:{" "}
+                {(() => {
+                  if (!restaurant.last_visited) return "";
+                  const date = new Date(restaurant.last_visited);
+                  const now = new Date();
+                  const diffTime = Math.abs(now.getTime() - date.getTime());
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  if (diffDays === 0) return "today";
+                  if (diffDays === 1) return "1 day ago";
+                  if (diffDays < 7) return `${diffDays} days ago`;
+                  if (diffDays < 30)
+                    return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) !== 1 ? "s" : ""} ago`;
+                  return formatDate(restaurant.last_visited).replace(
+                    /\d{4}$/,
+                    (y) => y.slice(2),
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Curator Take Section — public quotes plus inline edit for the
+          signed-in curator (replaces the old expandable rating panel). */}
+        {(() => {
+          const myRating = user
+            ? curatorRatings.find((r) => r.user_id === user.id)
+            : null;
+          const hasMyRating = !!myRating;
+          const noted = curatorRatings.filter(
+            (r) => r.note && r.note.trim().length > 0,
+          );
+          const showSection =
+            curatorRatings.length > 0 || (canManageContent && !!user);
+          if (!showSection) return null;
+          const sectionLabel =
+            curatorAvg !== null && curatorAvg >= 5
+              ? "Why we love it"
+              : curatorAvg !== null && curatorAvg >= 4
+                ? "Why we like it"
+                : "Our Take";
+          // Animated expand/collapse using a 1fr ↔ 0fr grid row. Both views
+          // (quote + editor, or CTA + editor) stay mounted; the height
+          // transition gives a smooth in-place morph instead of a hard swap.
+          const expandRow = (open: boolean) =>
+            `grid transition-[grid-template-rows] duration-[280ms] ease-out ${
+              open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            }`;
+          const editorBody = (
+            <CuratorRatingPanel
+              bare
+              ratings={curatorRatings}
+              profiles={curatorProfiles}
+              userId={user?.id}
+              canEdit={canManageContent}
+              onSave={saveCuratorRating}
+              onClose={() => setEditingMyTake(false)}
+            />
+          );
+          return (
+            <section
+              id="our-take"
+              className="px-6 py-7 border-b border-brd scroll-fade-in"
+            >
+              {curatorRatings.length > 0 && (
+                <header className="flex items-baseline justify-between gap-3 mb-5">
+                  <h2 className="font-display text-2xl tracking-tight leading-none">
+                    {noted.length > 0 ? sectionLabel : "Our Take"}
+                  </h2>
+                  <span className="text-2xs uppercase tracking-[0.1em] text-txt2 shrink-0">
+                    {curatorRatings.length} curator
+                    {curatorRatings.length !== 1 ? "s" : ""}
+                  </span>
+                </header>
+              )}
+
+              <div className="space-y-3">
+                {curatorRatings.map((r) => {
+                  const isOwn =
+                    canManageContent && !!user && r.user_id === user.id;
+                  const isEditingThis = isOwn && editingMyTake;
+                  const hasNote = !!(r.note && r.note.trim().length > 0);
+                  const p = curatorProfiles[r.user_id];
+                  const name = formatDisplayName(p?.display_name) || "Curator";
+                  return (
+                    <figure
+                      key={r.id}
+                      className="relative bg-bg2 border border-brd p-5"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm text-txt truncate">
+                            {name}
                           </div>
+                          {!isEditingThis && (
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              {r.rating !== null && (
+                                <span
+                                  className="text-accent text-xs leading-none"
+                                  aria-label={`${r.rating} out of 5 stars`}
+                                >
+                                  {"★".repeat(r.rating)}
+                                  <span className="text-brd">
+                                    {"★".repeat(5 - r.rating)}
+                                  </span>
+                                </span>
+                              )}
+                              {r.must_try && (
+                                <span className="text-2xs font-medium px-1.5 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase leading-none">
+                                  ★ Must-Try
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {isOwn && !editingMyTake && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingMyTake(true)}
+                            aria-label="Edit your take"
+                            className="text-txt2 hover:text-accent bg-transparent border-none cursor-pointer p-1.5 -m-1.5 transition-colors duration-150 shrink-0"
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M12 20h9" />
+                              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                            </svg>
+                          </button>
                         )}
                       </div>
-                      {isOwn && !editingMyTake && (
+
+                      {/* Quote view — collapses when own + editing.
+                        Skipped for curators who only rated. */}
+                      {hasNote && (
+                        <div className={expandRow(!isEditingThis)}>
+                          <div className="overflow-hidden">
+                            <p className="text-base text-txt leading-relaxed pt-3">
+                              {r.note}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Editor view — only mounted for the signed-in curator */}
+                      {isOwn && (
+                        <div className={expandRow(isEditingThis)}>
+                          <div className="overflow-hidden">
+                            <div className="pt-4">{editorBody}</div>
+                          </div>
+                        </div>
+                      )}
+                    </figure>
+                  );
+                })}
+
+                {/* Add-your-take slot — only when the curator has no rating
+                  row yet. If they've rated (with or without a note) their
+                  card above already contains the editor. */}
+                {canManageContent && !!user && !hasMyRating && (
+                  <figure className="relative bg-bg2 border border-brd overflow-hidden">
+                    <div className={expandRow(!editingMyTake)}>
+                      <div className="overflow-hidden">
                         <button
                           type="button"
                           onClick={() => setEditingMyTake(true)}
-                          aria-label="Edit your take"
-                          className="text-txt2 hover:text-accent bg-transparent border-none cursor-pointer p-1.5 -m-1.5 transition-colors duration-150 shrink-0"
+                          className="w-full py-4 px-5 text-txt2 hover:text-accent transition-colors duration-150 text-sm font-medium tracking-wide flex items-center justify-center gap-2 bg-transparent cursor-pointer border-none"
                         >
                           <svg
                             width="14"
@@ -1357,651 +1467,601 @@ export default function RestaurantDetailClient({ params }: Props) {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           >
-                            <path d="M12 20h9" />
-                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                            <path d="M12 5v14M5 12h14" />
                           </svg>
+                          <span>Add your take</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className={expandRow(editingMyTake)}>
+                      <div className="overflow-hidden">
+                        <div className="p-5">{editorBody}</div>
+                      </div>
+                    </div>
+                  </figure>
+                )}
+              </div>
+            </section>
+          );
+        })()}
+
+        {/* What to order here — public-facing, recommended dishes only */}
+        {publicDishes.length > 0 && (
+          <div
+            id="recommended-items"
+            className="p-6 border-b border-brd scroll-fade-in"
+          >
+            <h2 className="font-display text-xl mb-3 tracking-tight">
+              Recommended Items
+            </h2>
+            <div className="space-y-3">
+              {publicDishes.map((item) => {
+                const isUsual = item.menuItem.id === usualBadgeDishId;
+                return (
+                  <div
+                    key={item.menuItem.id}
+                    className="flex items-start gap-3 border-[1.5px] border-brd p-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <p className="font-display text-lg leading-tight">
+                          {item.menuItem.name}
+                        </p>
+                        {isUsual && (
+                          <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase">
+                            Usual order
+                          </span>
+                        )}
+                      </div>
+                      {item.noteOrder && (
+                        <p className="text-xs text-txt leading-snug italic mb-1">
+                          {item.noteOrder.id !== item.latestOrder?.id && (
+                            <span className="not-italic text-txt2">
+                              Latest note (from{" "}
+                              {formatDate(item.noteOrder.ordered_at)}):{" "}
+                            </span>
+                          )}
+                          &ldquo;{item.noteOrder.notes}&rdquo;
+                          {item.noteOrder.id !== item.latestOrder?.id && (
+                            <span className="not-italic text-txt2">
+                              {" "}
+                              &mdash;{" "}
+                              {ordererNames[item.noteOrder.ordered_by] ||
+                                "curator"}
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 text-2xs text-txt2 flex-wrap">
+                        <span>
+                          {item.orderCount} order
+                          {item.orderCount !== 1 ? "s" : ""}
+                        </span>
+                        <span>
+                          Recommended by{" "}
+                          {item.recommenderIds
+                            .map((id) => recommenderNames[id] || "curator")
+                            .join(", ")}
+                        </span>
+                      </div>
+                      {isUsual && isAdmin && item.latestOrder && (
+                        <button
+                          onClick={() => handleLogAgain(item.latestOrder!)}
+                          className="mt-2 py-1.5 px-3 text-2xs font-medium bg-accent text-white border-[1.5px] border-accent rounded-pill transition-all hover:opacity-90"
+                        >
+                          Log this again
                         </button>
                       )}
                     </div>
-
-                    {/* Quote view — collapses when own + editing.
-                        Skipped for curators who only rated. */}
-                    {hasNote && (
-                      <div className={expandRow(!isEditingThis)}>
-                        <div className="overflow-hidden">
-                          <p className="text-base text-txt leading-relaxed pt-3">
-                            {r.note}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Editor view — only mounted for the signed-in curator */}
-                    {isOwn && (
-                      <div className={expandRow(isEditingThis)}>
-                        <div className="overflow-hidden">
-                          <div className="pt-4">{editorBody}</div>
-                        </div>
-                      </div>
-                    )}
-                  </figure>
-                );
-              })}
-
-              {/* Add-your-take slot — only when the curator has no rating
-                  row yet. If they've rated (with or without a note) their
-                  card above already contains the editor. */}
-              {canManageContent && !!user && !hasMyRating && (
-                <figure className="relative bg-bg2 border border-brd overflow-hidden">
-                  <div className={expandRow(!editingMyTake)}>
-                    <div className="overflow-hidden">
+                    {item.latestPhotoUrl && (
                       <button
                         type="button"
-                        onClick={() => setEditingMyTake(true)}
-                        className="w-full py-4 px-5 text-txt2 hover:text-accent transition-colors duration-150 text-sm font-medium tracking-wide flex items-center justify-center gap-2 bg-transparent cursor-pointer border-none"
+                        onClick={() =>
+                          openRecommendedLightbox(item.latestPhotoUrl!)
+                        }
+                        className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
+                        aria-label={`View photos of ${item.menuItem.name}`}
                       >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M12 5v14M5 12h14" />
-                        </svg>
-                        <span>Add your take</span>
+                        <img
+                          src={item.latestPhotoUrl}
+                          alt={item.menuItem.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
+                        />
                       </button>
-                    </div>
+                    )}
                   </div>
-                  <div className={expandRow(editingMyTake)}>
-                    <div className="overflow-hidden">
-                      <div className="p-5">{editorBody}</div>
-                    </div>
-                  </div>
-                </figure>
-              )}
+                );
+              })}
             </div>
-          </section>
-        );
-      })()}
+          </div>
+        )}
 
-      {/* What to order here — public-facing, recommended dishes only */}
-      {publicDishes.length > 0 && (
-        <div
-          id="recommended-items"
-          className="p-6 border-b border-brd scroll-fade-in"
-        >
-          <h2 className="font-display text-xl mb-3 tracking-tight">
-            Recommended Items
-          </h2>
-          <div className="space-y-3">
-            {publicDishes.map((item) => {
-              const isUsual = item.menuItem.id === usualBadgeDishId;
-              return (
-                <div
-                  key={item.menuItem.id}
-                  className="flex items-start gap-3 border-[1.5px] border-brd p-3"
+        <RestaurantActionBar />
+
+        {/* Curator order history — read-only for non-admins */}
+        {itemOrders.length > 0 && (
+          <div
+            id="order-history"
+            className="p-6 border-t border-brd scroll-fade-in"
+          >
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <h2 className="font-display text-xl tracking-tight">
+                Curators&rsquo; order history
+              </h2>
+              <div className="flex border-[1.5px] border-brd rounded-none overflow-hidden">
+                <button
+                  onClick={() => setHistoryView("by-dish")}
+                  className={`py-1 px-3 text-2xs font-medium uppercase tracking-wide transition-colors ${
+                    historyView === "by-dish"
+                      ? "bg-txt text-bg"
+                      : "bg-transparent text-txt2"
+                  }`}
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <p className="font-display text-lg leading-tight">
-                        {item.menuItem.name}
-                      </p>
-                      {isUsual && (
-                        <span className="text-2xs font-medium px-2 py-0.5 rounded-pill bg-accent text-white tracking-tight uppercase">
-                          Usual order
-                        </span>
-                      )}
-                    </div>
-                    {item.noteOrder && (
-                      <p className="text-xs text-txt leading-snug italic mb-1">
-                        {item.noteOrder.id !== item.latestOrder?.id && (
-                          <span className="not-italic text-txt2">
-                            Latest note (from{" "}
-                            {formatDate(item.noteOrder.ordered_at)}):{" "}
-                          </span>
-                        )}
-                        &ldquo;{item.noteOrder.notes}&rdquo;
-                        {item.noteOrder.id !== item.latestOrder?.id && (
-                          <span className="not-italic text-txt2">
-                            {" "}
-                            &mdash;{" "}
-                            {ordererNames[item.noteOrder.ordered_by] ||
-                              "curator"}
-                          </span>
-                        )}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-3 text-2xs text-txt2 flex-wrap">
-                      <span>
-                        {item.orderCount} order
-                        {item.orderCount !== 1 ? "s" : ""}
-                      </span>
-                      <span>
-                        Recommended by{" "}
-                        {item.recommenderIds
-                          .map((id) => recommenderNames[id] || "curator")
-                          .join(", ")}
-                      </span>
-                    </div>
-                    {isUsual && isAdmin && item.latestOrder && (
-                      <button
-                        onClick={() => handleLogAgain(item.latestOrder!)}
-                        className="mt-2 py-1.5 px-3 text-2xs font-medium bg-accent text-white border-[1.5px] border-accent rounded-pill transition-all hover:opacity-90"
-                      >
-                        Log this again
-                      </button>
-                    )}
-                  </div>
-                  {item.latestPhotoUrl && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openRecommendedLightbox(item.latestPhotoUrl!)
-                      }
-                      className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
-                      aria-label={`View photos of ${item.menuItem.name}`}
-                    >
-                      <img
-                        src={item.latestPhotoUrl}
-                        alt={item.menuItem.name}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
-                      />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <RestaurantActionBar />
-
-      {/* Curator order history — read-only for non-admins */}
-      {itemOrders.length > 0 && (
-        <div
-          id="order-history"
-          className="p-6 border-t border-brd scroll-fade-in"
-        >
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h2 className="font-display text-xl tracking-tight">
-              Curators&rsquo; order history
-            </h2>
-            <div className="flex border-[1.5px] border-brd rounded-none overflow-hidden">
-              <button
-                onClick={() => setHistoryView("by-dish")}
-                className={`py-1 px-3 text-2xs font-medium uppercase tracking-wide transition-colors ${
-                  historyView === "by-dish"
-                    ? "bg-txt text-bg"
-                    : "bg-transparent text-txt2"
-                }`}
-              >
-                By dish
-              </button>
-              <button
-                onClick={() => setHistoryView("timeline")}
-                className={`py-1 px-3 text-2xs font-medium uppercase tracking-wide transition-colors ${
-                  historyView === "timeline"
-                    ? "bg-txt text-bg"
-                    : "bg-transparent text-txt2"
-                }`}
-              >
-                Timeline
-              </button>
+                  By dish
+                </button>
+                <button
+                  onClick={() => setHistoryView("timeline")}
+                  className={`py-1 px-3 text-2xs font-medium uppercase tracking-wide transition-colors ${
+                    historyView === "timeline"
+                      ? "bg-txt text-bg"
+                      : "bg-transparent text-txt2"
+                  }`}
+                >
+                  Timeline
+                </button>
+              </div>
             </div>
-          </div>
 
-          {historyView === "by-dish" ? (
-            <div className="space-y-3">
-              {curatorDishes.map((group) => {
-                const isSingle = group.orderCount === 1;
-                const expanded = expandedDishId === group.menuItem.id;
-                const latest = group.latestOrder;
-                const latestCurator = latest
-                  ? ordererNames[latest.ordered_by] || "curator"
-                  : null;
-                return (
-                  <div
-                    key={group.menuItem.id}
-                    className="border-[1.5px] border-brd"
-                  >
-                    {isSingle ? (
-                      <div className="p-3 flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <p className="font-display text-lg leading-tight">
-                              {group.menuItem.name}
-                            </p>
-                            {group.menuItem.category && (
-                              <span className="text-2xs text-txt2 capitalize">
-                                {group.menuItem.category}
-                              </span>
+            {historyView === "by-dish" ? (
+              <div className="space-y-3">
+                {curatorDishes.map((group) => {
+                  const isSingle = group.orderCount === 1;
+                  const expanded = expandedDishId === group.menuItem.id;
+                  const latest = group.latestOrder;
+                  const latestCurator = latest
+                    ? ordererNames[latest.ordered_by] || "curator"
+                    : null;
+                  return (
+                    <div
+                      key={group.menuItem.id}
+                      className="border-[1.5px] border-brd"
+                    >
+                      {isSingle ? (
+                        <div className="p-3 flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <p className="font-display text-lg leading-tight">
+                                {group.menuItem.name}
+                              </p>
+                              {group.menuItem.category && (
+                                <span className="text-2xs text-txt2 capitalize">
+                                  {group.menuItem.category}
+                                </span>
+                              )}
+                            </div>
+                            {latest && (
+                              <p className="text-2xs text-txt2 mb-1">
+                                {formatDate(latest.ordered_at)} · by{" "}
+                                {latestCurator}
+                              </p>
+                            )}
+                            {latest?.notes && (
+                              <p className="text-sm text-txt italic mb-1">
+                                {latest.notes}
+                              </p>
+                            )}
+                            {latest?.drink_details && (
+                              <p className="text-2xs text-txt2">
+                                {formatDrinkSummary(
+                                  latest.drink_details as DrinkDetails,
+                                )}
+                              </p>
+                            )}
+                            {isAdmin && latest && (
+                              <div className="flex gap-2 mt-2">
+                                <button
+                                  onClick={() => handleEditOrder(latest)}
+                                  className="btn-outline !py-1 !px-2 !text-2xs !border-txt !text-txt"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDeleteOrderClick(latest.id)
+                                  }
+                                  disabled={deletingOrderId === latest.id}
+                                  className="btn-outline !py-1 !px-2 !text-2xs !border-accent !text-accent hover:!bg-accent hover:!text-white"
+                                >
+                                  {deletingOrderId === latest.id
+                                    ? "Deleting..."
+                                    : "Delete"}
+                                </button>
+                              </div>
                             )}
                           </div>
-                          {latest && (
-                            <p className="text-2xs text-txt2 mb-1">
-                              {formatDate(latest.ordered_at)} · by{" "}
-                              {latestCurator}
-                            </p>
-                          )}
-                          {latest?.notes && (
-                            <p className="text-sm text-txt italic mb-1">
-                              {latest.notes}
-                            </p>
-                          )}
-                          {latest?.drink_details && (
-                            <p className="text-2xs text-txt2">
-                              {formatDrinkSummary(
-                                latest.drink_details as DrinkDetails,
-                              )}
-                            </p>
-                          )}
-                          {isAdmin && latest && (
-                            <div className="flex gap-2 mt-2">
-                              <button
-                                onClick={() => handleEditOrder(latest)}
-                                className="btn-outline !py-1 !px-2 !text-2xs !border-txt !text-txt"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleDeleteOrderClick(latest.id)
-                                }
-                                disabled={deletingOrderId === latest.id}
-                                className="btn-outline !py-1 !px-2 !text-2xs !border-accent !text-accent hover:!bg-accent hover:!text-white"
-                              >
-                                {deletingOrderId === latest.id
-                                  ? "Deleting..."
-                                  : "Delete"}
-                              </button>
-                            </div>
+                          {group.latestPhotoUrl && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openOrderHistoryLightbox(group.latestPhotoUrl!)
+                              }
+                              className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
+                              aria-label={`View photo of ${group.menuItem.name}`}
+                            >
+                              <img
+                                src={group.latestPhotoUrl}
+                                alt={group.menuItem.name}
+                                loading="lazy"
+                                decoding="async"
+                                className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
+                              />
+                            </button>
                           )}
                         </div>
-                        {group.latestPhotoUrl && (
+                      ) : (
+                        <div className="p-3 flex items-start justify-between gap-3">
                           <button
                             type="button"
                             onClick={() =>
-                              openOrderHistoryLightbox(group.latestPhotoUrl!)
+                              setExpandedDishId(
+                                expanded ? null : group.menuItem.id,
+                              )
                             }
-                            className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
-                            aria-label={`View photo of ${group.menuItem.name}`}
+                            className="flex-1 min-w-0 text-left bg-transparent border-none cursor-pointer p-0"
                           >
-                            <img
-                              src={group.latestPhotoUrl}
-                              alt={group.menuItem.name}
-                              loading="lazy"
-                              decoding="async"
-                              className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
-                            />
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="p-3 flex items-start justify-between gap-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedDishId(
-                              expanded ? null : group.menuItem.id,
-                            )
-                          }
-                          className="flex-1 min-w-0 text-left bg-transparent border-none cursor-pointer p-0"
-                        >
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <p className="font-display text-lg leading-tight">
-                              {group.menuItem.name}
-                            </p>
-                            {group.menuItem.category && (
-                              <span className="text-2xs text-txt2 capitalize">
-                                {group.menuItem.category}
-                              </span>
-                            )}
-                            <Chevron open={expanded} className="text-txt2" />
-                          </div>
-                          <p className="text-2xs text-txt2 mb-1">
-                            {group.orderCount} orders
-                            {latest && (
-                              <>
-                                {" · last "}
-                                {formatDate(latest.ordered_at)} by{" "}
-                                {latestCurator}
-                              </>
-                            )}
-                          </p>
-                          {group.noteOrder && (
-                            <p className="text-xs text-txt italic mb-2">
-                              {group.noteOrder.id === group.latestOrder?.id ? (
-                                <>&ldquo;{group.noteOrder.notes}&rdquo;</>
-                              ) : (
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <p className="font-display text-lg leading-tight">
+                                {group.menuItem.name}
+                              </p>
+                              {group.menuItem.category && (
+                                <span className="text-2xs text-txt2 capitalize">
+                                  {group.menuItem.category}
+                                </span>
+                              )}
+                              <Chevron open={expanded} className="text-txt2" />
+                            </div>
+                            <p className="text-2xs text-txt2 mb-1">
+                              {group.orderCount} orders
+                              {latest && (
                                 <>
-                                  <span className="not-italic text-txt2">
-                                    Latest note (from{" "}
-                                    {formatDate(group.noteOrder.ordered_at)}):{" "}
-                                  </span>
-                                  &ldquo;{group.noteOrder.notes}&rdquo;
-                                  <span className="not-italic text-txt2">
-                                    {" "}
-                                    &mdash;{" "}
-                                    {ordererNames[
-                                      group.noteOrder.ordered_by
-                                    ] || "curator"}
-                                  </span>
+                                  {" · last "}
+                                  {formatDate(latest.ordered_at)} by{" "}
+                                  {latestCurator}
                                 </>
                               )}
                             </p>
+                            {group.noteOrder && (
+                              <p className="text-xs text-txt italic mb-2">
+                                {group.noteOrder.id ===
+                                group.latestOrder?.id ? (
+                                  <>&ldquo;{group.noteOrder.notes}&rdquo;</>
+                                ) : (
+                                  <>
+                                    <span className="not-italic text-txt2">
+                                      Latest note (from{" "}
+                                      {formatDate(group.noteOrder.ordered_at)}
+                                      ):{" "}
+                                    </span>
+                                    &ldquo;{group.noteOrder.notes}&rdquo;
+                                    <span className="not-italic text-txt2">
+                                      {" "}
+                                      &mdash;{" "}
+                                      {ordererNames[
+                                        group.noteOrder.ordered_by
+                                      ] || "curator"}
+                                    </span>
+                                  </>
+                                )}
+                              </p>
+                            )}
+                          </button>
+                          {group.latestPhotoUrl && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openOrderHistoryLightbox(group.latestPhotoUrl!)
+                              }
+                              className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
+                              aria-label={`View photos of ${group.menuItem.name}`}
+                            >
+                              <img
+                                src={group.latestPhotoUrl}
+                                alt={group.menuItem.name}
+                                loading="lazy"
+                                decoding="async"
+                                className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
+                              />
+                            </button>
                           )}
-                        </button>
-                        {group.latestPhotoUrl && (
+                        </div>
+                      )}
+                      <div className="px-3 pb-3 -mt-1">
+                        <MenuItemRecommendToggle
+                          menuItemId={group.menuItem.id}
+                          recommendedUserIds={group.recommenderIds}
+                          recommenderNames={recommenderNames}
+                          onChange={reloadOrders}
+                        />
+                      </div>
+                      {!isSingle && expanded && (
+                        <div className="border-t border-brd p-3 space-y-3 bg-bg2">
+                          {group.orders.map((order) => (
+                            <div
+                              key={order.id}
+                              className="flex items-start gap-3 pb-3 border-b border-brd/40 last:border-0 last:pb-0"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <p className="text-xs text-txt2">
+                                    {formatDate(order.ordered_at)} · by{" "}
+                                    {ordererNames[order.ordered_by] ||
+                                      "curator"}
+                                  </p>
+                                </div>
+                                {order.notes && (
+                                  <p className="text-sm text-txt italic mb-1">
+                                    {order.notes}
+                                  </p>
+                                )}
+                                {order.drink_details && (
+                                  <p className="text-2xs text-txt2">
+                                    {formatDrinkSummary(
+                                      order.drink_details as DrinkDetails,
+                                    )}
+                                  </p>
+                                )}
+                                {isAdmin && (
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={() => handleEditOrder(order)}
+                                      className="btn-outline !py-1 !px-2 !text-2xs !border-txt !text-txt"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteOrderClick(order.id)
+                                      }
+                                      disabled={deletingOrderId === order.id}
+                                      className="btn-outline !py-1 !px-2 !text-2xs !border-accent !text-accent hover:!bg-accent hover:!text-white"
+                                    >
+                                      {deletingOrderId === order.id
+                                        ? "Deleting..."
+                                        : "Delete"}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              {order.photo_url && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openOrderHistoryLightbox(order.photo_url!)
+                                  }
+                                  className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
+                                  aria-label={`View photo of ${group.menuItem.name}`}
+                                >
+                                  <img
+                                    src={order.photo_url}
+                                    alt={group.menuItem.name}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
+                                    onError={(e) => {
+                                      (
+                                        e.target as HTMLImageElement
+                                      ).style.display = "none";
+                                    }}
+                                  />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {itemOrders.map((order) => {
+                  const menuItem = menuItems.find(
+                    (mi) => mi.id === order.menu_item_id,
+                  );
+                  const rowContent = (
+                    <div className="border-[1.5px] border-brd p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="font-display text-lg leading-tight">
+                              {menuItem?.name || "Unknown item"}
+                            </p>
+                            {menuItem?.category && (
+                              <span className="text-2xs text-txt2 capitalize">
+                                {menuItem.category}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-2xs text-txt2 mb-2">
+                            {formatDate(order.ordered_at)} · by{" "}
+                            {ordererNames[order.ordered_by] || "curator"}
+                          </p>
+                          {order.notes && (
+                            <p className="text-sm text-txt italic mb-1">
+                              {order.notes}
+                            </p>
+                          )}
+                          {order.drink_details && (
+                            <p className="text-2xs text-txt2">
+                              {formatDrinkSummary(
+                                order.drink_details as DrinkDetails,
+                              )}
+                            </p>
+                          )}
+                        </div>
+                        {order.photo_url && (
                           <button
                             type="button"
                             onClick={() =>
-                              openOrderHistoryLightbox(group.latestPhotoUrl!)
+                              openOrderHistoryLightbox(order.photo_url!)
                             }
                             className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
-                            aria-label={`View photos of ${group.menuItem.name}`}
+                            aria-label={`View photo of ${menuItem?.name || "order"}`}
                           >
                             <img
-                              src={group.latestPhotoUrl}
-                              alt={group.menuItem.name}
+                              src={order.photo_url}
+                              alt={menuItem?.name}
                               loading="lazy"
                               decoding="async"
                               className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display =
+                                  "none";
+                              }}
                             />
                           </button>
                         )}
                       </div>
-                    )}
-                    <div className="px-3 pb-3 -mt-1">
-                      <MenuItemRecommendToggle
-                        menuItemId={group.menuItem.id}
-                        recommendedUserIds={group.recommenderIds}
-                        recommenderNames={recommenderNames}
-                        onChange={reloadOrders}
-                      />
-                    </div>
-                    {!isSingle && expanded && (
-                      <div className="border-t border-brd p-3 space-y-3 bg-bg2">
-                        {group.orders.map((order) => (
-                          <div
-                            key={order.id}
-                            className="flex items-start gap-3 pb-3 border-b border-brd/40 last:border-0 last:pb-0"
+                      {isAdmin && (
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={() => handleEditOrder(order)}
+                            className="btn-outline !py-1 !px-3 !text-xs !border-txt !text-txt"
                           >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <p className="text-xs text-txt2">
-                                  {formatDate(order.ordered_at)} · by{" "}
-                                  {ordererNames[order.ordered_by] || "curator"}
-                                </p>
-                              </div>
-                              {order.notes && (
-                                <p className="text-sm text-txt italic mb-1">
-                                  {order.notes}
-                                </p>
-                              )}
-                              {order.drink_details && (
-                                <p className="text-2xs text-txt2">
-                                  {formatDrinkSummary(
-                                    order.drink_details as DrinkDetails,
-                                  )}
-                                </p>
-                              )}
-                              {isAdmin && (
-                                <div className="flex gap-2 mt-2">
-                                  <button
-                                    onClick={() => handleEditOrder(order)}
-                                    className="btn-outline !py-1 !px-2 !text-2xs !border-txt !text-txt"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleDeleteOrderClick(order.id)
-                                    }
-                                    disabled={deletingOrderId === order.id}
-                                    className="btn-outline !py-1 !px-2 !text-2xs !border-accent !text-accent hover:!bg-accent hover:!text-white"
-                                  >
-                                    {deletingOrderId === order.id
-                                      ? "Deleting..."
-                                      : "Delete"}
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                            {order.photo_url && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openOrderHistoryLightbox(order.photo_url!)
-                                }
-                                className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
-                                aria-label={`View photo of ${group.menuItem.name}`}
-                              >
-                                <img
-                                  src={order.photo_url}
-                                  alt={group.menuItem.name}
-                                  loading="lazy"
-                                  decoding="async"
-                                  className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
-                                  onError={(e) => {
-                                    (
-                                      e.target as HTMLImageElement
-                                    ).style.display = "none";
-                                  }}
-                                />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {itemOrders.map((order) => {
-                const menuItem = menuItems.find(
-                  (mi) => mi.id === order.menu_item_id,
-                );
-                const rowContent = (
-                  <div className="border-[1.5px] border-brd p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <p className="font-display text-lg leading-tight">
-                            {menuItem?.name || "Unknown item"}
-                          </p>
-                          {menuItem?.category && (
-                            <span className="text-2xs text-txt2 capitalize">
-                              {menuItem.category}
-                            </span>
-                          )}
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteOrderClick(order.id)}
+                            disabled={deletingOrderId === order.id}
+                            className="btn-outline !py-1 !px-3 !text-xs !border-accent !text-accent hover:!bg-accent hover:!text-white"
+                          >
+                            {deletingOrderId === order.id
+                              ? "Deleting..."
+                              : "Delete"}
+                          </button>
                         </div>
-                        <p className="text-2xs text-txt2 mb-2">
-                          {formatDate(order.ordered_at)} · by{" "}
-                          {ordererNames[order.ordered_by] || "curator"}
-                        </p>
-                        {order.notes && (
-                          <p className="text-sm text-txt italic mb-1">
-                            {order.notes}
-                          </p>
-                        )}
-                        {order.drink_details && (
-                          <p className="text-2xs text-txt2">
-                            {formatDrinkSummary(
-                              order.drink_details as DrinkDetails,
-                            )}
-                          </p>
-                        )}
-                      </div>
-                      {order.photo_url && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openOrderHistoryLightbox(order.photo_url!)
-                          }
-                          className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
-                          aria-label={`View photo of ${menuItem?.name || "order"}`}
-                        >
-                          <img
-                            src={order.photo_url}
-                            alt={menuItem?.name}
-                            loading="lazy"
-                            decoding="async"
-                            className="w-16 h-16 object-cover rounded-lg border border-brd bg-bg2"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display =
-                                "none";
-                            }}
-                          />
-                        </button>
                       )}
                     </div>
-                    {isAdmin && (
-                      <div className="flex gap-2 mt-3">
-                        <button
-                          onClick={() => handleEditOrder(order)}
-                          className="btn-outline !py-1 !px-3 !text-xs !border-txt !text-txt"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteOrderClick(order.id)}
-                          disabled={deletingOrderId === order.id}
-                          className="btn-outline !py-1 !px-3 !text-xs !border-accent !text-accent hover:!bg-accent hover:!text-white"
-                        >
-                          {deletingOrderId === order.id
-                            ? "Deleting..."
-                            : "Delete"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-                return (
-                  <SwipeableRow
-                    key={order.id}
-                    enabled={isAdmin}
-                    onDelete={() => handleDeleteOrderClick(order.id)}
-                  >
-                    {rowContent}
-                  </SwipeableRow>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      <VisitHistorySection />
-
-      {/* Footer Metadata */}
-      {(restaurant.added_by || restaurant.date_added) && (
-        <div className="px-6 py-4 border-t border-brd">
-          <p className="text-2xs text-txt2 opacity-70">
-            {restaurant.added_by && (
-              <>Added by {formatDisplayName(restaurant.added_by)}</>
+                  );
+                  return (
+                    <SwipeableRow
+                      key={order.id}
+                      enabled={isAdmin}
+                      onDelete={() => handleDeleteOrderClick(order.id)}
+                    >
+                      {rowContent}
+                    </SwipeableRow>
+                  );
+                })}
+              </div>
             )}
-            {restaurant.added_by && restaurant.date_added && " · "}
-            {restaurant.date_added && formatDate(restaurant.date_added)}
-          </p>
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Edit Modal */}
-      {showEditModal && restaurant && (
-        <AddModal
-          onSave={handleSave}
-          onClose={() => {
-            setShowEditModal(false);
-            setSaveError("");
-          }}
-          editData={restaurant}
-          existingCuisines={cuisines}
-          existingFoodTags={existingFoodTags}
-          onDeleteSuccess={() => router.push("/admin")}
-        />
-      )}
+        <VisitHistorySection />
 
-      {/* Order Modal */}
-      {showOrderModal && restaurant && (
-        <OrderModal
-          restaurantId={restaurant.id}
-          editOrder={editingOrder}
-          editMenuItem={editingMenuItem}
-          onClose={() => {
-            setShowOrderModal(false);
-            setEditingOrder(null);
-            setEditingMenuItem(null);
-          }}
-          onSaved={reloadOrders}
-        />
-      )}
+        {/* Footer Metadata */}
+        {(restaurant.added_by || restaurant.date_added) && (
+          <div className="px-6 py-4 border-t border-brd">
+            <p className="text-2xs text-txt2 opacity-70">
+              {restaurant.added_by && (
+                <>Added by {formatDisplayName(restaurant.added_by)}</>
+              )}
+              {restaurant.added_by && restaurant.date_added && " · "}
+              {restaurant.date_added && formatDate(restaurant.date_added)}
+            </p>
+          </div>
+        )}
 
-      {/* Check-In Modal */}
-      {showCheckInModal && restaurant && (
-        <CheckInModal
-          restaurantName={restaurant.name}
-          onConfirm={handleCheckIn}
-          onClose={() => setShowCheckInModal(false)}
-          isAdmin={isAdmin}
-        />
-      )}
+        {/* Edit Modal */}
+        {showEditModal && restaurant && (
+          <AddModal
+            onSave={handleSave}
+            onClose={() => {
+              setShowEditModal(false);
+              setSaveError("");
+            }}
+            editData={restaurant}
+            existingCuisines={cuisines}
+            existingFoodTags={existingFoodTags}
+            onDeleteSuccess={() => router.push("/admin")}
+          />
+        )}
 
-      {/* Photo Lightbox */}
-      {lightbox && (
-        <PhotoLightbox
-          photos={lightbox.photos}
-          startIndex={lightbox.index}
-          header={lightbox.header}
-          onClose={() => setLightbox(null)}
-        />
-      )}
+        {/* Order Modal */}
+        {showOrderModal && restaurant && (
+          <OrderModal
+            restaurantId={restaurant.id}
+            editOrder={editingOrder}
+            editMenuItem={editingMenuItem}
+            onClose={() => {
+              setShowOrderModal(false);
+              setEditingOrder(null);
+              setEditingMenuItem(null);
+            }}
+            onSaved={reloadOrders}
+          />
+        )}
 
-      {/* Delete Order Confirmation Modal */}
-      {showDeleteConfirm && (
-        <ConfirmModal
-          title="Delete Order"
-          message="Are you sure you want to delete this order? This action cannot be undone."
-          confirmText="Delete"
-          cancelText="Cancel"
-          onConfirm={() => handleDeleteOrderConfirm(showDeleteConfirm)}
-          onCancel={() => setShowDeleteConfirm(null)}
-        />
-      )}
+        {/* Check-In Modal */}
+        {showCheckInModal && restaurant && (
+          <CheckInModal
+            restaurantName={restaurant.name}
+            onConfirm={handleCheckIn}
+            onClose={() => setShowCheckInModal(false)}
+            isAdmin={isAdmin}
+          />
+        )}
 
-      {/* Delete Visit Confirmation Modal */}
-      {showDeleteVisitConfirm && (
-        <ConfirmModal
-          title="Delete Visit"
-          message="Are you sure you want to delete this visit? This action cannot be undone."
-          confirmText="Delete"
-          cancelText="Cancel"
-          onConfirm={() => handleDeleteVisit(showDeleteVisitConfirm)}
-          onCancel={() => setShowDeleteVisitConfirm(null)}
-        />
-      )}
+        {/* Photo Lightbox */}
+        {lightbox && (
+          <PhotoLightbox
+            photos={lightbox.photos}
+            startIndex={lightbox.index}
+            header={lightbox.header}
+            onClose={() => setLightbox(null)}
+          />
+        )}
 
-      {/* Delete Restaurant Confirmation Modal */}
-      {showDeleteRestaurantConfirm && restaurant && (
-        <ConfirmModal
-          title={`Delete ${restaurant.name}?`}
-          message="This will permanently delete the restaurant and all associated visits, orders, and recommendations. This action cannot be undone."
-          confirmText="Delete"
-          cancelText="Cancel"
-          onConfirm={confirmDeleteRestaurant}
-          onCancel={() => setShowDeleteRestaurantConfirm(false)}
-        />
-      )}
-    </main>
+        {/* Delete Order Confirmation Modal */}
+        {showDeleteConfirm && (
+          <ConfirmModal
+            title="Delete Order"
+            message="Are you sure you want to delete this order? This action cannot be undone."
+            confirmText="Delete"
+            cancelText="Cancel"
+            onConfirm={() => handleDeleteOrderConfirm(showDeleteConfirm)}
+            onCancel={() => setShowDeleteConfirm(null)}
+          />
+        )}
+
+        {/* Delete Visit Confirmation Modal */}
+        {showDeleteVisitConfirm && (
+          <ConfirmModal
+            title="Delete Visit"
+            message="Are you sure you want to delete this visit? This action cannot be undone."
+            confirmText="Delete"
+            cancelText="Cancel"
+            onConfirm={() => handleDeleteVisit(showDeleteVisitConfirm)}
+            onCancel={() => setShowDeleteVisitConfirm(null)}
+          />
+        )}
+
+        {/* Delete Restaurant Confirmation Modal */}
+        {showDeleteRestaurantConfirm && restaurant && (
+          <ConfirmModal
+            title={`Delete ${restaurant.name}?`}
+            message="This will permanently delete the restaurant and all associated visits, orders, and recommendations. This action cannot be undone."
+            confirmText="Delete"
+            cancelText="Cancel"
+            onConfirm={confirmDeleteRestaurant}
+            onCancel={() => setShowDeleteRestaurantConfirm(false)}
+          />
+        )}
+      </main>
     </RestaurantDetailProvider>
   );
 }

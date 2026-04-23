@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth-context";
 import { usePathname } from "next/navigation";
 import RequestAccessModal from "./RequestAccessModal";
@@ -12,6 +13,10 @@ export default function AdminButton() {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showBugModal, setShowBugModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(
+    null,
+  );
   const pathname = usePathname();
   const isAdminPage = pathname === "/admin";
   const [avatarLoaded, setAvatarLoaded] = useState(true);
@@ -27,15 +32,35 @@ export default function AdminButton() {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
-      }
+      const target = event.target as Node;
+      if (buttonRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setShowMenu(false);
     }
     if (showMenu) {
       document.addEventListener("mousedown", handleClickOutside);
       return () =>
         document.removeEventListener("mousedown", handleClickOutside);
     }
+  }, [showMenu]);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    function updateAnchor() {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setAnchor({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    updateAnchor();
+    window.addEventListener("resize", updateAnchor);
+    window.addEventListener("scroll", updateAnchor, true);
+    return () => {
+      window.removeEventListener("resize", updateAnchor);
+      window.removeEventListener("scroll", updateAnchor, true);
+    };
   }, [showMenu]);
 
   // Before mount, render a neutral placeholder to avoid hydration mismatch
@@ -76,9 +101,93 @@ export default function AdminButton() {
   }
 
   // Logged in (admin or regular user)
+  const menu =
+    showMenu && anchor ? (
+      <div
+        ref={menuRef}
+        style={{ top: anchor.top, right: anchor.right }}
+        className="fixed bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[140px] z-[1000]"
+      >
+        {isAdmin && (
+          <>
+            <a
+              href="/admin/restaurants"
+              className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
+              onClick={() => setShowMenu(false)}
+            >
+              Bulk Restaurants
+            </a>
+            <a
+              href="/admin/bugs"
+              className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
+              onClick={() => setShowMenu(false)}
+            >
+              View Bugs
+            </a>
+          </>
+        )}
+        {isSuperuser && (
+          <>
+            <a
+              href="/admin/users"
+              className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
+              onClick={() => setShowMenu(false)}
+            >
+              Manage Users
+            </a>
+            <a
+              href="/admin/stats"
+              className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
+              onClick={() => setShowMenu(false)}
+            >
+              Site Stats
+            </a>
+            <a
+              href="/admin/boba"
+              className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
+              onClick={() => setShowMenu(false)}
+            >
+              Boba Analytics
+            </a>
+          </>
+        )}
+        {!isAdmin && (
+          <button
+            onClick={() => {
+              setShowRequestModal(true);
+              setShowMenu(false);
+            }}
+            className="w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
+          >
+            Request access
+          </button>
+        )}
+        <button
+          onClick={() => {
+            setShowBugModal(true);
+            setShowMenu(false);
+          }}
+          className="w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
+        >
+          Make suggestion / report bug
+        </button>
+        <button
+          onClick={async () => {
+            await signOut();
+            setShowMenu(false);
+            window.location.href = "/";
+          }}
+          className="w-full text-left px-4 py-2.5 text-sm text-accent hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
+        >
+          Logout
+        </button>
+      </div>
+    ) : null;
+
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setShowMenu(!showMenu)}
         aria-label={isAdmin ? "Admin menu" : "User menu"}
         className={`w-9 h-9 flex items-center justify-center rounded-full border hover:opacity-90 transition-opacity duration-150 text-sm font-medium overflow-hidden ${
@@ -102,83 +211,7 @@ export default function AdminButton() {
           </span>
         )}
       </button>
-      {showMenu && (
-        <div className="absolute right-0 top-full mt-2 bg-bg border-[1.5px] border-brd rounded-md shadow-lg min-w-[140px] z-50">
-          {isAdmin && (
-            <>
-              <a
-                href="/admin/restaurants"
-                className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
-                onClick={() => setShowMenu(false)}
-              >
-                Bulk Restaurants
-              </a>
-              <a
-                href="/admin/bugs"
-                className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
-                onClick={() => setShowMenu(false)}
-              >
-                View Bugs
-              </a>
-            </>
-          )}
-          {isSuperuser && (
-            <>
-              <a
-                href="/admin/users"
-                className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
-                onClick={() => setShowMenu(false)}
-              >
-                Manage Users
-              </a>
-              <a
-                href="/admin/stats"
-                className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
-                onClick={() => setShowMenu(false)}
-              >
-                Site Stats
-              </a>
-              <a
-                href="/admin/boba"
-                className="block w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 no-underline transition-colors"
-                onClick={() => setShowMenu(false)}
-              >
-                Boba Analytics
-              </a>
-            </>
-          )}
-          {!isAdmin && (
-            <button
-              onClick={() => {
-                setShowRequestModal(true);
-                setShowMenu(false);
-              }}
-              className="w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
-            >
-              Request access
-            </button>
-          )}
-          <button
-            onClick={() => {
-              setShowBugModal(true);
-              setShowMenu(false);
-            }}
-            className="w-full text-left px-4 py-2.5 text-sm text-txt hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
-          >
-            Make suggestion / report bug
-          </button>
-          <button
-            onClick={async () => {
-              await signOut();
-              setShowMenu(false);
-              window.location.href = "/";
-            }}
-            className="w-full text-left px-4 py-2.5 text-sm text-accent hover:bg-brd/20 cursor-pointer bg-transparent border-none font-body transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      )}
+      {mounted && menu ? createPortal(menu, document.body) : null}
       {showRequestModal && (
         <RequestAccessModal onClose={() => setShowRequestModal(false)} />
       )}

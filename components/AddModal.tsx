@@ -45,7 +45,6 @@ const VISIBILITY_HINTS: Record<"public" | "private" | "archived", string> = {
   archived: "Kept for history — hidden from the public guide.",
 };
 
-
 const PRICE_LEVEL_MAP: Record<number, string> = {
   1: "$",
   2: "$$",
@@ -105,9 +104,7 @@ export default function AddModal({
     editData?.occasions ?? [],
   );
   const [occasionInput, setOccasionInput] = useState("");
-  const [foodTags, setFoodTags] = useState<string[]>(
-    editData?.food_tags ?? [],
-  );
+  const [foodTags, setFoodTags] = useState<string[]>(editData?.food_tags ?? []);
   const [foodTagInput, setFoodTagInput] = useState("");
   const [foodTagOpen, setFoodTagOpen] = useState(false);
   const [foodTagHighlight, setFoodTagHighlight] = useState(-1);
@@ -134,6 +131,10 @@ export default function AddModal({
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkError, setLinkError] = useState("");
   const [showLinkPanel, setShowLinkPanel] = useState(false);
+  const [pendingCascade, setPendingCascade] = useState<{
+    target: LinkedLocation;
+    extraCount: number;
+  } | null>(null);
 
   const cuisineOptions = Array.from(
     new Set([...DEFAULT_CUISINE_OPTIONS, ...(existingCuisines ?? [])]),
@@ -377,23 +378,23 @@ export default function AddModal({
 
     console.log("Saving restaurant with photo_url:", finalPhotoUrl);
 
-
     const previousVisibility = editData?.visibility ?? null;
-    const visibilityChanged =
-      !!editData && previousVisibility !== visibility;
+    const visibilityChanged = !!editData && previousVisibility !== visibility;
     const nextVisibilityChangedAt = visibilityChanged
       ? new Date().toISOString()
       : (editData?.visibility_changed_at ?? null);
     const nextPreviousVisibility = visibilityChanged
       ? previousVisibility
       : (editData?.previous_visibility ?? null);
+    const nextVisibilityChangedBy = visibilityChanged
+      ? (displayName ?? null)
+      : (editData?.visibility_changed_by ?? null);
 
     const ok = await onSave({
       name: name.trim(),
       neighborhood: neighborhood.trim(),
       cuisine: cuisine.trim(),
       price,
-      note: editData?.note ?? "",
       added_by: addedBy || null,
       address: address.trim() || null,
       google_maps_url: googleMapsUrl || null,
@@ -415,16 +416,49 @@ export default function AddModal({
       visibility,
       visibility_changed_at: nextVisibilityChangedAt,
       previous_visibility: nextPreviousVisibility,
+      visibility_changed_by: nextVisibilityChangedBy,
       chain_id: currentChainId,
     });
 
-    setSaving(false);
-    if (ok) {
-      setSuccess(true);
-      setTimeout(() => onClose(), 800);
-    } else {
-      setError("Failed to save — please try again.");
+    // Chain write-through: when editing a location in a chain, propagate the
+    // fields that should stay identical across siblings (curator-agnostic
+    // attributes of the place). Skip this for new records and when not chained.
+    let siblingSyncFailed = false;
+    if (ok && editData && currentChainId != null) {
+      const sharedUpdates = {
+        occasions: occasions.length > 0 ? occasions : null,
+        food_tags: foodTags.length > 0 ? foodTags : null,
+        visibility,
+        visibility_changed_at: nextVisibilityChangedAt,
+        previous_visibility: nextPreviousVisibility,
+        visibility_changed_by: nextVisibilityChangedBy,
+      };
+      const { error: syncError } = await supabase
+        .from("restaurants")
+        .update(sharedUpdates)
+        .eq("chain_id", currentChainId)
+        .neq("id", editData.id);
+      if (syncError) {
+        console.warn("Failed to sync shared fields to siblings:", syncError);
+        siblingSyncFailed = true;
+      }
     }
+
+    setSaving(false);
+    if (!ok) {
+      setError("Failed to save — please try again.");
+      return;
+    }
+    if (siblingSyncFailed) {
+      // Main row saved, but siblings are out of sync. Surface it and leave the
+      // modal open so the user can retry the save.
+      setError(
+        "Saved this location, but failed to sync shared fields to linked locations. Try saving again.",
+      );
+      return;
+    }
+    setSuccess(true);
+    setTimeout(() => onClose(), 800);
   }
 
   function handleDeleteClick() {
@@ -438,19 +472,38 @@ export default function AddModal({
     setError("");
     setShowDeleteConfirm(false);
 
+    const archivePayload = {
+      visibility: "archived" as const,
+      visibility_changed_at: new Date().toISOString(),
+      previous_visibility: editData.visibility,
+    };
+
     const { error } = await supabase
       .from("restaurants")
-      .update({
-        visibility: "archived",
-        visibility_changed_at: new Date().toISOString(),
-        previous_visibility: editData.visibility,
-      })
+      .update(archivePayload)
       .eq("id", editData.id);
 
     if (error) {
       setError("Failed to archive restaurant.");
       setSaving(false);
       return;
+    }
+
+    // Visibility is a chain-shared field — propagate archive to siblings so
+    // the chain stays consistent with the save flow's write-through.
+    if (currentChainId != null) {
+      const { error: syncError } = await supabase
+        .from("restaurants")
+        .update(archivePayload)
+        .eq("chain_id", currentChainId)
+        .neq("id", editData.id);
+      if (syncError) {
+        setError(
+          "Archived this location, but failed to archive linked locations.",
+        );
+        setSaving(false);
+        return;
+      }
     }
 
     setSaving(false);
@@ -505,6 +558,28 @@ export default function AddModal({
   }, [linkSearch, linkedSiblings, editData]);
 
   async function handleLink(target: LinkedLocation) {
+    if (!editData || linkBusy) return;
+
+    // If the target is already in a chain with other members beyond itself,
+    // linking will pull all of those members into this chain too. Surface a
+    // confirm so the user knows the cascade is happening.
+    if (target.chain_id != null) {
+      const { data: cascadeRows } = await supabase
+        .from("restaurants")
+        .select("id")
+        .eq("chain_id", target.chain_id)
+        .neq("id", target.id);
+      const extraCount = cascadeRows?.length ?? 0;
+      if (extraCount > 0) {
+        setPendingCascade({ target, extraCount });
+        return;
+      }
+    }
+
+    await performLink(target);
+  }
+
+  async function performLink(target: LinkedLocation) {
     if (!editData || linkBusy) return;
     setLinkBusy(true);
     setLinkError("");
@@ -607,10 +682,10 @@ export default function AddModal({
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      className="fixed inset-0 bg-black/55 z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-txt/20 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
     >
-      <div className="bg-bg border-2 border-txt p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
-        <div className="sticky top-0 bg-bg z-20 -mx-6 -mt-6 px-6 pt-6 pb-3 mb-3 flex items-start justify-between">
+      <div className="bg-bg border-2 border-txt w-full max-w-[480px] max-h-[90vh] flex flex-col">
+        <div className="flex-shrink-0 px-6 pt-6 pb-3 flex items-start justify-between border-b border-brd">
           <p className="font-display text-2xl leading-none">
             {success
               ? editData
@@ -630,223 +705,306 @@ export default function AddModal({
           </button>
         </div>
 
-        {success && (
-          <p className="text-success text-sm mb-4">
-            {editData
-              ? "Changes saved successfully."
-              : "Restaurant saved successfully."}
-          </p>
-        )}
+        <div className="overflow-y-auto overflow-x-hidden p-6 pt-3">
+          {success && (
+            <p className="text-success text-sm mb-4">
+              {editData
+                ? "Changes saved successfully."
+                : "Restaurant saved successfully."}
+            </p>
+          )}
 
-        {!editData && (
+          {!editData && (
+            <div className="mb-4">
+              <label className={labelCls}>Search Google Places</label>
+              <input
+                ref={autocompleteRef}
+                placeholder="Search for a restaurant..."
+                className="input-base"
+              />
+            </div>
+          )}
+
           <div className="mb-4">
-            <label className={labelCls}>Search Google Places</label>
-            <input
-              ref={autocompleteRef}
-              placeholder="Search for a restaurant..."
-              className="input-base"
-            />
-          </div>
-        )}
-
-        <div className="mb-4">
-          <label className={labelCls}>Visibility</label>
-          <div className="flex gap-2">
-            {VISIBILITIES.map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setVisibility(v)}
-                className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
-                  visibility === v
-                    ? "bg-txt text-bg border-txt"
-                    : "bg-transparent text-txt2 border-brd"
-                }`}
-              >
-                {VISIBILITY_LABELS[v]}
-              </button>
-            ))}
-          </div>
-          <p className="text-2xs text-txt2 mt-1.5">
-            {VISIBILITY_HINTS[visibility]}
-          </p>
-        </div>
-
-
-        {[
-          {
-            label: "Restaurant name",
-            value: name,
-            set: setName,
-            placeholder: "e.g. Juniper & Ivy",
-          },
-          {
-            label: "Neighborhood",
-            value: neighborhood,
-            set: setNeighborhood,
-            placeholder: "e.g. Little Italy, North Park...",
-          },
-          {
-            label: "Address",
-            value: address,
-            set: setAddress,
-            placeholder: "e.g. 2228 Kettner Blvd, San Diego",
-          },
-        ].map((field) => (
-          <div key={field.label} className="mb-4">
-            <label className={labelCls}>{field.label}</label>
-            <input
-              value={field.value}
-              onChange={(e) => field.set(e.target.value)}
-              placeholder={field.placeholder}
-              onKeyDown={(e) => e.key === "Enter" && handleSave()}
-              className="input-base"
-            />
-          </div>
-        ))}
-
-        <div ref={cuisineWrapperRef} className="mb-4 relative">
-          <label className={labelCls}>Cuisine type</label>
-          <input
-            value={cuisine}
-            onChange={(e) => {
-              setCuisine(e.target.value);
-              setCuisineOpen(true);
-              setCuisineHighlight(-1);
-            }}
-            placeholder="Search or type a cuisine..."
-            onFocus={() => setCuisineOpen(true)}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setCuisineHighlight((prev) =>
-                  prev < filteredCuisines.length - 1 ? prev + 1 : prev,
-                );
-              } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setCuisineHighlight((prev) => (prev > 0 ? prev - 1 : -1));
-              } else if (e.key === "Enter") {
-                e.preventDefault();
-                if (
-                  cuisineHighlight >= 0 &&
-                  filteredCuisines[cuisineHighlight]
-                ) {
-                  const picked = filteredCuisines[cuisineHighlight];
-                  setCuisine(picked);
-                  setCuisineOpen(false);
-                  setCuisineHighlight(-1);
-                } else {
-                  setCuisineOpen(false);
-                }
-              } else if (e.key === "Escape") {
-                setCuisineOpen(false);
-              }
-            }}
-            className="input-base"
-            autoComplete="off"
-          />
-          {cuisineOpen && (filteredCuisines.length > 0 || showCuisineAdd) && (
-            <ul className="absolute top-full left-0 right-0 z-10 bg-bg border-[1.5px] border-brd border-t-0 max-h-[200px] overflow-y-auto list-none m-0 p-0">
-              {showCuisineAdd && (
-                <li
-                  onMouseDown={() => {
-                    setCuisineOpen(false);
-                  }}
-                  className={`py-2 px-3 text-sm cursor-pointer text-accent font-medium font-body ${filteredCuisines.length > 0 ? "border-b border-brd" : ""}`}
+            <label className={labelCls}>Visibility</label>
+            <div className="flex gap-2">
+              {VISIBILITIES.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setVisibility(v)}
+                  className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                    visibility === v
+                      ? "bg-txt text-bg border-txt"
+                      : "bg-transparent text-txt2 border-brd"
+                  }`}
                 >
-                  Add &ldquo;{cuisine.trim()}&rdquo;
-                </li>
-              )}
-              {filteredCuisines.map((c, i) => (
-                <li
-                  key={c}
-                  onMouseDown={() => {
-                    setCuisine(c);
+                  {VISIBILITY_LABELS[v]}
+                </button>
+              ))}
+            </div>
+            <p className="text-2xs text-txt2 mt-1.5">
+              {VISIBILITY_HINTS[visibility]}
+            </p>
+          </div>
+
+          {[
+            {
+              label: "Restaurant name",
+              value: name,
+              set: setName,
+              placeholder: "e.g. Juniper & Ivy",
+            },
+            {
+              label: "Neighborhood",
+              value: neighborhood,
+              set: setNeighborhood,
+              placeholder: "e.g. Little Italy, North Park...",
+            },
+            {
+              label: "Address",
+              value: address,
+              set: setAddress,
+              placeholder: "e.g. 2228 Kettner Blvd, San Diego",
+            },
+          ].map((field) => (
+            <div key={field.label} className="mb-4">
+              <label className={labelCls}>{field.label}</label>
+              <input
+                value={field.value}
+                onChange={(e) => field.set(e.target.value)}
+                placeholder={field.placeholder}
+                onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                className="input-base"
+              />
+            </div>
+          ))}
+
+          <div ref={cuisineWrapperRef} className="mb-4 relative">
+            <label className={labelCls}>Cuisine type</label>
+            <input
+              value={cuisine}
+              onChange={(e) => {
+                setCuisine(e.target.value);
+                setCuisineOpen(true);
+                setCuisineHighlight(-1);
+              }}
+              placeholder="Search or type a cuisine..."
+              onFocus={() => setCuisineOpen(true)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setCuisineHighlight((prev) =>
+                    prev < filteredCuisines.length - 1 ? prev + 1 : prev,
+                  );
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setCuisineHighlight((prev) => (prev > 0 ? prev - 1 : -1));
+                } else if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (
+                    cuisineHighlight >= 0 &&
+                    filteredCuisines[cuisineHighlight]
+                  ) {
+                    const picked = filteredCuisines[cuisineHighlight];
+                    setCuisine(picked);
                     setCuisineOpen(false);
                     setCuisineHighlight(-1);
-                  }}
-                  className={`py-2 px-3 text-sm cursor-pointer font-body text-txt transition-colors duration-75 hover:bg-bg2 ${i === cuisineHighlight ? "bg-bg2" : "bg-transparent"}`}
-                >
-                  {c}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="mb-4">
-          <label className={labelCls}>Price range</label>
-          <div className="flex gap-2">
-            {PRICES.map((p) => (
-              <button
-                key={p}
-                onClick={() => setPrice(p)}
-                className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
-                  price === p
-                    ? "bg-txt text-bg border-txt"
-                    : "bg-transparent text-txt2 border-brd"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <label className={labelCls}>Occasion Tags</label>
-          <div className="mb-2">
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={occasionInput}
-                onChange={(e) => setOccasionInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && occasionInput.trim()) {
-                    e.preventDefault();
-                    const tag = occasionInput.trim().toLowerCase();
-                    if (!occasions.includes(tag)) {
-                      setOccasions([...occasions, tag]);
-                    }
-                    setOccasionInput("");
+                  } else {
+                    setCuisineOpen(false);
                   }
-                }}
-                placeholder="Add occasion tag..."
-                className="input-base flex-1"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (occasionInput.trim()) {
-                    const tag = occasionInput.trim().toLowerCase();
-                    if (!occasions.includes(tag)) {
-                      setOccasions([...occasions, tag]);
-                    }
-                    setOccasionInput("");
-                  }
-                }}
-                className="btn-outline !py-2 !px-4 !border-txt !text-txt"
-              >
-                Add
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {OCCASION_SUGGESTIONS.filter((s) => !occasions.includes(s)).map(
-                (suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => setOccasions([...occasions, suggestion])}
-                    className="text-2xs px-2 py-1 border border-brd text-txt2 hover:border-txt hover:text-txt transition-colors capitalize"
+                } else if (e.key === "Escape") {
+                  setCuisineOpen(false);
+                }
+              }}
+              className="input-base"
+              autoComplete="off"
+            />
+            {cuisineOpen && (filteredCuisines.length > 0 || showCuisineAdd) && (
+              <ul className="absolute top-full left-0 right-0 z-10 bg-bg border-[1.5px] border-brd border-t-0 max-h-[200px] overflow-y-auto list-none m-0 p-0">
+                {showCuisineAdd && (
+                  <li
+                    onMouseDown={() => {
+                      setCuisineOpen(false);
+                    }}
+                    className={`py-2 px-3 text-sm cursor-pointer text-accent font-medium font-body ${filteredCuisines.length > 0 ? "border-b border-brd" : ""}`}
                   >
-                    + {suggestion}
-                  </button>
-                ),
+                    Add &ldquo;{cuisine.trim()}&rdquo;
+                  </li>
+                )}
+                {filteredCuisines.map((c, i) => (
+                  <li
+                    key={c}
+                    onMouseDown={() => {
+                      setCuisine(c);
+                      setCuisineOpen(false);
+                      setCuisineHighlight(-1);
+                    }}
+                    className={`py-2 px-3 text-sm cursor-pointer font-body text-txt transition-colors duration-75 hover:bg-bg2 ${i === cuisineHighlight ? "bg-bg2" : "bg-transparent"}`}
+                  >
+                    {c}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="mb-4">
+            <label className={labelCls}>Price range</label>
+            <div className="flex gap-2">
+              {PRICES.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPrice(p)}
+                  className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] ${
+                    price === p
+                      ? "bg-txt text-bg border-txt"
+                      : "bg-transparent text-txt2 border-brd"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label className={labelCls}>Occasion Tags</label>
+            <div className="mb-2">
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={occasionInput}
+                  onChange={(e) => setOccasionInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && occasionInput.trim()) {
+                      e.preventDefault();
+                      const tag = occasionInput.trim().toLowerCase();
+                      if (!occasions.includes(tag)) {
+                        setOccasions([...occasions, tag]);
+                      }
+                      setOccasionInput("");
+                    }
+                  }}
+                  placeholder="Add occasion tag..."
+                  className="input-base flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (occasionInput.trim()) {
+                      const tag = occasionInput.trim().toLowerCase();
+                      if (!occasions.includes(tag)) {
+                        setOccasions([...occasions, tag]);
+                      }
+                      setOccasionInput("");
+                    }
+                  }}
+                  className="btn-outline !py-2 !px-4 !border-txt !text-txt"
+                >
+                  Add
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {OCCASION_SUGGESTIONS.filter((s) => !occasions.includes(s)).map(
+                  (suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => setOccasions([...occasions, suggestion])}
+                      className="text-2xs px-2 py-1 border border-brd text-txt2 hover:border-txt hover:text-txt transition-colors capitalize"
+                    >
+                      + {suggestion}
+                    </button>
+                  ),
+                )}
+              </div>
+              {occasions.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {occasions.map((tag) => (
+                    <span
+                      key={tag}
+                      className="text-2xs font-medium px-2.5 py-1 rounded-pill border border-txt text-txt capitalize flex items-center gap-1.5"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOccasions(occasions.filter((t) => t !== tag))
+                        }
+                        className="text-txt hover:text-accent transition-colors"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
-            {occasions.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {occasions.map((tag) => (
+          </div>
+
+          <div ref={foodTagWrapperRef} className="mb-4 relative">
+            <label className={labelCls}>Food / drink tags</label>
+            <input
+              value={foodTagInput}
+              onChange={(e) => {
+                setFoodTagInput(e.target.value);
+                setFoodTagOpen(true);
+                setFoodTagHighlight(-1);
+              }}
+              onFocus={() => setFoodTagOpen(true)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setFoodTagHighlight((prev) =>
+                    prev < filteredFoodTagOptions.length - 1 ? prev + 1 : prev,
+                  );
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setFoodTagHighlight((prev) => (prev > 0 ? prev - 1 : -1));
+                } else if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (
+                    foodTagHighlight >= 0 &&
+                    filteredFoodTagOptions[foodTagHighlight]
+                  ) {
+                    addFoodTag(filteredFoodTagOptions[foodTagHighlight]);
+                  } else if (normalizedFoodTagInput) {
+                    addFoodTag(normalizedFoodTagInput);
+                  }
+                } else if (e.key === "Escape") {
+                  setFoodTagOpen(false);
+                }
+              }}
+              placeholder="Search or add a food/drink tag (e.g. boba, ramen)"
+              className="input-base"
+              autoComplete="off"
+            />
+            {foodTagOpen &&
+              (filteredFoodTagOptions.length > 0 || showFoodTagAdd) && (
+                <ul className="absolute top-full left-0 right-0 z-10 bg-bg border-[1.5px] border-brd border-t-0 max-h-[200px] overflow-y-auto list-none m-0 p-0">
+                  {showFoodTagAdd && (
+                    <li
+                      onMouseDown={() => addFoodTag(normalizedFoodTagInput)}
+                      className={`py-2 px-3 text-sm cursor-pointer text-accent font-medium font-body ${filteredFoodTagOptions.length > 0 ? "border-b border-brd" : ""}`}
+                    >
+                      Add &ldquo;{normalizedFoodTagInput}&rdquo;
+                    </li>
+                  )}
+                  {filteredFoodTagOptions.map((t, i) => (
+                    <li
+                      key={t}
+                      onMouseDown={() => addFoodTag(t)}
+                      className={`py-2 px-3 text-sm cursor-pointer font-body text-txt transition-colors duration-75 hover:bg-bg2 ${i === foodTagHighlight ? "bg-bg2" : "bg-transparent"}`}
+                    >
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            {foodTags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {foodTags.map((tag) => (
                   <span
                     key={tag}
                     className="text-2xs font-medium px-2.5 py-1 rounded-pill border border-txt text-txt capitalize flex items-center gap-1.5"
@@ -855,7 +1013,7 @@ export default function AddModal({
                     <button
                       type="button"
                       onClick={() =>
-                        setOccasions(occasions.filter((t) => t !== tag))
+                        setFoodTags(foodTags.filter((t) => t !== tag))
                       }
                       className="text-txt hover:text-accent transition-colors"
                     >
@@ -866,295 +1024,215 @@ export default function AddModal({
               </div>
             )}
           </div>
-        </div>
 
-        <div ref={foodTagWrapperRef} className="mb-4 relative">
-          <label className={labelCls}>Food / drink tags</label>
-          <input
-            value={foodTagInput}
-            onChange={(e) => {
-              setFoodTagInput(e.target.value);
-              setFoodTagOpen(true);
-              setFoodTagHighlight(-1);
-            }}
-            onFocus={() => setFoodTagOpen(true)}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setFoodTagHighlight((prev) =>
-                  prev < filteredFoodTagOptions.length - 1 ? prev + 1 : prev,
-                );
-              } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setFoodTagHighlight((prev) => (prev > 0 ? prev - 1 : -1));
-              } else if (e.key === "Enter") {
-                e.preventDefault();
-                if (
-                  foodTagHighlight >= 0 &&
-                  filteredFoodTagOptions[foodTagHighlight]
-                ) {
-                  addFoodTag(filteredFoodTagOptions[foodTagHighlight]);
-                } else if (normalizedFoodTagInput) {
-                  addFoodTag(normalizedFoodTagInput);
-                }
-              } else if (e.key === "Escape") {
-                setFoodTagOpen(false);
-              }
-            }}
-            placeholder="Search or add a food/drink tag (e.g. boba, ramen)"
-            className="input-base"
-            autoComplete="off"
-          />
-          {foodTagOpen &&
-            (filteredFoodTagOptions.length > 0 || showFoodTagAdd) && (
-              <ul className="absolute top-full left-0 right-0 z-10 bg-bg border-[1.5px] border-brd border-t-0 max-h-[200px] overflow-y-auto list-none m-0 p-0">
-                {showFoodTagAdd && (
-                  <li
-                    onMouseDown={() => addFoodTag(normalizedFoodTagInput)}
-                    className={`py-2 px-3 text-sm cursor-pointer text-accent font-medium font-body ${filteredFoodTagOptions.length > 0 ? "border-b border-brd" : ""}`}
-                  >
-                    Add &ldquo;{normalizedFoodTagInput}&rdquo;
-                  </li>
+          {googleRating !== null && (
+            <div className="mb-4 p-3 bg-bg2 border border-brd">
+              <label className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1 block">
+                Google Rating (auto-populated)
+              </label>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-accent">★</span>
+                <span className="font-medium text-txt">
+                  {googleRating.toFixed(1)}
+                </span>
+                {googleReviewCount && (
+                  <span className="text-txt2">
+                    ({googleReviewCount.toLocaleString()} reviews)
+                  </span>
                 )}
-                {filteredFoodTagOptions.map((t, i) => (
-                  <li
-                    key={t}
-                    onMouseDown={() => addFoodTag(t)}
-                    className={`py-2 px-3 text-sm cursor-pointer font-body text-txt transition-colors duration-75 hover:bg-bg2 ${i === foodTagHighlight ? "bg-bg2" : "bg-transparent"}`}
-                  >
-                    {t}
-                  </li>
-                ))}
-              </ul>
-            )}
-          {foodTags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {foodTags.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-2xs font-medium px-2.5 py-1 rounded-pill border border-txt text-txt capitalize flex items-center gap-1.5"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFoodTags(foodTags.filter((t) => t !== tag))
-                    }
-                    className="text-txt hover:text-accent transition-colors"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
+              </div>
             </div>
           )}
-        </div>
 
-        {googleRating !== null && (
-          <div className="mb-4 p-3 bg-bg2 border border-brd">
-            <label className="text-2xs tracking-wide uppercase font-medium text-txt2 mb-1 block">
-              Google Rating (auto-populated)
-            </label>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-accent">★</span>
-              <span className="font-medium text-txt">
-                {googleRating.toFixed(1)}
-              </span>
-              {googleReviewCount && (
-                <span className="text-txt2">
-                  ({googleReviewCount.toLocaleString()} reviews)
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="mb-4">
-          <label className={labelCls}>Photo</label>
-          <div className="flex flex-col gap-2">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setPhotoFile(file);
-                  setPhotoUrl(""); // Clear URL if file is selected
-                }
-              }}
-              className="text-sm text-txt2 file:mr-4 file:py-2 file:px-4 file:rounded-none file:border-[1.5px] file:border-brd file:text-sm file:font-medium file:bg-transparent file:text-txt2 file:cursor-pointer hover:file:bg-bg2"
-            />
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-px bg-brd" />
-              <span className="text-xs text-txt2 uppercase tracking-wide">
-                or
-              </span>
-              <div className="flex-1 h-px bg-brd" />
-            </div>
-            <input
-              value={photoUrl}
-              onChange={(e) => {
-                setPhotoUrl(e.target.value);
-                setPhotoFile(null); // Clear file if URL is entered
-              }}
-              placeholder="Paste image URL"
-              className="input-base"
-              disabled={!!photoFile}
-            />
-          </div>
-          {(photoFile || photoUrl.trim()) && (
-            <img
-              src={photoFile ? URL.createObjectURL(photoFile) : photoUrl.trim()}
-              alt="Preview"
-              className="mt-2 w-full h-[120px] object-cover border border-brd"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          )}
-        </div>
-
-        {editData && !showLinkPanel && (
           <div className="mb-4">
-            <button
-              type="button"
-              onClick={() => setShowLinkPanel(true)}
-              className="btn-outline w-full text-sm"
-            >
-              {linkedSiblings.length > 0
-                ? `Manage linked locations (${linkedSiblings.length})`
-                : "Link another location"}
-            </button>
+            <label className={labelCls}>Photo</label>
+            <div className="flex flex-col gap-2">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setPhotoFile(file);
+                    setPhotoUrl(""); // Clear URL if file is selected
+                  }
+                }}
+                className="text-sm text-txt2 file:mr-4 file:py-2 file:px-4 file:rounded-none file:border-[1.5px] file:border-brd file:text-sm file:font-medium file:bg-transparent file:text-txt2 file:cursor-pointer hover:file:bg-bg2"
+              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-brd" />
+                <span className="text-xs text-txt2 uppercase tracking-wide">
+                  or
+                </span>
+                <div className="flex-1 h-px bg-brd" />
+              </div>
+              <input
+                value={photoUrl}
+                onChange={(e) => {
+                  setPhotoUrl(e.target.value);
+                  setPhotoFile(null); // Clear file if URL is entered
+                }}
+                placeholder="Paste image URL"
+                className="input-base"
+                disabled={!!photoFile}
+              />
+            </div>
+            {(photoFile || photoUrl.trim()) && (
+              <img
+                src={
+                  photoFile ? URL.createObjectURL(photoFile) : photoUrl.trim()
+                }
+                alt="Preview"
+                className="mt-2 w-full h-[120px] object-cover border border-brd"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+            )}
           </div>
-        )}
 
-        {editData && showLinkPanel && (
-          <div className="mb-4 p-3 border border-brd">
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <label className={`${labelCls} mb-0`}>Linked locations</label>
+          {editData && !showLinkPanel && (
+            <div className="mb-4">
               <button
                 type="button"
-                onClick={() => {
-                  setShowLinkPanel(false);
-                  setLinkSearch("");
-                  setLinkResults([]);
-                }}
-                className="text-txt2 hover:text-txt text-lg leading-none"
-                aria-label="Close linked locations"
+                onClick={() => setShowLinkPanel(true)}
+                className="btn-outline w-full text-sm"
               >
-                ×
+                {linkedSiblings.length > 0
+                  ? `Manage linked locations (${linkedSiblings.length})`
+                  : "Link another location"}
               </button>
             </div>
-            <p className="text-2xs text-txt2 mb-2">
-              Linked locations share menu items and order history on the
-              detail page. Visits stay per-location.
-            </p>
+          )}
 
-            {linkedSiblings.length > 0 ? (
-              <div className="flex flex-col gap-1.5 mb-3">
-                {linkedSiblings.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex items-center justify-between gap-2 px-2 py-1.5 bg-bg2 border border-brd"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm truncate">{s.name}</div>
-                      {s.neighborhood && (
-                        <div className="text-2xs text-txt2 truncate">
-                          {s.neighborhood}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleUnlinkSibling(s.id)}
-                      disabled={linkBusy}
-                      className="text-2xs uppercase tracking-wide text-accent hover:underline disabled:opacity-50"
-                    >
-                      Unlink
-                    </button>
-                  </div>
-                ))}
+          {editData && showLinkPanel && (
+            <div className="mb-4 p-3 border border-brd">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <label className={`${labelCls} mb-0`}>Linked locations</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLinkPanel(false);
+                    setLinkSearch("");
+                    setLinkResults([]);
+                  }}
+                  className="text-txt2 hover:text-txt text-lg leading-none"
+                  aria-label="Close linked locations"
+                >
+                  ×
+                </button>
               </div>
-            ) : (
-              <p className="text-2xs text-txt2 mb-2 italic">
-                Not linked to any other locations.
+              <p className="text-2xs text-txt2 mb-2">
+                Linked locations share menu items and order history on the
+                detail page. Visits stay per-location.
               </p>
-            )}
 
-            <div className="relative">
-              <input
-                value={linkSearch}
-                onChange={(e) => setLinkSearch(e.target.value)}
-                placeholder="Search to link another location…"
-                disabled={linkBusy}
-                className="input-base"
-              />
-              {linkResults.length > 0 && (
-                <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-bg border border-brd max-h-[200px] overflow-y-auto">
-                  {linkResults.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => handleLink(r)}
-                      disabled={linkBusy}
-                      className="w-full text-left px-2 py-1.5 hover:bg-bg2 border-b border-brd last:border-b-0 disabled:opacity-50"
+              {linkedSiblings.length > 0 ? (
+                <div className="flex flex-col gap-1.5 mb-3">
+                  {linkedSiblings.map((s) => (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between gap-2 px-2 py-1.5 bg-bg2 border border-brd"
                     >
-                      <div className="text-sm truncate">
-                        {r.name}
-                        {r.chain_id != null && (
-                          <span className="ml-1 text-2xs text-txt2">
-                            (already in a chain)
-                          </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm truncate">{s.name}</div>
+                        {s.neighborhood && (
+                          <div className="text-2xs text-txt2 truncate">
+                            {s.neighborhood}
+                          </div>
                         )}
                       </div>
-                      {r.neighborhood && (
-                        <div className="text-2xs text-txt2 truncate">
-                          {r.neighborhood}
-                        </div>
-                      )}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUnlinkSibling(s.id)}
+                        disabled={linkBusy}
+                        className="text-2xs uppercase tracking-wide text-accent hover:underline disabled:opacity-50"
+                      >
+                        Unlink
+                      </button>
+                    </div>
                   ))}
                 </div>
+              ) : (
+                <p className="text-2xs text-txt2 mb-2 italic">
+                  Not linked to any other locations.
+                </p>
+              )}
+
+              <div className="relative">
+                <input
+                  value={linkSearch}
+                  onChange={(e) => setLinkSearch(e.target.value)}
+                  placeholder="Search to link another location…"
+                  disabled={linkBusy}
+                  className="input-base"
+                />
+                {linkResults.length > 0 && (
+                  <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-bg border border-brd max-h-[200px] overflow-y-auto">
+                    {linkResults.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => handleLink(r)}
+                        disabled={linkBusy}
+                        className="w-full text-left px-2 py-1.5 hover:bg-bg2 border-b border-brd last:border-b-0 disabled:opacity-50"
+                      >
+                        <div className="text-sm truncate">
+                          {r.name}
+                          {r.chain_id != null && (
+                            <span className="ml-1 text-2xs text-txt2">
+                              (already in a chain)
+                            </span>
+                          )}
+                        </div>
+                        {r.neighborhood && (
+                          <div className="text-2xs text-txt2 truncate">
+                            {r.neighborhood}
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {linkError && (
+                <p className="text-error text-2xs mt-2">{linkError}</p>
               )}
             </div>
-
-            {linkError && (
-              <p className="text-error text-2xs mt-2">{linkError}</p>
-            )}
-          </div>
-        )}
-
-        {error && <p className="text-error text-sm mb-2">{error}</p>}
-
-        <div className="flex gap-2 mt-6">
-          <button
-            onClick={handleSave}
-            disabled={saving || success}
-            className="btn-primary flex-1"
-          >
-            {uploading
-              ? "Uploading photo..."
-              : saving
-                ? "Saving..."
-                : success
-                  ? "Saved!"
-                  : editData
-                    ? "Save changes"
-                    : "Save restaurant"}
-          </button>
-          {editData && editData.visibility !== "archived" && (
-            <button
-              onClick={handleDeleteClick}
-              disabled={saving || success}
-              className="btn-outline !border-accent !text-accent hover:!bg-accent hover:!text-white"
-            >
-              Archive
-            </button>
           )}
-          <button onClick={onClose} className="btn-outline">
-            Cancel
-          </button>
+
+          {error && <p className="text-error text-sm mb-2">{error}</p>}
+
+          <div className="flex gap-2 mt-6">
+            <button
+              onClick={handleSave}
+              disabled={saving || success}
+              className="btn-primary flex-1"
+            >
+              {uploading
+                ? "Uploading photo..."
+                : saving
+                  ? "Saving..."
+                  : success
+                    ? "Saved!"
+                    : editData
+                      ? "Save changes"
+                      : "Save restaurant"}
+            </button>
+            {editData && editData.visibility !== "archived" && (
+              <button
+                onClick={handleDeleteClick}
+                disabled={saving || success}
+                className="btn-outline !border-accent !text-accent hover:!bg-accent hover:!text-white"
+              >
+                Archive
+              </button>
+            )}
+            <button onClick={onClose} className="btn-outline">
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1167,6 +1245,22 @@ export default function AddModal({
           cancelText="Cancel"
           onConfirm={handleDeleteConfirm}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+
+      {/* Chain Cascade Confirmation Modal */}
+      {pendingCascade && (
+        <ConfirmModal
+          title="Merge chain?"
+          message={`"${pendingCascade.target.name}" is already linked to ${pendingCascade.extraCount} other location${pendingCascade.extraCount === 1 ? "" : "s"}. Linking will pull all of them into this chain and they will start sharing menu items, orders, occasions, food tags, and visibility with this location.`}
+          confirmText="Merge"
+          cancelText="Cancel"
+          onConfirm={() => {
+            const target = pendingCascade.target;
+            setPendingCascade(null);
+            performLink(target);
+          }}
+          onCancel={() => setPendingCascade(null)}
         />
       )}
     </div>

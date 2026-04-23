@@ -459,7 +459,8 @@ export default function OrderModal({
     if (details.size) parts.push(details.size);
     if (details.temperature) parts.push(details.temperature);
     if (details.milk_type) parts.push(details.milk_type + " milk");
-    if (details.shots) parts.push(`${details.shots} shot${details.shots > 1 ? "s" : ""}`);
+    if (details.shots)
+      parts.push(`${details.shots} shot${details.shots > 1 ? "s" : ""}`);
     return parts.join(" · ");
   }
 
@@ -506,7 +507,7 @@ export default function OrderModal({
   return (
     <div
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      className="fixed inset-0 bg-black/55 z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-txt/20 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
     >
       <div className="bg-bg border-2 border-txt p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <div className="sticky top-0 bg-bg z-20 -mx-6 -mt-6 px-6 pt-6 pb-3 mb-3 flex items-start justify-between">
@@ -626,104 +627,106 @@ export default function OrderModal({
 
         {/* Menu item search/select */}
         {!lockedToPast && (
-        <div ref={dropdownRef} className="mb-4 relative">
-          <label className={labelCls}>Menu item</label>
-          <input
-            value={menuSearch}
-            onChange={(e) => {
-              setMenuSearch(e.target.value);
-              setSelectedItem(null);
-              setShowDropdown(true);
-              setHighlightIdx(-1);
-            }}
-            onFocus={() => setShowDropdown(true)}
-            onKeyDown={(e) => {
-              const items = filteredItems;
-              const offset = showCreateNew ? 1 : 0;
-              const total = items.length + offset;
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setHighlightIdx((prev) => (prev < total - 1 ? prev + 1 : prev));
-              } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setHighlightIdx((prev) => (prev > 0 ? prev - 1 : -1));
-              } else if (e.key === "Enter") {
-                e.preventDefault();
-                if (showCreateNew && highlightIdx === 0) {
-                  // "Create new" selected — just close dropdown, use typed name
-                  setShowDropdown(false);
-                  setHighlightIdx(-1);
-                } else if (
-                  highlightIdx >= offset &&
-                  items[highlightIdx - offset]
-                ) {
-                  selectMenuItem(items[highlightIdx - offset]);
-                } else {
-                  setShowDropdown(false);
-                }
-              } else if (e.key === "Escape") {
-                setShowDropdown(false);
-              }
-            }}
-            placeholder="Search or type a new item..."
-            className="input-base"
-            autoComplete="off"
-          />
-          {showDropdown && (filteredItems.length > 0 || showCreateNew) && (
-            <ul className="absolute top-full left-0 right-0 z-10 bg-bg border-[1.5px] border-brd border-t-0 max-h-[200px] overflow-y-auto list-none m-0 p-0">
-              {showCreateNew && (
-                <li
-                  onMouseDown={() => {
+          <div ref={dropdownRef} className="mb-4 relative">
+            <label className={labelCls}>Menu item</label>
+            <input
+              value={menuSearch}
+              onChange={(e) => {
+                setMenuSearch(e.target.value);
+                setSelectedItem(null);
+                setShowDropdown(true);
+                setHighlightIdx(-1);
+              }}
+              onFocus={() => setShowDropdown(true)}
+              onKeyDown={(e) => {
+                const items = filteredItems;
+                const offset = showCreateNew ? 1 : 0;
+                const total = items.length + offset;
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setHighlightIdx((prev) =>
+                    prev < total - 1 ? prev + 1 : prev,
+                  );
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setHighlightIdx((prev) => (prev > 0 ? prev - 1 : -1));
+                } else if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (showCreateNew && highlightIdx === 0) {
+                    // "Create new" selected — just close dropdown, use typed name
                     setShowDropdown(false);
                     setHighlightIdx(-1);
-                  }}
-                  className={`py-2 px-3 text-sm cursor-pointer text-accent font-medium font-body ${filteredItems.length > 0 ? "border-b border-brd" : ""} ${highlightIdx === 0 ? "bg-bg2" : ""}`}
-                >
-                  Create &ldquo;{menuSearch.trim()}&rdquo;
-                </li>
-              )}
-              {filteredItems.map((item, i) => {
-                const idx = i + (showCreateNew ? 1 : 0);
-                return (
+                  } else if (
+                    highlightIdx >= offset &&
+                    items[highlightIdx - offset]
+                  ) {
+                    selectMenuItem(items[highlightIdx - offset]);
+                  } else {
+                    setShowDropdown(false);
+                  }
+                } else if (e.key === "Escape") {
+                  setShowDropdown(false);
+                }
+              }}
+              placeholder="Search or type a new item..."
+              className="input-base"
+              autoComplete="off"
+            />
+            {showDropdown && (filteredItems.length > 0 || showCreateNew) && (
+              <ul className="absolute top-full left-0 right-0 z-10 bg-bg border-[1.5px] border-brd border-t-0 max-h-[200px] overflow-y-auto list-none m-0 p-0">
+                {showCreateNew && (
                   <li
-                    key={item.id}
-                    onMouseDown={() => selectMenuItem(item)}
-                    className={`py-2 px-3 text-sm cursor-pointer font-body text-txt transition-colors duration-75 hover:bg-bg2 ${idx === highlightIdx ? "bg-bg2" : "bg-transparent"}`}
+                    onMouseDown={() => {
+                      setShowDropdown(false);
+                      setHighlightIdx(-1);
+                    }}
+                    className={`py-2 px-3 text-sm cursor-pointer text-accent font-medium font-body ${filteredItems.length > 0 ? "border-b border-brd" : ""} ${highlightIdx === 0 ? "bg-bg2" : ""}`}
                   >
-                    <span>{item.name}</span>
-                    {item.category && (
-                      <span className="ml-2 text-xs text-txt2">
-                        {item.category}
-                      </span>
-                    )}
+                    Create &ldquo;{menuSearch.trim()}&rdquo;
                   </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+                )}
+                {filteredItems.map((item, i) => {
+                  const idx = i + (showCreateNew ? 1 : 0);
+                  return (
+                    <li
+                      key={item.id}
+                      onMouseDown={() => selectMenuItem(item)}
+                      className={`py-2 px-3 text-sm cursor-pointer font-body text-txt transition-colors duration-75 hover:bg-bg2 ${idx === highlightIdx ? "bg-bg2" : "bg-transparent"}`}
+                    >
+                      <span>{item.name}</span>
+                      {item.category && (
+                        <span className="ml-2 text-xs text-txt2">
+                          {item.category}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         )}
 
         {/* Category */}
         {!lockedToPast && (
-        <div className="mb-4">
-          <label className={labelCls}>Category</label>
-          <div className="flex gap-2">
-            {CATEGORIES.map((c) => (
-              <button
-                key={c}
-                onClick={() => setSelectedCategory(c)}
-                className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] capitalize ${
-                  selectedCategory === c
-                    ? "bg-txt text-bg border-txt"
-                    : "bg-transparent text-txt2 border-brd"
-                }`}
-              >
-                {c}
-              </button>
-            ))}
+          <div className="mb-4">
+            <label className={labelCls}>Category</label>
+            <div className="flex gap-2">
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setSelectedCategory(c)}
+                  className={`flex-1 p-2 text-sm font-medium border-[1.5px] cursor-pointer font-body rounded-none transition-all duration-[0.12s] capitalize ${
+                    selectedCategory === c
+                      ? "bg-txt text-bg border-txt"
+                      : "bg-transparent text-txt2 border-brd"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
         )}
 
         {/* Date */}
@@ -1067,10 +1070,7 @@ export default function OrderModal({
                     ? "Update order"
                     : "Save order"}
           </button>
-          <button
-            onClick={onClose}
-            className="btn-outline"
-          >
+          <button onClick={onClose} className="btn-outline">
             Cancel
           </button>
         </div>
