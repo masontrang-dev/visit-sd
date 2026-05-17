@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useRouter } from "next/navigation";
 import {
@@ -15,10 +16,18 @@ import {
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/Toast";
-import AddModal from "@/components/AddModal";
-import OrderModal, { type OrderSavedPayload } from "@/components/OrderModal";
+import type { OrderSavedPayload } from "@/components/OrderModal";
 import ConfirmModal from "@/components/ConfirmModal";
-import CheckInModal from "@/components/CheckInModal";
+
+const AddModal = dynamic(() => import("@/components/AddModal"), {
+  ssr: false,
+});
+const OrderModal = dynamic(() => import("@/components/OrderModal"), {
+  ssr: false,
+});
+const CheckInModal = dynamic(() => import("@/components/CheckInModal"), {
+  ssr: false,
+});
 import CuratorRatingControl from "@/components/CuratorRatingControl";
 import CuratorRatingPanel, {
   type CuratorProfile,
@@ -72,9 +81,13 @@ function Chevron({
 
 type Props = {
   params: Promise<{ id: string }>;
+  initialRestaurant?: Restaurant;
 };
 
-export default function RestaurantDetailClient({ params }: Props) {
+export default function RestaurantDetailClient({
+  params,
+  initialRestaurant,
+}: Props) {
   const router = useRouter();
   const {
     isAdmin,
@@ -85,9 +98,11 @@ export default function RestaurantDetailClient({ params }: Props) {
     isLoading: authLoading,
   } = useAuth();
   const { toast } = useToast();
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(
+    initialRestaurant ?? null,
+  );
   const [visits, setVisits] = useState<RestaurantVisit[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialRestaurant);
   const [error, setError] = useState<string | null>(null);
   const [visitingId, setVisitingId] = useState<number | null>(null);
   const [, setDeletingId] = useState<number | null>(null);
@@ -98,6 +113,10 @@ export default function RestaurantDetailClient({ params }: Props) {
   const [, setSaveError] = useState("");
   const [cuisines, setCuisines] = useState<string[]>([]);
   const [existingFoodTags, setExistingFoodTags] = useState<string[]>([]);
+  // Tracks whether the heavy food_tags dropdown payload has been loaded.
+  // Lazy-loaded the first time the edit modal opens so public visitors
+  // never pay the cost.
+  const [foodTagsLoaded, setFoodTagsLoaded] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemOrders, setItemOrders] = useState<ItemOrder[]>([]);
   const [chainRestaurantIds, setChainRestaurantIds] = useState<number[]>([]);
@@ -150,6 +169,9 @@ export default function RestaurantDetailClient({ params }: Props) {
   const [isScrolled, setIsScrolled] = useState(false);
   const hasScrolled = useRef(false);
   const stickySentinelRef = useRef<HTMLDivElement>(null);
+  // Consumed once on first fetchData run so subsequent refreshKey-driven
+  // refetches still hit the network for fresh restaurant data.
+  const seedConsumedRef = useRef(false);
 
   const cuisineColor = useMemo(() => {
     if (!restaurant?.cuisine || cuisines.length === 0) return CUISINE_COLORS[0];
@@ -206,134 +228,157 @@ export default function RestaurantDetailClient({ params }: Props) {
   }, [authLoading, isAdmin, restaurant, router]);
 
   useEffect(() => {
+    let mounted = true;
+
+    // Fire admin-role lookups (used to render delete permissions) in parallel
+    // with the restaurant data. They don't gate the main render path.
+    async function loadAdminRoleNames() {
+      if (!isAdmin || isSuperuser) return;
+      const { data: roles } = (await supabase
+        .from("user_roles")
+        .select("user_id, role")
+        .in("role", ["superuser", "admin"])) as {
+        data: { user_id: string; role: string }[] | null;
+      };
+      if (!mounted || !roles) return;
+      const superuserIds = roles
+        .filter((r) => r.role === "superuser")
+        .map((r) => r.user_id);
+      const adminIds = roles
+        .filter((r) => r.role === "admin")
+        .map((r) => r.user_id);
+
+      const { data: profiles } = (await supabase
+        .from("user_profiles")
+        .select("user_id, display_name")
+        .in("user_id", [...superuserIds, ...adminIds])) as {
+        data: { user_id: string; display_name: string | null }[] | null;
+      };
+      if (!mounted || !profiles) return;
+      const superuserProfiles = profiles.filter((p) =>
+        superuserIds.includes(p.user_id),
+      );
+      const adminProfiles = profiles.filter((p) =>
+        adminIds.includes(p.user_id),
+      );
+      setSuperuserNames(
+        superuserProfiles
+          .map((p) => p.display_name)
+          .filter((n): n is string => Boolean(n)),
+      );
+      setAdminNames(
+        adminProfiles
+          .map((p) => p.display_name)
+          .filter((n): n is string => Boolean(n)),
+      );
+    }
+
     async function fetchData() {
       const resolvedParams = await params;
       const id = parseInt(resolvedParams.id, 10);
       if (isNaN(id)) {
+        if (!mounted) return;
         setError("Invalid restaurant ID");
         setLoading(false);
         return;
       }
 
-      // Fetch superuser and admin names if admin (to determine delete permissions)
-      if (isAdmin && !isSuperuser) {
-        const { data: roles } = (await supabase
-          .from("user_roles")
-          .select("user_id, role")
-          .in("role", ["superuser", "admin"])) as {
-          data: { user_id: string; role: string }[] | null;
-        };
+      // Kick admin-role lookup off in parallel — it doesn't gate anything below.
+      const adminRolesPromise = loadAdminRoleNames();
 
-        if (roles) {
-          const superuserIds = roles
-            .filter((r) => r.role === "superuser")
-            .map((r) => r.user_id);
-          const adminIds = roles
-            .filter((r) => r.role === "admin")
-            .map((r) => r.user_id);
+      // Skip the single-row fetch on initial mount when the server seeded
+      // initialRestaurant — that's the whole point of passing it down.
+      // When seeded we already have restaurant + chain_id, so fan out all
+      // remaining queries (chain siblings, visits, menu, orders, ratings)
+      // in parallel from the very first tick.
+      let restaurantData: Restaurant;
+      if (initialRestaurant && !seedConsumedRef.current) {
+        seedConsumedRef.current = true;
+        restaurantData = initialRestaurant;
+      } else {
+        const { data, error: restaurantError } = await supabase
+          .from("restaurants")
+          .select("*")
+          .eq("id", id)
+          .single();
 
-          const { data: profiles } = (await supabase
-            .from("user_profiles")
-            .select("user_id, display_name")
-            .in("user_id", [...superuserIds, ...adminIds])) as {
-            data: { user_id: string; display_name: string | null }[] | null;
-          };
-
-          if (profiles) {
-            const superuserProfiles = profiles.filter((p) =>
-              superuserIds.includes(p.user_id),
-            );
-            const adminProfiles = profiles.filter((p) =>
-              adminIds.includes(p.user_id),
-            );
-
-            setSuperuserNames(
-              superuserProfiles
-                .map((p) => p.display_name)
-                .filter((n): n is string => Boolean(n)),
-            );
-            setAdminNames(
-              adminProfiles
-                .map((p) => p.display_name)
-                .filter((n): n is string => Boolean(n)),
-            );
-          }
+        if (!mounted) return;
+        if (restaurantError || !data) {
+          setError("Restaurant not found");
+          setLoading(false);
+          return;
         }
-      }
-
-      // Fetch restaurant data first for fast initial render
-      const { data: restaurantData, error: restaurantError } = await supabase
-        .from("restaurants")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (restaurantError || !restaurantData) {
-        setError("Restaurant not found");
+        restaurantData = data;
+        setRestaurant(restaurantData);
         setLoading(false);
-        return;
       }
 
-      // Show restaurant immediately, then load the rest in parallel
-      setRestaurant(restaurantData);
-      setLoading(false);
-
-      // If this restaurant is part of a chain, merge menu_items and item_orders
-      // from all sibling locations. Visits/checkins stay location-specific.
-      // Storefront and hero photos stay per-location (photo_url /
-      // storefront_photo_url are not shared across the chain).
-      let nextChainIds: number[] = [id];
-      if (restaurantData.chain_id != null) {
+      // Chain siblings: only ever needed when chain_id is set. We need the
+      // sibling list before menu/orders queries (they filter by chain ids),
+      // but with the seeded restaurant we know chain_id immediately so this
+      // is the only remaining sequential hop.
+      async function loadChainSiblings(): Promise<number[]> {
+        if (restaurantData.chain_id == null) return [id];
         const { data: siblings } = await supabase
           .from("restaurants")
           .select("id")
           .eq("chain_id", restaurantData.chain_id);
         if (siblings && siblings.length > 0) {
           const typed = siblings as { id: number }[];
-          nextChainIds = Array.from(new Set([id, ...typed.map((s) => s.id)]));
+          return Array.from(new Set([id, ...typed.map((s) => s.id)]));
         }
+        return [id];
       }
+      const chainSiblingsPromise = loadChainSiblings();
+
+      // Visits are restaurant-specific (not chain-merged), so fire that off
+      // immediately alongside the sibling lookup.
+      const visitsPromise = supabase
+        .from("restaurant_visits")
+        .select("*")
+        .eq("restaurant_id", id)
+        .order("visited_at", { ascending: false });
+
+      const nextChainIds = await chainSiblingsPromise;
+      if (!mounted) return;
       setChainRestaurantIds(nextChainIds);
       const chainRestaurantIds = nextChainIds;
 
       const [visitsResult, menuResult, ordersResult, cuisinesResult] =
         await Promise.all([
-          supabase
-            .from("restaurant_visits")
-            .select("*")
-            .eq("restaurant_id", id)
-            .order("visited_at", { ascending: false }),
+          visitsPromise,
           supabase
             .from("menu_items")
             .select("*")
             .in("restaurant_id", chainRestaurantIds)
             .order("name"),
+          // Explicit field list (omits created_at) — drink_details stays
+          // because formatDrinkSummary renders it under each order card.
           supabase
             .from("item_orders")
-            .select("*")
+            .select(
+              "id, menu_item_id, restaurant_id, ordered_at, ordered_by, notes, photo_url, drink_details",
+            )
             .in("restaurant_id", chainRestaurantIds)
             .order("ordered_at", { ascending: false }),
-          supabase.from("restaurants").select("cuisine, food_tags"),
+          // Lightweight cuisines-only query so the page header's accent
+          // color (cuisineColor useMemo) matches the home page's color
+          // map without forcing the heavy food_tags payload on every visitor.
+          supabase.from("restaurants").select("cuisine"),
         ]);
 
+      if (!mounted) return;
       setVisits(visitsResult.data ?? []);
       setMenuItems(menuResult.data ?? []);
       setItemOrders(ordersResult.data ?? []);
-
-      if (cuisinesResult.data) {
-        const rows = cuisinesResult.data as {
-          cuisine: string | null;
-          food_tags: string[] | null;
-        }[];
-        const uniqueCuisines = Array.from(
-          new Set(rows.map((r) => r.cuisine).filter(Boolean)),
-        ).sort();
-        setCuisines(uniqueCuisines as string[]);
-        const uniqueFoodTags = Array.from(
-          new Set(rows.flatMap((r) => r.food_tags ?? [])),
-        ).sort();
-        setExistingFoodTags(uniqueFoodTags);
-      }
+      const sortedCuisines = Array.from(
+        new Set(
+          (cuisinesResult.data ?? [])
+            .map((r: { cuisine: string | null }) => r.cuisine)
+            .filter(Boolean),
+        ),
+      ).sort() as string[];
+      setCuisines(sortedCuisines);
 
       await Promise.all([
         loadRecommendationsAndNames(
@@ -341,10 +386,37 @@ export default function RestaurantDetailClient({ params }: Props) {
           ordersResult.data ?? [],
         ),
         loadCuratorRatings(chainRestaurantIds),
+        adminRolesPromise,
       ]);
     }
     fetchData();
+
+    return () => {
+      mounted = false;
+    };
   }, [params, refreshKey]);
+
+  // Lazy-load the food-tags dropdown options the first time the edit modal
+  // opens. Public visitors never trigger this; admins pay it on demand. The
+  // cuisine list is loaded eagerly in fetchData because the page header's
+  // accent color depends on it.
+  useEffect(() => {
+    if (!showEditModal || foodTagsLoaded) return;
+    let active = true;
+    (async () => {
+      const { data } = await supabase.from("restaurants").select("food_tags");
+      if (!active || !data) return;
+      const rows = data as { food_tags: string[] | null }[];
+      const uniqueFoodTags = Array.from(
+        new Set(rows.flatMap((r) => r.food_tags ?? [])),
+      ).sort();
+      setExistingFoodTags(uniqueFoodTags);
+      setFoodTagsLoaded(true);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [showEditModal, foodTagsLoaded]);
 
   async function loadCuratorRatings(restaurantIds: number[]) {
     const { data: ratingsData } = await supabase
@@ -526,6 +598,28 @@ export default function RestaurantDetailClient({ params }: Props) {
     setVisitingId(restaurant.id);
     setShowCheckInModal(false);
 
+    // Optimistic UI: insert a placeholder visit + bump last_visited immediately
+    // so the check-in count and "last visited" line update before the network
+    // round-trip. Negative id guarantees no collision with real rows; we replace
+    // the whole array with the canonical fetch after the insert succeeds.
+    const previousVisits = visits;
+    const previousLastVisited = restaurant.last_visited;
+    const optimisticVisit: RestaurantVisit = {
+      id: -Date.now(),
+      restaurant_id: restaurant.id,
+      visited_by: visitedBy,
+      visited_at: visitDate,
+      note: note || null,
+      user_id: user?.id ?? null,
+    };
+    setVisits([optimisticVisit, ...previousVisits]);
+    // Only advance last_visited optimistically when the new visit is more
+    // recent than the existing one — avoids regressing the date if the user
+    // back-dates a check-in.
+    if (!previousLastVisited || visitDate > previousLastVisited) {
+      setRestaurant({ ...restaurant, last_visited: visitDate });
+    }
+
     const { error: insertError } = await supabase
       .from("restaurant_visits")
       .insert([
@@ -539,6 +633,9 @@ export default function RestaurantDetailClient({ params }: Props) {
       ]);
 
     if (insertError) {
+      // Rollback the optimistic update so the UI doesn't lie to the user.
+      setVisits(previousVisits);
+      setRestaurant({ ...restaurant, last_visited: previousLastVisited });
       // The 24h cooldown is now enforced in Postgres; surface that clearly
       // rather than leaving the user wondering why the button failed.
       const msg = /row-level security/i.test(insertError.message)
@@ -570,6 +667,8 @@ export default function RestaurantDetailClient({ params }: Props) {
       .eq("id", restaurant.id)
       .single();
 
+    // Reconcile with server state — replaces the optimistic placeholder with
+    // the canonical row (real id, server-validated fields).
     setVisits(visitsData ?? []);
     if (restaurantData) setRestaurant(restaurantData);
     setVisitingId(null);
@@ -635,6 +734,23 @@ export default function RestaurantDetailClient({ params }: Props) {
       // siblings. Refetch so menu/orders/chainIds stay consistent.
       setRefreshKey((k) => k + 1);
     }
+
+    // Bust the ISR cache so the static `/restaurant/[id]` HTML reflects this
+    // edit immediately instead of waiting up to an hour for revalidation.
+    // Also refresh chain siblings since AddModal may have cascaded edits.
+    // Fire-and-forget: the local state is already up-to-date for this user;
+    // revalidation only affects the next visitor's first byte.
+    const idsToRevalidate = Array.from(
+      new Set([restaurant.id, ...chainRestaurantIds]),
+    );
+    fetch("/api/admin/revalidate-restaurant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: idsToRevalidate }),
+    }).catch((err) => {
+      console.error("Failed to revalidate restaurant page:", err);
+    });
+
     setShowEditModal(false);
     return true;
   }
@@ -651,7 +767,9 @@ export default function RestaurantDetailClient({ params }: Props) {
         .order("name"),
       supabase
         .from("item_orders")
-        .select("*")
+        .select(
+          "id, menu_item_id, restaurant_id, ordered_at, ordered_by, notes, photo_url, drink_details",
+        )
         .eq("restaurant_id", restaurant.id)
         .order("ordered_at", { ascending: false }),
     ]);

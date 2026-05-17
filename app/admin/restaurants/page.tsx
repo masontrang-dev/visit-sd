@@ -165,6 +165,15 @@ export default function AdminRestaurantsPage() {
         kind: "success",
         text: `Updated ${ids.length} restaurant${ids.length === 1 ? "" : "s"} to "${visibilityTarget}".`,
       });
+      // Bust ISR cache: visibility changes flip whether the row should be
+      // served as static HTML, so the stale page must be revalidated now.
+      fetch("/api/admin/revalidate-restaurant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      }).catch((err) => {
+        console.error("Failed to revalidate restaurant pages:", err);
+      });
       await load();
     }
     setWorking(false);

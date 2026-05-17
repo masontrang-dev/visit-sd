@@ -5,6 +5,8 @@ import { AuthProvider } from "@/lib/auth-context";
 import ToastProvider from "@/components/Toast";
 import PageViewTracker from "@/components/PageViewTracker";
 import WelcomeModal from "@/components/WelcomeModal";
+import WebVitals from "@/components/WebVitals";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const bebasNeue = Bebas_Neue({
   weight: "400",
@@ -58,9 +60,16 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   return (
     <html lang="en" className={`${bebasNeue.variable} ${dmSans.variable}`} suppressHydrationWarning>
       <head>
+        {supabaseUrl ? (
+          <link rel="preconnect" href={supabaseUrl} crossOrigin="anonymous" />
+        ) : (
+          <link rel="dns-prefetch" href="https://supabase.co" />
+        )}
+        <link rel="dns-prefetch" href="https://places.googleapis.com" />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var d=document.documentElement;var t=localStorage.getItem("theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){d.classList.add("dark")}else{d.classList.remove("dark")}}catch(e){}})();`,
@@ -68,6 +77,8 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <WebVitals />
+        <SpeedInsights />
         <AuthProvider>
           <ToastProvider>
             <PageViewTracker />

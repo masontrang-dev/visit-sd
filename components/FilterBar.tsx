@@ -17,9 +17,12 @@ const VISIBILITY_OPTIONS: VisibilityFilter[] = [
 
 const PRICE_OPTIONS = ["$", "$$", "$$$", "$$$$"] as const;
 
+const CURATOR_RATING_OPTIONS = [1, 2, 3, 4, 5] as const;
+const RATING_STARS = ["", "★", "★★", "★★★", "★★★★", "★★★★★"] as const;
+
 const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: "default", label: "Curator picks" },
-  { value: "rating", label: "Highest rated" },
+  { value: "rating", label: "Highest rated (Google)" },
   { value: "recently-visited", label: "Recently visited" },
   { value: "recently-added", label: "Recently added" },
   { value: "near-me", label: "Near me" },
@@ -49,6 +52,9 @@ type Props = {
   onFoodTagChange?: (f: string[]) => void;
   foodTagCounts?: Record<string, number>;
   priceCounts?: Record<string, number>;
+  activeCuratorRatings?: number[];
+  onCuratorRatingChange?: (ratings: number[]) => void;
+  curatorRatingCounts?: Record<number, number>;
   onAdd?: () => void;
   viewMode?: "list" | "map";
   onViewModeChange?: (mode: "list" | "map") => void;
@@ -96,6 +102,9 @@ export default function FilterBar({
   onFoodTagChange,
   foodTagCounts,
   priceCounts,
+  activeCuratorRatings,
+  onCuratorRatingChange,
+  curatorRatingCounts,
   onAdd,
   viewMode,
   onViewModeChange,
@@ -120,7 +129,14 @@ export default function FilterBar({
   resultCount,
 }: Props) {
   const [activePanel, setActivePanel] = useState<
-    "cuisine" | "area" | "occasion" | "food-tag" | "price" | "sort" | null
+    | "cuisine"
+    | "area"
+    | "occasion"
+    | "food-tag"
+    | "price"
+    | "curator-rating"
+    | "sort"
+    | null
   >(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetView, setSheetView] = useState<"filters" | "sort">("filters");
@@ -225,6 +241,7 @@ export default function FilterBar({
   const hasOccasionFilter = (activeOccasions ?? []).length > 0;
   const hasFoodTagFilter = (activeFoodTags ?? []).length > 0;
   const hasPriceFilter = (activePrices ?? []).length > 0;
+  const hasCuratorRatingFilter = (activeCuratorRatings ?? []).length > 0;
   const panelOpen = activePanel !== null;
   const hasAnyFilter =
     hasCuisineFilter ||
@@ -232,6 +249,7 @@ export default function FilterBar({
     hasOccasionFilter ||
     hasFoodTagFilter ||
     hasPriceFilter ||
+    hasCuratorRatingFilter ||
     mustTryFilter ||
     openNowFilter ||
     (showWishlist && wishlistFilter);
@@ -241,6 +259,7 @@ export default function FilterBar({
     (activeOccasions?.length ?? 0) +
     (activeFoodTags?.length ?? 0) +
     (activePrices?.length ?? 0) +
+    (activeCuratorRatings?.length ?? 0) +
     (mustTryFilter ? 1 : 0) +
     (openNowFilter ? 1 : 0) +
     (showWishlist && wishlistFilter ? 1 : 0);
@@ -251,6 +270,7 @@ export default function FilterBar({
     if (onOccasionChange) onOccasionChange([]);
     if (onFoodTagChange) onFoodTagChange([]);
     if (onPriceChange) onPriceChange([]);
+    if (onCuratorRatingChange) onCuratorRatingChange([]);
     if (onMustTryFilterChange) onMustTryFilterChange(false);
     if (onOpenNowFilterChange) onOpenNowFilterChange(false);
     if (onWishlistFilterChange) onWishlistFilterChange(false);
@@ -586,6 +606,53 @@ export default function FilterBar({
     );
   }
 
+  function renderCuratorRatingChips() {
+    if (!onCuratorRatingChange) return null;
+    const active = activeCuratorRatings ?? [];
+    const showsJournal = active.includes(1) || active.includes(2);
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-1.5 flex-wrap items-center">
+          <button
+            className={!hasCuratorRatingFilter ? "chip-active" : "chip"}
+            onClick={() => onCuratorRatingChange([])}
+          >
+            All
+          </button>
+          {CURATOR_RATING_OPTIONS.map((r) => {
+            const count = curatorRatingCounts?.[r] ?? 0;
+            const empty = curatorRatingCounts && count === 0;
+            return (
+              <button
+                key={r}
+                disabled={empty}
+                className={`${
+                  active.includes(r) ? "chip-active" : "chip"
+                } ${empty ? "opacity-40 cursor-not-allowed" : ""}`}
+                onClick={() => {
+                  const next = active.includes(r)
+                    ? active.filter((x) => x !== r)
+                    : [...active, r];
+                  onCuratorRatingChange(next);
+                }}
+              >
+                {RATING_STARS[r]}
+                {curatorRatingCounts && (
+                  <span className="ml-1 opacity-60">({count})</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {showsJournal && (
+          <p className="text-2xs text-txt2 italic">
+            Includes journal entries (spots we wouldn&apos;t revisit)
+          </p>
+        )}
+      </div>
+    );
+  }
+
   function renderFoodTagChips() {
     if (!foodTags || !onFoodTagChange) return null;
     return (
@@ -709,6 +776,20 @@ export default function FilterBar({
             <span className="text-xs">✕</span>
           </button>
         ))}
+        {(activeCuratorRatings ?? []).map((rating) => (
+          <button
+            key={`pill-curator-rating-${rating}`}
+            onClick={() =>
+              onCuratorRatingChange?.(
+                (activeCuratorRatings ?? []).filter((r) => r !== rating),
+              )
+            }
+            className="chip !border-txt !bg-txt !text-bg flex items-center gap-1.5"
+          >
+            {RATING_STARS[rating]} Curator
+            <span className="text-xs">✕</span>
+          </button>
+        ))}
         {mustTryFilter && onMustTryFilterChange && (
           <button
             key="pill-must-try"
@@ -813,7 +894,7 @@ export default function FilterBar({
 
       {/* Mobile: horizontally scrollable row of active filter pills */}
       {hasAnyFilter && (
-        <div className="md:hidden flex gap-1.5 px-6 pb-3 overflow-x-auto scrollbar-hide">
+        <div className="md:hidden flex gap-1.5 px-6 pb-3 overflow-x-auto overscroll-x-contain scrollbar-hide">
           {renderActivePills()}
         </div>
       )}
@@ -935,6 +1016,24 @@ export default function FilterBar({
           </button>
         )}
 
+        {onCuratorRatingChange && !hasCuratorRatingFilter && (
+          <button
+            className={`chip flex items-center gap-1.5 ${activePanel === "curator-rating" ? "!border-txt !bg-txt !text-bg" : ""}`}
+            onClick={() =>
+              setActivePanel(
+                activePanel === "curator-rating" ? null : "curator-rating",
+              )
+            }
+          >
+            Rating
+            <span
+              className={`text-2xs transition-transform duration-[0.12s] ${activePanel === "curator-rating" ? "rotate-180" : ""}`}
+            >
+              ▾
+            </span>
+          </button>
+        )}
+
         {hasAnyFilter && (
           <button
             onClick={handleClearAll}
@@ -964,7 +1063,9 @@ export default function FilterBar({
                         ? "Food tags"
                         : activePanel === "sort"
                           ? "Sort"
-                          : "Price"}
+                          : activePanel === "curator-rating"
+                            ? "Curator Rating"
+                            : "Price"}
               </span>
               <button
                 onClick={() => setActivePanel(null)}
@@ -979,6 +1080,7 @@ export default function FilterBar({
             {activePanel === "occasion" && renderOccasionChips()}
             {activePanel === "food-tag" && renderFoodTagChips()}
             {activePanel === "price" && renderPriceChips()}
+            {activePanel === "curator-rating" && renderCuratorRatingChips()}
             {activePanel === "sort" && renderSortList()}
           </div>
         </div>
@@ -1058,120 +1160,125 @@ export default function FilterBar({
               </>
             ) : (
               <>
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-              {onViewModeChange && (
-                <section className="flex gap-2 items-center flex-wrap">
-                  {renderViewToggle()}
-                </section>
-              )}
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+                  {onViewModeChange && (
+                    <section className="flex gap-2 items-center flex-wrap">
+                      {renderViewToggle()}
+                    </section>
+                  )}
 
-              {viewMode === "list" && onImageDisplayModeChange && (
-                <section className="flex gap-2 items-center flex-wrap">
-                  {renderImageMode()}
-                </section>
-              )}
+                  {viewMode === "list" && onImageDisplayModeChange && (
+                    <section className="flex gap-2 items-center flex-wrap">
+                      {renderImageMode()}
+                    </section>
+                  )}
 
-              {onSortModeChange && (
-                <section>
-                  <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
-                    Sort
-                  </span>
-                  {renderSortList()}
-                </section>
-              )}
+                  {onSortModeChange && (
+                    <section>
+                      <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                        Sort
+                      </span>
+                      {renderSortList()}
+                    </section>
+                  )}
 
-              {(onMustTryFilterChange ||
-                onOpenNowFilterChange ||
-                (showWishlist && onWishlistFilterChange)) && (
-                <section>
-                  <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
-                    Highlights
-                  </span>
-                  <div className="flex gap-2 flex-wrap">
-                    {renderMustTry()}
-                    {renderOpenNow()}
-                    {renderWishlist()}
-                  </div>
-                </section>
-              )}
+                  {(onMustTryFilterChange ||
+                    onOpenNowFilterChange ||
+                    (showWishlist && onWishlistFilterChange)) && (
+                    <section>
+                      <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                        Highlights
+                      </span>
+                      <div className="flex gap-2 flex-wrap">
+                        {renderMustTry()}
+                        {renderOpenNow()}
+                        {renderWishlist()}
+                      </div>
+                    </section>
+                  )}
 
-              {isAdminView && onVisibilityChange && (
-                <section className="flex gap-2 items-center flex-wrap">
-                  {renderVisibility()}
-                </section>
-              )}
+                  {isAdminView && onVisibilityChange && (
+                    <section className="flex gap-2 items-center flex-wrap">
+                      {renderVisibility()}
+                    </section>
+                  )}
 
-              {cuisines.length > 0 && (
-                <section>
-                  <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
-                    Cuisine
-                  </span>
-                  {renderCuisineChips()}
-                </section>
-              )}
+                  {cuisines.length > 0 && (
+                    <section>
+                      <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                        Cuisine
+                      </span>
+                      {renderCuisineChips()}
+                    </section>
+                  )}
 
-              {neighborhoods &&
-                neighborhoods.length > 0 &&
-                onNeighborhoodChange && (
-                  <section>
-                    <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
-                      Area
-                    </span>
-                    {renderAreaChips()}
-                  </section>
-                )}
+                  {neighborhoods &&
+                    neighborhoods.length > 0 &&
+                    onNeighborhoodChange && (
+                      <section>
+                        <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                          Area
+                        </span>
+                        {renderAreaChips()}
+                      </section>
+                    )}
 
-              {occasions &&
-                occasions.length > 0 &&
-                onOccasionChange && (
-                  <section>
-                    <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
-                      Occasion
-                    </span>
-                    {renderOccasionChips()}
-                  </section>
-                )}
+                  {occasions && occasions.length > 0 && onOccasionChange && (
+                    <section>
+                      <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                        Occasion
+                      </span>
+                      {renderOccasionChips()}
+                    </section>
+                  )}
 
-              {foodTags &&
-                foodTags.length > 0 &&
-                onFoodTagChange && (
-                  <section>
-                    <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
-                      Food tags
-                    </span>
-                    {renderFoodTagChips()}
-                  </section>
-                )}
+                  {foodTags && foodTags.length > 0 && onFoodTagChange && (
+                    <section>
+                      <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                        Food tags
+                      </span>
+                      {renderFoodTagChips()}
+                    </section>
+                  )}
 
-              {onPriceChange && (
-                <section>
-                  <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
-                    Price
-                  </span>
-                  {renderPriceChips()}
-                </section>
-              )}
-            </div>
+                  {onPriceChange && (
+                    <section>
+                      <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                        Price
+                      </span>
+                      {renderPriceChips()}
+                    </section>
+                  )}
 
-            <div className="flex gap-2 px-6 py-4 border-t-2 border-brd">
-              <button
-                type="button"
-                onClick={handleClearAll}
-                disabled={!hasAnyFilter}
-                className="btn-outline flex-1"
-              >
-                Clear all
-              </button>
-              <button
-                type="button"
-                onClick={closeSheet}
-                className="btn-primary flex-1"
-              >
-                {hasAnyFilter && resultCount != null
-                  ? `Show results (${resultCount})`
-                  : "Done"}
-              </button>
-            </div>
+                  {onCuratorRatingChange && (
+                    <section>
+                      <span className="text-2xs font-medium text-txt2 uppercase tracking-wide block mb-2">
+                        Curator Rating
+                      </span>
+                      {renderCuratorRatingChips()}
+                    </section>
+                  )}
+                </div>
+
+                <div className="flex gap-2 px-6 py-4 border-t-2 border-brd">
+                  <button
+                    type="button"
+                    onClick={handleClearAll}
+                    disabled={!hasAnyFilter}
+                    className="btn-outline flex-1"
+                  >
+                    Clear all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeSheet}
+                    className="btn-primary flex-1"
+                  >
+                    {hasAnyFilter && resultCount != null
+                      ? `Show results (${resultCount})`
+                      : "Done"}
+                  </button>
+                </div>
               </>
             )}
           </div>

@@ -12,6 +12,7 @@
     "@googlemaps/js-api-loader": "^2.0.2",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.43.0",
+    "@vercel/speed-insights": "^2.0.0",
     "@vis.gl/react-google-maps": "^1.8.1",
     "browser-image-compression": "^2.0.2",
     "embla-carousel-react": "^8.6.0",
@@ -20,6 +21,7 @@
     "react-dom": "^19.3.0-canary-da9325b5-20260417"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.6",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^20",
     "@types/react": "^19.2.14",

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import Image from "next/image";
 import useEmblaCarousel from "embla-carousel-react";
 import { formatRecencyTag } from "@/lib/utils";
 import { isSupabaseUrl } from "@/lib/photo";
+import FadeImage from "@/components/FadeImage";
 
 export type RestaurantPhoto = {
   url: string;
@@ -27,6 +27,15 @@ type Props = {
    * breakpoints; pass a smaller value for the detail-page hero so Vercel
    * serves a smaller variant (and Safari decodes fewer pixels into memory). */
   sizes?: string;
+  /** Whether to apply `backdrop-blur-sm` to the recency / open-now badges.
+   * Defaults to true (detail-page hero where the blur visibly mixes with the
+   * underlying photo). Pass false from grid cards — the badge bg is already
+   * ~95% opaque so the blur isn't visible and costs scroll perf. */
+  blurBadges?: boolean;
+  /** Image quality forwarded to next/image. Defaults to next/image's 75. Pass
+   * 65 from grid cards where the thumbnail size makes the difference
+   * imperceptible (10-20% byte savings). The detail hero keeps the default. */
+  quality?: number;
 };
 
 const DEFAULT_SIZES =
@@ -43,6 +52,8 @@ export default function PhotoCarousel({
   cuisineColor,
   onPhotoClick,
   sizes = DEFAULT_SIZES,
+  blurBadges = true,
+  quality,
 }: Props) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: "start",
@@ -128,13 +139,25 @@ export default function PhotoCarousel({
                 (() => {
                   const isLcpCandidate = priority && i === 0;
                   return (
-                    <Image
+                    <FadeImage
                       src={photo.url}
                       alt={photo.itemName ?? ""}
                       fill
                       sizes={sizes}
                       priority={isLcpCandidate}
+                      // `fetchPriority` is a native browser hint that elevates
+                      // the actual network priority of the image fetch.
+                      // `priority` alone only triggers a <link rel=preload>;
+                      // adding `fetchpriority=high` tells the browser to also
+                      // bump TCP/HTTP priority. Only the genuine LCP slide
+                      // gets this — diluting it across multiple images
+                      // defeats the purpose.
+                      fetchPriority={isLcpCandidate ? "high" : undefined}
                       loading={isLcpCandidate ? undefined : "lazy"}
+                      quality={quality}
+                      // Grid cards use the default sizes; pass quality=65 from
+                      // the consumer when the slide is a thumbnail. Detail
+                      // hero (overrides `sizes`) keeps next/image's default.
                       className="object-cover"
                       unoptimized={!isSupabaseUrl(photo.url)}
                       draggable={false}
@@ -179,13 +202,17 @@ export default function PhotoCarousel({
       {/* Top-right: recency, open/closed */}
       <div className="absolute top-2 right-2 flex gap-1.5 flex-wrap justify-end z-[2]">
         {recencyTag && (
-          <span className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80 bg-recency-bg text-recency-txt">
+          <span
+            className={`text-2xs font-medium px-2 py-1 rounded-pill shadow-sm tracking-tight uppercase border-2 border-white/80 bg-recency-bg text-recency-txt ${blurBadges ? "backdrop-blur-sm" : ""}`}
+          >
             {recencyTag.text}
           </span>
         )}
         {openNow !== null && (
           <span
-            className={`text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80 ${
+            className={`text-2xs font-medium px-2 py-1 rounded-pill shadow-sm tracking-tight uppercase border-2 border-white/80 ${
+              blurBadges ? "backdrop-blur-sm " : ""
+            }${
               openNow
                 ? "bg-open-bg text-open-txt"
                 : "bg-closed-bg text-closed-txt"

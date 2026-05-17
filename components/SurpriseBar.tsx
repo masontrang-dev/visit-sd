@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { type Restaurant } from "@/lib/supabase";
+import type { Restaurant } from "@/lib/supabase";
 
 type Props = {
   restaurants: Restaurant[];

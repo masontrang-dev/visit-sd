@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import { useAuth } from "@/lib/auth-context";
 import ConfirmModal from "@/components/ConfirmModal";
-import { type Restaurant } from "@/lib/supabase";
+import type { Restaurant } from "@/lib/supabase";
 import {
   extractCuisineFromTypes,
   extractNeighborhood,

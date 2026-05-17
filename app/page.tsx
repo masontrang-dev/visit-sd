@@ -1,14 +1,52 @@
 "use client";
 
-import { Suspense, useEffect, useState, useRef, useMemo } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+  useCallback,
+  useTransition,
+  useDeferredValue,
+} from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { supabase, type Restaurant } from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar from "@/components/FilterBar";
-import MapView from "@/components/MapView";
 import SurpriseBar from "@/components/SurpriseBar";
-import CheckInModal from "@/components/CheckInModal";
-import AddModal from "@/components/AddModal";
+
+// MapView pulls in @vis.gl/react-google-maps + @googlemaps/js-api-loader and
+// triggers fetches to maps.googleapis.com. Keep it out of the initial bundle —
+// it only mounts once the user opens the map tab (gated by mapEverMounted).
+const MapView = dynamic(() => import("@/components/MapView"), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="relative bg-bg2"
+      style={{ height: "calc(100vh - 200px)" }}
+      aria-hidden="true"
+    >
+      <div
+        className="absolute inset-0 opacity-60"
+        style={{
+          backgroundImage:
+            "linear-gradient(90deg, transparent 0%, var(--bg) 50%, transparent 100%)",
+          backgroundSize: "200% 100%",
+          animation: "shimmer 1.5s ease-in-out infinite",
+        }}
+      />
+    </div>
+  ),
+});
+
+const CheckInModal = dynamic(() => import("@/components/CheckInModal"), {
+  ssr: false,
+});
+const AddModal = dynamic(() => import("@/components/AddModal"), {
+  ssr: false,
+});
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import ActivityFeed from "@/components/ActivityFeed";
@@ -23,6 +61,7 @@ import { useWishlist } from "@/hooks/useWishlist";
 import { success } from "@/lib/haptics";
 import { isCurrentlyOpen } from "@/lib/google-types";
 import { haversineMiles } from "@/lib/distance";
+import { dedupeByChain } from "@/lib/chain-utils";
 
 function SkeletonCard() {
   return (
@@ -139,6 +178,7 @@ function HomeContent() {
     openNowFilter,
     wishlistFilter,
     activePrices,
+    activeCuratorRatings,
     activeVisibility,
     searchQuery,
     debouncedSearch,
@@ -154,12 +194,81 @@ function HomeContent() {
     setOpenNowFilter,
     setWishlistFilter,
     setActivePrices,
+    setActiveCuratorRatings,
     setActiveVisibility,
     setSearchQuery,
     setViewMode,
     setImageDisplayMode,
     setSortMode,
   } = useFilterState();
+
+  // Heavy filter/sort state changes are wrapped in startTransition so the
+  // initial tap/UI feedback (the chip pressed visual) isn't blocked by the
+  // synchronous filter pass over the full restaurant list. Search uses
+  // useDeferredValue below instead, so typing remains immediate.
+  const [isPending, startTransition] = useTransition();
+  const deferredSearchQuery = useDeferredValue(debouncedSearch);
+
+  const onCuisineChange = useCallback(
+    (v: string[]) => {
+      startTransition(() => setActiveCuisines(v));
+    },
+    [setActiveCuisines],
+  );
+  const onNeighborhoodChange = useCallback(
+    (v: string[]) => {
+      startTransition(() => setActiveNeighborhoods(v));
+    },
+    [setActiveNeighborhoods],
+  );
+  const onOccasionChange = useCallback(
+    (v: string[]) => {
+      startTransition(() => setActiveOccasions(v));
+    },
+    [setActiveOccasions],
+  );
+  const onFoodTagChange = useCallback(
+    (v: string[]) => {
+      startTransition(() => setActiveFoodTags(v));
+    },
+    [setActiveFoodTags],
+  );
+  const onPriceChange = useCallback(
+    (v: string[]) => {
+      startTransition(() => setActivePrices(v));
+    },
+    [setActivePrices],
+  );
+  const onCuratorRatingChange = useCallback(
+    (v: number[]) => {
+      startTransition(() => setActiveCuratorRatings(v));
+    },
+    [setActiveCuratorRatings],
+  );
+  const onSortModeChange = useCallback(
+    (v: typeof sortMode) => {
+      startTransition(() => setSortMode(v));
+    },
+    [setSortMode],
+  );
+  const onMustTryFilterChange = useCallback(
+    (v: boolean) => {
+      startTransition(() => setMustTryFilter(v));
+    },
+    [setMustTryFilter],
+  );
+  const onOpenNowFilterChange = useCallback(
+    (v: boolean) => {
+      startTransition(() => setOpenNowFilter(v));
+    },
+    [setOpenNowFilter],
+  );
+  const onWishlistFilterChange = useCallback(
+    (v: boolean) => {
+      startTransition(() => setWishlistFilter(v));
+    },
+    [setWishlistFilter],
+  );
 
   const {
     position: geoPosition,
@@ -184,7 +293,6 @@ function HomeContent() {
   const [checkInRestaurant, setCheckInRestaurant] = useState<Restaurant | null>(
     null,
   );
-  const [visitingId, setVisitingId] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
   const [mapEverMounted, setMapEverMounted] = useState(false);
   const [isFirstVisit, setIsFirstVisit] = useState(false);
@@ -192,16 +300,11 @@ function HomeContent() {
   const [addOpError, setAddOpError] = useState("");
   const surpriseBtnRef = useRef<HTMLButtonElement>(null);
 
-  function handleCheckInClick(restaurant: Restaurant) {
-    setCheckInRestaurant(restaurant);
-  }
-
   async function handleCheckIn(visitDate: string, shouldLogOrder: boolean) {
     if (!checkInRestaurant || !user) return;
 
     const visitedBy = user.user_metadata?.name || user.email || "Unknown";
 
-    setVisitingId(checkInRestaurant.id);
     setCheckInRestaurant(null);
 
     const { error: visitError } = await supabase
@@ -220,7 +323,6 @@ function HomeContent() {
       if (/row-level security/i.test(visitError.message)) {
         setAddOpError("You've already checked in here in the last 24 hours.");
       }
-      setVisitingId(null);
       return;
     }
 
@@ -233,7 +335,6 @@ function HomeContent() {
       console.error("Failed to update last visited:", updateError);
     }
 
-    setVisitingId(null);
     await reload();
   }
 
@@ -312,12 +413,20 @@ function HomeContent() {
     [restaurants, isAdmin, activeVisibility],
   );
 
-  const cuisines = Array.from(
-    new Set(visibilityScoped.map((r) => r.cuisine).filter(Boolean)),
-  ).sort();
-  const neighborhoods = Array.from(
-    new Set(visibilityScoped.map((r) => r.neighborhood).filter(Boolean)),
-  ).sort();
+  const cuisines = useMemo(
+    () =>
+      Array.from(
+        new Set(visibilityScoped.map((r) => r.cuisine).filter(Boolean)),
+      ).sort(),
+    [visibilityScoped],
+  );
+  const neighborhoods = useMemo(
+    () =>
+      Array.from(
+        new Set(visibilityScoped.map((r) => r.neighborhood).filter(Boolean)),
+      ).sort(),
+    [visibilityScoped],
+  );
   const occasions = useMemo(
     () =>
       Array.from(
@@ -371,6 +480,13 @@ function HomeContent() {
     });
     return m;
   }, [visibilityScoped]);
+  const curatorRatingCounts = useMemo(() => {
+    const m: Record<number, number> = {};
+    visibilityScoped.forEach((r) => {
+      if (r.my_rating != null) m[r.my_rating] = (m[r.my_rating] ?? 0) + 1;
+    });
+    return m;
+  }, [visibilityScoped]);
   const filtered = useMemo(
     () =>
       restaurants.filter((r) => {
@@ -402,10 +518,19 @@ function HomeContent() {
         if (wishlistFilter && !wishlistIds.has(r.id)) return false;
         if (activePrices.length > 0 && !activePrices.includes(r.price || ""))
           return false;
-        if (debouncedSearch.trim()) {
+        if (activeCuratorRatings.length > 0) {
+          if (
+            r.my_rating == null ||
+            !activeCuratorRatings.includes(r.my_rating)
+          )
+            return false;
+        } else if (!isAdmin) {
+          if (r.my_rating != null && r.my_rating <= 2) return false;
+        }
+        if (deferredSearchQuery.trim()) {
           const normalize = (s: string) =>
             s.toLowerCase().replace(/[^\w\s]/g, "");
-          const q = normalize(debouncedSearch.trim());
+          const q = normalize(deferredSearchQuery.trim());
           const searchable = normalize(
             [
               r.name,
@@ -436,7 +561,8 @@ function HomeContent() {
       wishlistFilter,
       wishlistIds,
       activePrices,
-      debouncedSearch,
+      activeCuratorRatings,
+      deferredSearchQuery,
       searchIndex,
     ],
   );
@@ -486,9 +612,28 @@ function HomeContent() {
             : Infinity;
         return da - db;
       });
+    } else {
+      arr.sort((a, b) => {
+        if (a.must_try && !b.must_try) return -1;
+        if (!a.must_try && b.must_try) return 1;
+        const ra = a.my_rating ?? -1;
+        const rb = b.my_rating ?? -1;
+        if (rb !== ra) return rb - ra;
+        return (a.name || "").localeCompare(b.name || "");
+      });
     }
     return arr;
   }, [filtered, sortMode, lastVisitedByRestaurant, geoPosition]);
+
+  const { displayList, chainLocationCounts } = useMemo(() => {
+    if (sortMode === "near-me") {
+      return {
+        displayList: sorted,
+        chainLocationCounts: {} as Record<number, number>,
+      };
+    }
+    return dedupeByChain(sorted);
+  }, [sorted, sortMode]);
 
   const totalCount = restaurants.length;
   // Pills at the top describe the full dataset, not the current filter view,
@@ -606,33 +751,36 @@ function HomeContent() {
       <FilterBar
         cuisines={cuisines}
         activeCuisines={activeCuisines}
-        onCuisineChange={setActiveCuisines}
+        onCuisineChange={onCuisineChange}
         cuisineCounts={cuisineCounts}
         neighborhoods={neighborhoods}
         activeNeighborhoods={activeNeighborhoods}
-        onNeighborhoodChange={setActiveNeighborhoods}
+        onNeighborhoodChange={onNeighborhoodChange}
         neighborhoodCounts={neighborhoodCounts}
         occasions={occasions}
         activeOccasions={activeOccasions}
-        onOccasionChange={setActiveOccasions}
+        onOccasionChange={onOccasionChange}
         occasionCounts={occasionCounts}
         foodTags={foodTagOptions}
         activeFoodTags={activeFoodTags}
-        onFoodTagChange={setActiveFoodTags}
+        onFoodTagChange={onFoodTagChange}
         foodTagCounts={foodTagCounts}
         priceCounts={priceCounts}
+        activeCuratorRatings={activeCuratorRatings}
+        onCuratorRatingChange={onCuratorRatingChange}
+        curatorRatingCounts={curatorRatingCounts}
         onAdd={isAdmin ? () => setShowAddModal(true) : undefined}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         mustTryFilter={mustTryFilter}
-        onMustTryFilterChange={setMustTryFilter}
+        onMustTryFilterChange={onMustTryFilterChange}
         openNowFilter={openNowFilter}
-        onOpenNowFilterChange={setOpenNowFilter}
+        onOpenNowFilterChange={onOpenNowFilterChange}
         wishlistFilter={wishlistFilter}
-        onWishlistFilterChange={setWishlistFilter}
+        onWishlistFilterChange={onWishlistFilterChange}
         showWishlist={!!user}
         activePrices={activePrices}
-        onPriceChange={setActivePrices}
+        onPriceChange={onPriceChange}
         isAdminView={isAdmin}
         activeVisibility={activeVisibility}
         onVisibilityChange={setActiveVisibility}
@@ -641,7 +789,7 @@ function HomeContent() {
         imageDisplayMode={imageDisplayMode}
         onImageDisplayModeChange={setImageDisplayMode}
         sortMode={sortMode}
-        onSortModeChange={setSortMode}
+        onSortModeChange={onSortModeChange}
         resultCount={filtered.length}
       />
       {sortMode === "near-me" && geoStatus === "denied" && (
@@ -670,24 +818,25 @@ function HomeContent() {
             <div
               className={`transition-opacity duration-200 ${
                 viewMode === "list"
-                  ? "opacity-100"
+                  ? isPending
+                    ? "opacity-95"
+                    : "opacity-100"
                   : "opacity-0 pointer-events-none absolute inset-x-0 top-0"
               }`}
               aria-hidden={viewMode !== "list"}
             >
               <RestaurantGrid
-                restaurants={sorted}
+                restaurants={displayList}
                 grouped={false}
                 recommendedItems={recommendedItems}
                 restaurantPhotos={restaurantPhotos}
                 imageDisplayMode={imageDisplayMode}
-                onCheckIn={handleCheckInClick}
-                visitingId={visitingId}
                 visits={user ? visits : undefined}
                 userLocation={sortMode === "near-me" ? geoPosition : null}
-                preserveOrder={sortMode !== "default"}
+                preserveOrder={true}
+                chainLocationCounts={chainLocationCounts}
               />
-              {isFiltered && <SurpriseBar restaurants={sorted} />}
+              {isFiltered && <SurpriseBar restaurants={displayList} />}
             </div>
             {mapEverMounted && (
               <div

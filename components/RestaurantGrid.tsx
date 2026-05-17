@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { memo, useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   type Restaurant,
   type RestaurantVisit,
@@ -15,6 +15,7 @@ import { type ImageDisplayMode } from "@/components/FilterBar";
 import PhotoCarousel, {
   type RestaurantPhoto,
 } from "@/components/PhotoCarousel";
+import FadeImage from "@/components/FadeImage";
 import { CUISINE_COLORS, buildCuisineColorMap } from "@/lib/cuisine-colors";
 import { haversineMiles, formatMiles } from "@/lib/distance";
 import { formatFoodTag } from "@/lib/food-tags";
@@ -60,8 +61,6 @@ type Props = {
   grouped: boolean;
   onEdit?: (r: Restaurant) => void;
   onOrder?: (r: Restaurant) => void;
-  onCheckIn?: (r: Restaurant) => void;
-  visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   recommendedItems?: Record<number, MenuItem[]>;
   restaurantPhotos?: Record<number, RestaurantPhoto[]>;
@@ -71,9 +70,17 @@ type Props = {
    * internal must-try-first / alphabetical sort. Set this when the parent has
    * already applied a sort (e.g. rating, recently visited, near me). */
   preserveOrder?: boolean;
+  /** Map from restaurant id to total chain location count. When > 1 the card
+   * shows a "N locations" badge indicating there are sibling locations. */
+  chainLocationCounts?: Record<number, number>;
 };
 
-function Card({
+// React.memo prevents every Card from re-rendering when a single filter chip
+// toggles in the parent — only cards whose props actually changed (e.g. the
+// newly-mounted/unmounted ones) will re-render. Effective because the parent
+// passes stable `restaurant` rows from a Supabase fetch and `useCallback`'d
+// onNavigate handlers below.
+const Card = memo(function Card({
   r,
   cuisineColor,
   onEdit,
@@ -84,24 +91,33 @@ function Card({
   imageDisplayMode = "full",
   onNavigate,
   priority = false,
+  eagerPrefetch = false,
   heroName,
   userLocation,
+  locationCount,
 }: {
   r: Restaurant;
   cuisineColor: string;
   onEdit?: (r: Restaurant) => void;
   onOrder?: (r: Restaurant) => void;
-  onCheckIn?: (r: Restaurant) => void;
-  visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   recommendedItems?: MenuItem[];
   restaurantPhotos?: RestaurantPhoto[];
   imageDisplayMode?: ImageDisplayMode;
   onNavigate?: () => void;
   priority?: boolean;
+  /** If true, proactively prefetch this card's detail route on mount.
+   * Reserved for the top above-the-fold cards — never the full list. */
+  eagerPrefetch?: boolean;
   heroName?: string;
   userLocation?: { lat: number; lng: number } | null;
+  locationCount?: number;
 }) {
+  const router = useRouter();
+  useEffect(() => {
+    if (eagerPrefetch) router.prefetch(`/restaurant/${r.id}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eagerPrefetch, r.id]);
   const isAdmin = !!(onEdit || onOrder);
   const visitCount = visits?.[r.id]?.length ?? 0;
   const recencyTag = formatRecencyTag(r.last_visited);
@@ -130,7 +146,14 @@ function Card({
     <Link
       href={`/restaurant/${r.id}`}
       onClick={() => onNavigate?.()}
-      className="group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-[background-color,box-shadow,transform] duration-200 hover:bg-bg2 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm motion-reduce:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg h-full"
+      // Tap-intent prefetch: onPointerDown fires for mouse/touch/pen ~50-100ms
+      // before the click event, giving Next.js a head start on the route work.
+      // router.prefetch is idempotent — safe even though Sub-Agent 4's
+      // eagerPrefetch already covers the top 6 cards.
+      onPointerDown={() => router.prefetch(`/restaurant/${r.id}`)}
+      className={`group bg-bg relative border-b border-brd block no-underline cursor-pointer transition-[background-color,box-shadow,transform] duration-200 hover:bg-bg2 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:shadow-sm motion-reduce:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg h-full ${
+        imageDisplayMode === "compact" ? "card-contain-compact" : "card-contain"
+      }`}
       style={{
         borderLeft: `3px solid ${cuisineColor}`,
       }}
@@ -163,13 +186,20 @@ function Card({
                 }}
               >
                 {photoNear && (
-                  <Image
+                  <FadeImage
                     src={slides[0].url}
                     alt={r.name}
                     fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                    sizes="(max-width: 640px) 100vw, 33vw"
                     priority={priority}
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
+                    // Only the LCP candidate (first card, index 0) gets the
+                    // high fetch-priority hint — applying it to every card
+                    // would dilute the signal.
+                    fetchPriority={priority ? "high" : undefined}
+                    // 65 is imperceptible at 100px card thumbnails and trims
+                    // 10-20% off the byte size vs the default 75.
+                    quality={65}
+                    className="object-cover group-hover:scale-105"
                     onError={(e) => {
                       (
                         e.target as HTMLImageElement
@@ -188,13 +218,13 @@ function Card({
                 </div>
                 <div className="absolute top-2 right-2 flex gap-1.5 flex-wrap justify-end">
                   {recencyTag && (
-                    <span className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80 bg-recency-bg text-recency-txt">
+                    <span className="text-2xs font-medium px-2 py-1 rounded-pill shadow-sm tracking-tight uppercase border-2 border-white/80 bg-recency-bg text-recency-txt">
                       {recencyTag.text}
                     </span>
                   )}
                   {openNow !== null && (
                     <span
-                      className={`text-2xs font-medium px-2 py-1 rounded-pill shadow-sm backdrop-blur-sm tracking-tight uppercase border-2 border-white/80 ${
+                      className={`text-2xs font-medium px-2 py-1 rounded-pill shadow-sm tracking-tight uppercase border-2 border-white/80 ${
                         openNow
                           ? "bg-open-bg text-open-txt"
                           : "bg-closed-bg text-closed-txt"
@@ -218,6 +248,10 @@ function Card({
                 mustTry={!!r.must_try}
                 heroName={heroName}
                 cuisineColor={cuisineColor}
+                blurBadges={false}
+                // Grid-card thumbnails are tiny; 65 trims bytes without any
+                // perceptible quality loss. Detail hero keeps the default.
+                quality={65}
               />
             </div>
           ) : (
@@ -285,6 +319,16 @@ function Card({
               {formatFoodTag(tag)}
             </span>
           ))}
+          {locationCount != null && locationCount > 1 && (
+            <span className="text-2xs font-medium px-2 py-0.5 rounded-pill border border-brd text-txt2 tracking-tight">
+              📍 {locationCount} locations
+            </span>
+          )}
+          {r.my_rating != null && r.my_rating <= 2 && (
+            <span className="text-2xs font-medium px-2 py-0.5 rounded-pill border border-brd text-txt2 tracking-tight opacity-60">
+              Not recommended
+            </span>
+          )}
         </div>
 
         {/* Ratings row */}
@@ -369,7 +413,7 @@ function Card({
       </div>
     </Link>
   );
-}
+});
 
 const gridClass =
   "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0 bg-brd border-l border-brd";
@@ -391,29 +435,37 @@ function FlatCardGrid({
   cuisineColorMap,
   onEdit,
   onOrder,
-  onCheckIn,
-  visitingId,
   visits,
   recommendedItems,
   restaurantPhotos,
   imageDisplayMode = "full",
   userLocation,
+  chainLocationCounts,
 }: {
   restaurants: Restaurant[];
   cuisineColorMap: Record<string, string>;
   onEdit?: (r: Restaurant) => void;
   onOrder?: (r: Restaurant) => void;
-  onCheckIn?: (r: Restaurant) => void;
-  visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
   recommendedItems?: Record<number, MenuItem[]>;
   restaurantPhotos?: Record<number, RestaurantPhoto[]>;
   imageDisplayMode?: ImageDisplayMode;
   userLocation?: { lat: number; lng: number } | null;
+  chainLocationCounts?: Record<number, number>;
 }) {
   const [activeHeroId, setActiveHeroId] = useState<number | null>(null);
-  const handleNavigate = useCallback((id: number) => {
-    setActiveHeroId(id);
+  // Per-id stable onNavigate callbacks: a fresh `() => handleNavigate(id)`
+  // each render would give every Card a new function prop and defeat memo.
+  // We cache one bound function per restaurant id and reuse it.
+  const navigateCacheRef = useRef<Map<number, () => void>>(new Map());
+  const getNavigate = useCallback((id: number) => {
+    const cache = navigateCacheRef.current;
+    let fn = cache.get(id);
+    if (!fn) {
+      fn = () => setActiveHeroId(id);
+      cache.set(id, fn);
+    }
+    return fn;
   }, []);
 
   return (
@@ -425,20 +477,20 @@ function FlatCardGrid({
           cuisineColor={cuisineColorMap[r.cuisine || ""] || CUISINE_COLORS[0]}
           onEdit={onEdit}
           onOrder={onOrder}
-          onCheckIn={onCheckIn}
-          visitingId={visitingId}
           visits={visits}
           recommendedItems={recommendedItems?.[r.id]}
           restaurantPhotos={restaurantPhotos?.[r.id]}
           imageDisplayMode={imageDisplayMode}
           userLocation={userLocation}
-          onNavigate={() => handleNavigate(r.id)}
+          onNavigate={getNavigate(r.id)}
           priority={i === 0}
+          eagerPrefetch={i < 6}
           heroName={
             activeHeroId === r.id && imageDisplayMode === "full"
               ? `hero-${r.id}`
               : undefined
           }
+          locationCount={chainLocationCounts?.[r.id]}
         />
       ))}
     </div>
@@ -450,14 +502,13 @@ export default function RestaurantGrid({
   grouped,
   onEdit,
   onOrder,
-  onCheckIn,
-  visitingId,
   visits,
   recommendedItems,
   restaurantPhotos,
   imageDisplayMode = "full",
   userLocation,
   preserveOrder,
+  chainLocationCounts,
 }: Props) {
   const cuisineColorMap = useMemo(
     () => buildCuisineColorMap(restaurants),
@@ -466,6 +517,17 @@ export default function RestaurantGrid({
   const [groupedActiveHeroId, setGroupedActiveHeroId] = useState<number | null>(
     null,
   );
+  // Same per-id stable-callback trick as in FlatCardGrid — see comment there.
+  const groupedNavigateCacheRef = useRef<Map<number, () => void>>(new Map());
+  const getGroupedNavigate = useCallback((id: number) => {
+    const cache = groupedNavigateCacheRef.current;
+    let fn = cache.get(id);
+    if (!fn) {
+      fn = () => setGroupedActiveHeroId(id);
+      cache.set(id, fn);
+    }
+    return fn;
+  }, []);
 
   if (restaurants.length === 0) {
     return (
@@ -498,13 +560,12 @@ export default function RestaurantGrid({
         cuisineColorMap={cuisineColorMap}
         onEdit={onEdit}
         onOrder={onOrder}
-        onCheckIn={onCheckIn}
-        visitingId={visitingId}
         visits={visits}
         recommendedItems={recommendedItems}
         restaurantPhotos={restaurantPhotos}
         imageDisplayMode={imageDisplayMode}
         userLocation={userLocation}
+        chainLocationCounts={chainLocationCounts}
       />
     );
   }
@@ -543,20 +604,20 @@ export default function RestaurantGrid({
                   }
                   onEdit={onEdit}
                   onOrder={onOrder}
-                  onCheckIn={onCheckIn}
-                  visitingId={visitingId}
                   visits={visits}
                   recommendedItems={recommendedItems?.[r.id]}
                   restaurantPhotos={restaurantPhotos?.[r.id]}
                   imageDisplayMode={imageDisplayMode}
                   userLocation={userLocation}
-                  onNavigate={() => setGroupedActiveHeroId(r.id)}
+                  onNavigate={getGroupedNavigate(r.id)}
                   priority={i === 0 && j === 0}
+                  eagerPrefetch={i === 0 && j < 6}
                   heroName={
                     groupedActiveHeroId === r.id && imageDisplayMode === "full"
                       ? `hero-${r.id}`
                       : undefined
                   }
+                  locationCount={chainLocationCounts?.[r.id]}
                 />
               ))}
             </div>

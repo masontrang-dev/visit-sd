@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
   ImageDisplayMode,
@@ -24,6 +24,7 @@ export type FilterState = {
   openNowFilter: boolean;
   wishlistFilter: boolean;
   activePrices: string[];
+  activeCuratorRatings: number[];
   activeVisibility: VisibilityFilter;
   searchQuery: string;
   debouncedSearch: string;
@@ -39,6 +40,7 @@ export type FilterState = {
   setOpenNowFilter: (v: boolean) => void;
   setWishlistFilter: (v: boolean) => void;
   setActivePrices: (v: string[]) => void;
+  setActiveCuratorRatings: (v: number[]) => void;
   setActiveVisibility: (v: VisibilityFilter) => void;
   setSearchQuery: (v: string) => void;
   setViewMode: (v: "list" | "map") => void;
@@ -64,6 +66,7 @@ type UrlState = {
   openNow: boolean;
   wishlist: boolean;
   prices: string[];
+  curatorRatings: number[];
   sort: SortMode;
 };
 
@@ -78,6 +81,8 @@ function buildQs(s: UrlState): string {
   if (s.openNow) params.set("open_now", "true");
   if (s.wishlist) params.set("wishlist", "true");
   if (s.prices.length > 0) params.set("price", s.prices.join(","));
+  if (s.curatorRatings.length > 0)
+    params.set("curator_rating", s.curatorRatings.join(","));
   if (s.sort !== "default") params.set("sort", s.sort);
   return params.toString();
 }
@@ -117,6 +122,17 @@ export function useFilterState(): FilterState {
     const param = searchParams.get("price");
     return param ? param.split(",") : [];
   });
+  const [activeCuratorRatings, setActiveCuratorRatingsState] = useState<
+    number[]
+  >(() => {
+    const param = searchParams.get("curator_rating");
+    return param
+      ? param
+          .split(",")
+          .map(Number)
+          .filter((n) => n >= 1 && n <= 5)
+      : [];
+  });
   const [sortMode, setSortModeState] = useState<SortMode>(() => {
     const param = searchParams.get("sort");
     return SORT_MODES.includes(param as SortMode)
@@ -150,10 +166,7 @@ export function useFilterState(): FilterState {
   useEffect(() => {
     const q = searchQuery.trim();
     if (q.length < 2) return;
-    const timer = setTimeout(
-      () => trackEvent("search", q.slice(0, 100)),
-      1200,
-    );
+    const timer = setTimeout(() => trackEvent("search", q.slice(0, 100)), 1200);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -169,6 +182,7 @@ export function useFilterState(): FilterState {
     openNow: openNowFilter,
     wishlist: wishlistFilter,
     prices: activePrices,
+    curatorRatings: activeCuratorRatings,
     sort: sortMode,
   });
   stateRef.current = {
@@ -180,6 +194,7 @@ export function useFilterState(): FilterState {
     openNow: openNowFilter,
     wishlist: wishlistFilter,
     prices: activePrices,
+    curatorRatings: activeCuratorRatings,
     sort: sortMode,
   };
 
@@ -256,6 +271,14 @@ export function useFilterState(): FilterState {
     [syncUrl],
   );
 
+  const setActiveCuratorRatings = useCallback(
+    (v: number[]) => {
+      setActiveCuratorRatingsState(v);
+      syncUrl({ curatorRatings: v });
+    },
+    [syncUrl],
+  );
+
   const setSortMode = useCallback(
     (v: SortMode) => {
       setSortModeState(v);
@@ -280,6 +303,7 @@ export function useFilterState(): FilterState {
     setOpenNowFilterState(false);
     setWishlistFilterState(false);
     setActivePricesState([]);
+    setActiveCuratorRatingsState([]);
     setSortModeState("default");
     setSearchQuery("");
     syncUrl({
@@ -291,6 +315,7 @@ export function useFilterState(): FilterState {
       openNow: false,
       wishlist: false,
       prices: [],
+      curatorRatings: [],
       sort: "default",
     });
   }, [syncUrl]);
@@ -304,37 +329,79 @@ export function useFilterState(): FilterState {
     openNowFilter ||
     wishlistFilter ||
     activePrices.length > 0 ||
+    activeCuratorRatings.length > 0 ||
     debouncedSearch.trim() !== "";
 
-  return {
-    activeCuisines,
-    activeNeighborhoods,
-    activeOccasions,
-    activeFoodTags,
-    mustTryFilter,
-    openNowFilter,
-    wishlistFilter,
-    activePrices,
-    activeVisibility,
-    searchQuery,
-    debouncedSearch,
-    viewMode,
-    imageDisplayMode,
-    sortMode,
-    isFiltered,
-    setActiveCuisines,
-    setActiveNeighborhoods,
-    setActiveOccasions,
-    setActiveFoodTags,
-    setMustTryFilter,
-    setOpenNowFilter,
-    setWishlistFilter,
-    setActivePrices,
-    setActiveVisibility,
-    setSearchQuery,
-    setViewMode,
-    setImageDisplayMode,
-    setSortMode,
-    clearAll,
-  };
+  // Memoize the returned object so consumers (and anything downstream of
+  // destructured values) get a stable reference whenever no tracked value
+  // changed. Setters are already `useCallback`-stable, so they don't need
+  // to appear in the deps list beyond their identity.
+  return useMemo(
+    () => ({
+      activeCuisines,
+      activeNeighborhoods,
+      activeOccasions,
+      activeFoodTags,
+      mustTryFilter,
+      openNowFilter,
+      wishlistFilter,
+      activePrices,
+      activeCuratorRatings,
+      activeVisibility,
+      searchQuery,
+      debouncedSearch,
+      viewMode,
+      imageDisplayMode,
+      sortMode,
+      isFiltered,
+      setActiveCuisines,
+      setActiveNeighborhoods,
+      setActiveOccasions,
+      setActiveFoodTags,
+      setMustTryFilter,
+      setOpenNowFilter,
+      setWishlistFilter,
+      setActivePrices,
+      setActiveCuratorRatings,
+      setActiveVisibility,
+      setSearchQuery,
+      setViewMode,
+      setImageDisplayMode,
+      setSortMode,
+      clearAll,
+    }),
+    [
+      activeCuisines,
+      activeNeighborhoods,
+      activeOccasions,
+      activeFoodTags,
+      mustTryFilter,
+      openNowFilter,
+      wishlistFilter,
+      activePrices,
+      activeCuratorRatings,
+      activeVisibility,
+      searchQuery,
+      debouncedSearch,
+      viewMode,
+      imageDisplayMode,
+      sortMode,
+      isFiltered,
+      setActiveCuisines,
+      setActiveNeighborhoods,
+      setActiveOccasions,
+      setActiveFoodTags,
+      setMustTryFilter,
+      setOpenNowFilter,
+      setWishlistFilter,
+      setActivePrices,
+      setActiveCuratorRatings,
+      setActiveVisibility,
+      setSearchQuery,
+      setViewMode,
+      setSortMode,
+      setImageDisplayMode,
+      clearAll,
+    ],
+  );
 }

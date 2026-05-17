@@ -1,45 +1,47 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import type { Restaurant } from "@/lib/supabase";
 import RestaurantDetailClient from "./RestaurantDetailClient";
 
 type Params = Promise<{ id: string }>;
 
-type RestaurantMeta = {
-  id: number;
-  name: string;
-  cuisine: string | null;
-  neighborhood: string | null;
-  price: string | null;
-  must_try: boolean | null;
-  address: string | null;
-  lat: number | null;
-  lng: number | null;
-  photo_url: string | null;
-  storefront_photo_url: string | null;
-  google_rating: number | null;
-  google_review_count: number | null;
-  google_maps_url: string | null;
-  visibility: string | null;
-};
+// Pre-render every public restaurant page at build time; refresh each one at
+// most every hour. Private/archived rows are excluded so they don't ship as
+// static HTML to search crawlers or anon users.
+export const revalidate = 3600;
+export const dynamicParams = true;
 
-async function fetchRestaurantMeta(id: number): Promise<RestaurantMeta | null> {
-  // Use the anon-key client here — generateMetadata runs during static/ISR
-  // rendering where cookies() would make the route dynamic. Per-user
-  // visibility checks stay on the client component.
+export async function generateStaticParams() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
   const { data } = await supabase
     .from("restaurants")
-    .select(
-      "id, name, cuisine, neighborhood, price, must_try, address, lat, lng, photo_url, storefront_photo_url, google_rating, google_review_count, google_maps_url, visibility",
-    )
-    .eq("id", id)
-    .single();
-  return (data as RestaurantMeta) ?? null;
+    .select("id")
+    .eq("visibility", "public");
+  return (data ?? []).map((r: { id: number }) => ({ id: String(r.id) }));
 }
+
+const fetchRestaurant = cache(
+  async (id: number): Promise<Restaurant | null> => {
+    // Use the anon-key client here — generateMetadata runs during static/ISR
+    // rendering where cookies() would make the route dynamic. Per-user
+    // visibility checks stay on the client component.
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+    const { data } = await supabase
+      .from("restaurants")
+      .select("*")
+      .eq("id", id)
+      .single();
+    return (data as Restaurant) ?? null;
+  },
+);
 
 function priceToRange(price: string | null): string | undefined {
   if (!price) return undefined;
@@ -47,7 +49,7 @@ function priceToRange(price: string | null): string | undefined {
   return price;
 }
 
-function buildRestaurantJsonLd(r: RestaurantMeta) {
+function buildRestaurantJsonLd(r: Restaurant) {
   const image = [r.photo_url, r.storefront_photo_url].filter(Boolean);
   const jsonLd: Record<string, unknown> = {
     "@context": "https://schema.org",
@@ -103,7 +105,7 @@ export async function generateMetadata({
   const parsed = parseInt(id, 10);
   if (isNaN(parsed)) return { title: "Restaurant not found · VISIT SD" };
 
-  const restaurant = await fetchRestaurantMeta(parsed);
+  const restaurant = await fetchRestaurant(parsed);
   if (!restaurant) return { title: "Restaurant not found · VISIT SD" };
 
   const parts = [
@@ -148,7 +150,7 @@ export default async function RestaurantDetailPage({
   const parsed = parseInt(id, 10);
   if (isNaN(parsed)) notFound();
 
-  const restaurant = await fetchRestaurantMeta(parsed);
+  const restaurant = await fetchRestaurant(parsed);
   if (!restaurant) notFound();
 
   // Only emit JSON-LD for publicly visible restaurants — hides private/archived
@@ -164,7 +166,7 @@ export default async function RestaurantDetailPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <RestaurantDetailClient params={params} />
+      <RestaurantDetailClient params={params} initialRestaurant={restaurant} />
     </>
   );
 }

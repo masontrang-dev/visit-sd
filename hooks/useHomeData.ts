@@ -10,6 +10,36 @@ import {
 } from "@/lib/supabase";
 import type { RestaurantPhoto } from "@/components/RestaurantGrid";
 
+// Module-level in-memory cache for the primary restaurant list. Survives React
+// re-mounts (e.g. back-nav from a detail page) so the home page can paint
+// instantly without re-running the Supabase query and re-showing the skeleton.
+// Lost on full page reload — that's intentional, and matches the "feels fresh
+// but feels instant" tradeoff.
+//
+// CRITICAL: keyed by isAdmin. Admin sessions see non-public restaurants that
+// the anon query filters out via `.eq("visibility", "public")`. A shared
+// cache would leak admin-only rows to an anon user on the next mount.
+type RestaurantCacheKey = "anon" | "admin";
+type RestaurantCacheEntry = {
+  restaurants: Restaurant[];
+  timestamp: number;
+};
+const restaurantCache: Record<RestaurantCacheKey, RestaurantCacheEntry | null> =
+  {
+    anon: null,
+    admin: null,
+  };
+const RESTAURANT_CACHE_TTL_MS = 60_000;
+
+function getCacheKey(isAdmin: boolean): RestaurantCacheKey {
+  return isAdmin ? "admin" : "anon";
+}
+
+function invalidateRestaurantCache() {
+  restaurantCache.anon = null;
+  restaurantCache.admin = null;
+}
+
 export type HomeData = {
   restaurants: Restaurant[];
   recommendedItems: Record<number, MenuItem[]>;
@@ -57,19 +87,39 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
 
   const load = useCallback(async () => {
     setSecondaryLoaded(false);
+
     // Phase 1: fetch restaurants and render the grid immediately.
-    let query = supabase
-      .from("restaurants")
-      .select("*")
-      .order("cuisine")
-      .order("name");
-    if (!isAdmin) {
-      query = query.eq("visibility", "public");
+    // Cache hit path: skip the network round-trip entirely and paint from
+    // the module-level cache. setLoading(false) without ever flipping to
+    // true avoids the skeleton flash on back-nav.
+    const cacheKey = getCacheKey(isAdmin);
+    const cached = restaurantCache[cacheKey];
+    const cacheFresh =
+      cached !== null && Date.now() - cached.timestamp < RESTAURANT_CACHE_TTL_MS;
+
+    let rows: Restaurant[];
+    if (cacheFresh && cached) {
+      rows = cached.restaurants;
+      setRestaurants(rows);
+      setLoading(false);
+    } else {
+      let query = supabase
+        .from("restaurants")
+        .select("*")
+        .order("cuisine")
+        .order("name");
+      if (!isAdmin) {
+        query = query.eq("visibility", "public");
+      }
+      const { data } = (await query) as { data: Restaurant[] | null };
+      rows = data ?? [];
+      setRestaurants(rows);
+      setLoading(false);
+      restaurantCache[cacheKey] = {
+        restaurants: rows,
+        timestamp: Date.now(),
+      };
     }
-    const { data } = (await query) as { data: Restaurant[] | null };
-    const rows = data ?? [];
-    setRestaurants(rows);
-    setLoading(false);
 
     if (rows.length === 0) {
       setSecondaryLoaded(true);
@@ -223,6 +273,14 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     setSecondaryLoaded(true);
   }, [isAdmin]);
 
+  // reload() is what callers invoke after a mutation or on pull-to-refresh —
+  // they explicitly want fresh data, so blow the cache away (both keys, since
+  // admin/anon visibility can shift around login state) before re-fetching.
+  const reload = useCallback(async () => {
+    invalidateRestaurantCache();
+    await load();
+  }, [load]);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -243,6 +301,6 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     searchIndex,
     loading,
     secondaryLoaded,
-    reload: load,
+    reload,
   };
 }

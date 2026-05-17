@@ -9,7 +9,7 @@ import {
   useApiIsLoaded,
 } from "@vis.gl/react-google-maps";
 import Link from "next/link";
-import { type Restaurant } from "@/lib/supabase";
+import type { Restaurant } from "@/lib/supabase";
 import { CUISINE_COLORS, buildCuisineColorMap } from "@/lib/cuisine-colors";
 
 function MapSkeleton() {

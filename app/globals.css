@@ -356,11 +356,59 @@
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
+  will-change: background-position;
 }
 @media (prefers-reduced-motion: reduce) {
   .skeleton::after {
     animation: none;
   }
+}
+
+/* ── Global reduced-motion catch-all ──
+   Respect the user's OS preference for every custom animation/transition in
+   the app (fade-up, word-reveal, scroll-fade-in, modal slide-ins, the
+   "Surprise me" wiggle, etc.). The shimmer skeleton's animation is already
+   neutralized above; its static gradient end-state remains visible because
+   the gradient is painted via `background-image`, not via the animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── content-visibility utility ──
+   Skip rendering/layout/paint work for cards that are off-screen. The
+   `contain-intrinsic-size` keeps a placeholder box reserved so scroll
+   position and scrollbar height stay stable. Tune the height per variant
+   (full vs compact) to keep the reservation close to the real card height
+   and avoid jumpiness when content materializes near the viewport. */
+.card-contain {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 480px;
+  contain: layout style paint;
+}
+.card-contain-compact {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 180px;
+  contain: layout style paint;
+}
+
+/* ── Tap-delay removal for interactive elements ──
+   `touch-action: manipulation` opts out of iOS Safari's residual 300ms
+   tap-delay heuristic without disabling pan/zoom on the page itself.
+   Scoped to interactive elements only — embla's viewport sets its own
+   touch-action and wins via specificity, so carousels keep their pan
+   behaviour. Deliberately NOT applied to html/body. */
+button,
+a,
+[role="button"],
+[role="link"] {
+  touch-action: manipulation;
 }
 
 /* ── Hide scrollbars for horizontal carousels ── */
