@@ -1,8 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Bebas_Neue, DM_Sans } from "next/font/google";
-import { ViewTransition } from "react";
-// Canary channel types for <ViewTransition>
-import type {} from "react/canary";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import ToastProvider from "@/components/Toast";
@@ -73,7 +70,7 @@ export default function RootLayout({
         <AuthProvider>
           <ToastProvider>
             <PageViewTracker />
-            <ViewTransition>{children}</ViewTransition>
+            {children}
           </ToastProvider>
         </AuthProvider>
       </body>
