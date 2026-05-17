@@ -677,7 +677,6 @@ function HomeContent() {
               <RestaurantGrid
                 restaurants={sorted}
                 grouped={false}
-                baseDelay={isFirstVisit ? 400 : 0}
                 recommendedItems={recommendedItems}
                 restaurantPhotos={restaurantPhotos}
                 imageDisplayMode={imageDisplayMode}

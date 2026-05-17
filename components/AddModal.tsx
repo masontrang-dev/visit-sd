@@ -256,13 +256,6 @@ export default function AddModal({
           periods: openingHoursData.periods || [],
         });
       }
-      // Auto-populate storefront photo from first Google photo
-      if (place.photos && place.photos.length > 0) {
-        const photoRef = place.photos[0].getUrl({ maxWidth: 800 });
-        if (photoRef) {
-          setStorefrontPhotoUrl(photoRef);
-        }
-      }
     },
     [],
   );
@@ -293,7 +286,6 @@ export default function AddModal({
             "user_ratings_total",
             "opening_hours",
             "current_opening_hours",
-            "photos",
           ],
         },
       );
@@ -349,9 +341,8 @@ export default function AddModal({
       // Compress image before upload
       let fileToUpload = photoFile;
       try {
-        const { default: imageCompression } = await import(
-          "browser-image-compression"
-        );
+        const { default: imageCompression } =
+          await import("browser-image-compression");
         const options = {
           maxSizeMB: 0.5, // Max 500KB
           maxWidthOrHeight: 1920, // Max dimension

@@ -4,6 +4,10 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
+  VirtuosoGrid,
+  type GridStateSnapshot,
+} from "react-virtuoso";
+import {
   type Restaurant,
   type RestaurantVisit,
   type MenuItem,
@@ -30,7 +34,6 @@ type Props = {
   onCheckIn?: (r: Restaurant) => void;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
-  baseDelay?: number;
   recommendedItems?: Record<number, MenuItem[]>;
   restaurantPhotos?: Record<number, RestaurantPhoto[]>;
   imageDisplayMode?: ImageDisplayMode;
@@ -317,52 +320,10 @@ function Card({
   );
 }
 
-function useFadeUp() {
-  const ref = useRef<HTMLDivElement>(null!);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.classList.add("animate-fade-up");
-          observer.unobserve(el);
-        }
-      },
-      { threshold: 0.1 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-  return ref;
-}
-
-function FadeUpCard({
-  children,
-  delay,
-}: {
-  children: React.ReactNode;
-  delay: number;
-}) {
-  const ref = useFadeUp();
-  return (
-    <div
-      ref={ref}
-      className="opacity-0 h-full"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      {children}
-    </div>
-  );
-}
-
 const gridClass =
   "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0 bg-brd border-l border-brd";
 
-const BATCH_SIZE = 12;
-
-const SCROLL_STORAGE_KEY = "visitsd-grid-scroll";
-const SCROLL_POS_KEY = SCROLL_STORAGE_KEY + "-pos";
+const GRID_STATE_KEY = "visitsd-grid-virtuoso-state";
 
 function InfiniteCardGrid({
   restaurants,
@@ -372,7 +333,6 @@ function InfiniteCardGrid({
   onCheckIn,
   visitingId,
   visits,
-  baseDelay = 0,
   recommendedItems,
   restaurantPhotos,
   imageDisplayMode = "full",
@@ -385,160 +345,90 @@ function InfiniteCardGrid({
   onCheckIn?: (r: Restaurant) => void;
   visitingId?: number | null;
   visits?: Record<number, RestaurantVisit[]>;
-  baseDelay?: number;
   recommendedItems?: Record<number, MenuItem[]>;
   restaurantPhotos?: Record<number, RestaurantPhoto[]>;
   imageDisplayMode?: ImageDisplayMode;
   userLocation?: { lat: number; lng: number } | null;
 }) {
-  const [visibleCount, setVisibleCount] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem(SCROLL_STORAGE_KEY);
-      if (saved) {
-        return Math.max(parseInt(saved, 10), BATCH_SIZE);
-      }
-    } catch {}
-    return BATCH_SIZE;
-  });
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [activeHeroId, setActiveHeroId] = useState<number | null>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const prevRestaurantIdsRef = useRef<string>("");
-  const restoredRef = useRef(false);
-  const [isRestoring, setIsRestoring] = useState(() => {
-    try {
-      return !!sessionStorage.getItem(SCROLL_POS_KEY);
-    } catch {
-      return false;
-    }
-  });
+  const stateRef = useRef<GridStateSnapshot | null>(null);
 
-  // Restore scroll position after the grid has rendered with the saved visible count,
-  // then flip isRestoring off so subsequent list changes get the FadeUp animation.
-  useEffect(() => {
-    if (restoredRef.current) return;
-    restoredRef.current = true;
+  // Read the saved Virtuoso scroll snapshot once on mount and immediately
+  // remove it from sessionStorage so a hard refresh starts from the top.
+  const initialState = useMemo<GridStateSnapshot | undefined>(() => {
+    if (typeof window === "undefined") return undefined;
     try {
-      const raw = sessionStorage.getItem(SCROLL_POS_KEY);
-      sessionStorage.removeItem(SCROLL_STORAGE_KEY);
-      sessionStorage.removeItem(SCROLL_POS_KEY);
-      if (raw) {
-        const scrollY = parseInt(raw, 10);
-        requestAnimationFrame(() => {
-          window.scrollTo(0, scrollY);
-          setIsRestoring(false);
-        });
-      } else {
-        setIsRestoring(false);
-      }
+      const raw = sessionStorage.getItem(GRID_STATE_KEY);
+      if (!raw) return undefined;
+      sessionStorage.removeItem(GRID_STATE_KEY);
+      return JSON.parse(raw) as GridStateSnapshot;
     } catch {
-      setIsRestoring(false);
+      return undefined;
     }
   }, []);
 
-  // Reset visible count only when the actual restaurant list changes (not on re-renders)
+  // Persist whatever the latest snapshot is whenever the tab is hidden so we
+  // restore correctly even if the user uses the browser back button (which
+  // doesn't fire onNavigate).
   useEffect(() => {
-    const currentIds = restaurants.map((r) => r.id).join(",");
-    if (prevRestaurantIdsRef.current !== currentIds) {
-      // Don't reset if this is the initial load (restoration case)
-      if (prevRestaurantIdsRef.current !== "") {
-        setVisibleCount(BATCH_SIZE);
-      }
-      prevRestaurantIdsRef.current = currentIds;
-    }
-  }, [restaurants]);
-
-  const loadMore = useCallback(() => {
-    setIsLoadingMore(true);
-    setTimeout(() => {
-      setVisibleCount((prev) =>
-        Math.min(prev + BATCH_SIZE, restaurants.length),
-      );
-      setIsLoadingMore(false);
-    }, 100);
-  }, [restaurants.length]);
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) loadMore();
-      },
-      { rootMargin: "200px" },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [loadMore]);
-
-  const visible = restaurants.slice(0, visibleCount);
-  const hasMore = visibleCount < restaurants.length;
-
-  const handleNavigate = useCallback(
-    (id: number) => {
-      setActiveHeroId(id);
+    const onVisibility = () => {
+      if (document.visibilityState !== "hidden") return;
+      if (!stateRef.current) return;
       try {
-        sessionStorage.setItem(SCROLL_STORAGE_KEY, String(visibleCount));
-        sessionStorage.setItem(SCROLL_POS_KEY, String(window.scrollY));
+        sessionStorage.setItem(
+          GRID_STATE_KEY,
+          JSON.stringify(stateRef.current),
+        );
       } catch {}
-    },
-    [visibleCount],
-  );
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+
+  const handleNavigate = useCallback((id: number) => {
+    setActiveHeroId(id);
+    if (!stateRef.current) return;
+    try {
+      sessionStorage.setItem(GRID_STATE_KEY, JSON.stringify(stateRef.current));
+    } catch {}
+  }, []);
 
   return (
-    <>
-      <div className={gridClass}>
-        {visible.map((r, i) => {
-          const card = (
-            <Card
-              r={r}
-              cuisineColor={
-                cuisineColorMap[r.cuisine || ""] || CUISINE_COLORS[0]
-              }
-              onEdit={onEdit}
-              onOrder={onOrder}
-              onCheckIn={onCheckIn}
-              visitingId={visitingId}
-              visits={visits}
-              recommendedItems={recommendedItems?.[r.id]}
-              restaurantPhotos={restaurantPhotos?.[r.id]}
-              imageDisplayMode={imageDisplayMode}
-              userLocation={userLocation}
-              onNavigate={() => handleNavigate(r.id)}
-              priority={i === 0}
-              heroName={
-                activeHeroId === r.id && imageDisplayMode === "full"
-                  ? `hero-${r.id}`
-                  : undefined
-              }
-            />
-          );
-          return isRestoring ? (
-            <div key={r.id} className="h-full">
-              {card}
-            </div>
-          ) : (
-            <FadeUpCard key={r.id} delay={(i % BATCH_SIZE) * 50 + baseDelay}>
-              {card}
-            </FadeUpCard>
-          );
-        })}
-      </div>
-      {hasMore && (
-        <>
-          <div ref={sentinelRef} className="h-px" />
-          {isLoadingMore && (
-            <div className="py-6 flex justify-center">
-              <div className="flex items-center gap-2 text-txt2 text-sm">
-                <div className="w-4 h-4 border-2 border-txt2 border-t-transparent rounded-full animate-spin" />
-                Loading more...
-              </div>
-            </div>
-          )}
-        </>
+    <VirtuosoGrid
+      useWindowScroll
+      data={restaurants}
+      restoreStateFrom={initialState}
+      stateChanged={(snap) => {
+        stateRef.current = snap;
+      }}
+      listClassName={gridClass}
+      computeItemKey={(_, r) => r.id}
+      // Render a buffer outside the visible viewport so quick scrolling
+      // doesn't reveal blank gaps. Larger overscan = more DOM, less blanking.
+      overscan={400}
+      itemContent={(i, r) => (
+        <Card
+          r={r}
+          cuisineColor={cuisineColorMap[r.cuisine || ""] || CUISINE_COLORS[0]}
+          onEdit={onEdit}
+          onOrder={onOrder}
+          onCheckIn={onCheckIn}
+          visitingId={visitingId}
+          visits={visits}
+          recommendedItems={recommendedItems?.[r.id]}
+          restaurantPhotos={restaurantPhotos?.[r.id]}
+          imageDisplayMode={imageDisplayMode}
+          userLocation={userLocation}
+          onNavigate={() => handleNavigate(r.id)}
+          priority={i === 0}
+          heroName={
+            activeHeroId === r.id && imageDisplayMode === "full"
+              ? `hero-${r.id}`
+              : undefined
+          }
+        />
       )}
-    </>
+    />
   );
 }
 
@@ -550,7 +440,6 @@ export default function RestaurantGrid({
   onCheckIn,
   visitingId,
   visits,
-  baseDelay,
   recommendedItems,
   restaurantPhotos,
   imageDisplayMode = "full",
@@ -599,7 +488,6 @@ export default function RestaurantGrid({
         onCheckIn={onCheckIn}
         visitingId={visitingId}
         visits={visits}
-        baseDelay={baseDelay}
         recommendedItems={recommendedItems}
         restaurantPhotos={restaurantPhotos}
         imageDisplayMode={imageDisplayMode}
