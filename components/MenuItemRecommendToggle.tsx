@@ -9,14 +9,14 @@ type Props = {
   menuItemId: number;
   recommendedUserIds: string[];
   recommenderNames: Record<string, string>;
-  onChange?: () => void;
+  onLocalToggle?: (nowRecommended: boolean) => void;
 };
 
 export default function MenuItemRecommendToggle({
   menuItemId,
   recommendedUserIds,
   recommenderNames,
-  onChange,
+  onLocalToggle,
 }: Props) {
   const { user, canManageContent } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -29,20 +29,23 @@ export default function MenuItemRecommendToggle({
   async function toggle() {
     if (!user || busy) return;
     tap();
+    const wasRecommending = iRecommend;
+    // Optimistic flip — parent updates `recommendations`, button label
+    // re-renders to the new state immediately.
+    onLocalToggle?.(!wasRecommending);
     setBusy(true);
-    if (iRecommend) {
-      await supabase
-        .from("menu_item_recommendations")
-        .delete()
-        .eq("menu_item_id", menuItemId)
-        .eq("user_id", user.id);
-    } else {
-      await supabase
-        .from("menu_item_recommendations")
-        .insert({ menu_item_id: menuItemId, user_id: user.id });
-    }
+    const op = wasRecommending
+      ? supabase
+          .from("menu_item_recommendations")
+          .delete()
+          .eq("menu_item_id", menuItemId)
+          .eq("user_id", user.id)
+      : supabase
+          .from("menu_item_recommendations")
+          .insert({ menu_item_id: menuItemId, user_id: user.id });
+    const { error } = await op;
+    if (error) onLocalToggle?.(wasRecommending);
     setBusy(false);
-    onChange?.();
   }
 
   return (
@@ -56,7 +59,7 @@ export default function MenuItemRecommendToggle({
             : "bg-transparent text-txt2 border-brd hover:border-accent hover:text-accent"
         }`}
       >
-        {busy ? "..." : iRecommend ? "★ Recommended" : "☆ Recommend"}
+        {iRecommend ? "★ Recommended" : "☆ Recommend"}
       </button>
       {othersRecommend.length > 0 && (
         <span className="text-2xs text-txt2">

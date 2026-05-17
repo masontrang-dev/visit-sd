@@ -18,6 +18,7 @@ import PhotoCarousel, {
 import { CUISINE_COLORS, buildCuisineColorMap } from "@/lib/cuisine-colors";
 import { haversineMiles, formatMiles } from "@/lib/distance";
 import { formatFoodTag } from "@/lib/food-tags";
+import { isSupabaseUrl } from "@/lib/photo";
 
 export type { RestaurantPhoto };
 
@@ -134,7 +135,7 @@ function Card({
                       e.target as HTMLImageElement
                     ).parentElement!.parentElement!.style.display = "none";
                   }}
-                  unoptimized
+                  unoptimized={!isSupabaseUrl(slides[0].url)}
                 />
                 <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg/40 to-transparent pointer-events-none" />
                 <div className="absolute top-2 left-2 flex gap-1.5">

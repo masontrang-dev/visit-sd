@@ -10,10 +10,16 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import imageCompression from "browser-image-compression";
 
+export type OrderSavedPayload = {
+  order: ItemOrder;
+  isEdit: boolean;
+  createdMenuItem?: MenuItem;
+};
+
 type Props = {
   restaurantId: number;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (payload: OrderSavedPayload) => void;
   editOrder?: ItemOrder | null;
   editMenuItem?: MenuItem | null;
   prefillFromOrder?: ItemOrder | null;
@@ -261,6 +267,7 @@ export default function OrderModal({
     setError("");
 
     let menuItemId: number;
+    let createdMenuItem: MenuItem | undefined;
 
     // Create or use existing menu item
     if (selectedItem) {
@@ -292,6 +299,7 @@ export default function OrderModal({
         return;
       }
       menuItemId = newItem.id;
+      createdMenuItem = newItem as MenuItem;
     }
 
     // Upload photo if present
@@ -346,36 +354,48 @@ export default function OrderModal({
       drink_details: drinkDetails,
     };
 
+    let savedOrder: ItemOrder | null = null;
     if (isEditing) {
-      const { error: orderError } = await supabase
+      const { data, error: orderError } = await supabase
         .from("item_orders")
         .update(basePayload)
-        .eq("id", editOrder!.id);
-      if (orderError) {
+        .eq("id", editOrder!.id)
+        .select()
+        .single();
+      if (orderError || !data) {
         setError("Failed to update order.");
         setSaving(false);
         return;
       }
+      savedOrder = data as ItemOrder;
     } else {
       if (!user) {
         setError("You must be signed in to log an order.");
         setSaving(false);
         return;
       }
-      const { error: orderError } = await supabase
+      const { data, error: orderError } = await supabase
         .from("item_orders")
-        .insert([{ ...basePayload, ordered_by: user.id }]);
-      if (orderError) {
+        .insert([{ ...basePayload, ordered_by: user.id }])
+        .select()
+        .single();
+      if (orderError || !data) {
         setError("Failed to save order.");
         setSaving(false);
         return;
       }
+      savedOrder = data as ItemOrder;
     }
 
     setSaving(false);
     setSuccess(true);
+    const payload: OrderSavedPayload = {
+      order: savedOrder,
+      isEdit: isEditing,
+      createdMenuItem,
+    };
     setTimeout(() => {
-      onSaved();
+      onSaved(payload);
       onClose();
     }, 800);
   }
@@ -388,25 +408,33 @@ export default function OrderModal({
     }
     setSaving(true);
     setError("");
-    const { error: insertError } = await supabase.from("item_orders").insert([
-      {
-        menu_item_id: past.menu_item_id,
-        restaurant_id: past.restaurant_id,
-        ordered_at: new Date().toISOString().slice(0, 10),
-        notes: null,
-        drink_details: past.drink_details,
-        photo_url: null,
-        ordered_by: user.id,
-      },
-    ]);
+    const { data, error: insertError } = await supabase
+      .from("item_orders")
+      .insert([
+        {
+          menu_item_id: past.menu_item_id,
+          restaurant_id: past.restaurant_id,
+          ordered_at: new Date().toISOString().slice(0, 10),
+          notes: null,
+          drink_details: past.drink_details,
+          photo_url: null,
+          ordered_by: user.id,
+        },
+      ])
+      .select()
+      .single();
     setSaving(false);
-    if (insertError) {
+    if (insertError || !data) {
       setError("Failed to log order.");
       return;
     }
     setSuccess(true);
+    const payload: OrderSavedPayload = {
+      order: data as ItemOrder,
+      isEdit: false,
+    };
     setTimeout(() => {
-      onSaved();
+      onSaved(payload);
       onClose();
     }, 800);
   }

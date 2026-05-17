@@ -16,7 +16,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/Toast";
 import AddModal from "@/components/AddModal";
-import OrderModal from "@/components/OrderModal";
+import OrderModal, { type OrderSavedPayload } from "@/components/OrderModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import CheckInModal from "@/components/CheckInModal";
 import CuratorRatingControl from "@/components/CuratorRatingControl";
@@ -29,6 +29,8 @@ import PhotoCarousel, {
 } from "@/components/PhotoCarousel";
 import PhotoLightbox, { type LightboxPhoto } from "@/components/PhotoLightbox";
 import Link from "next/link";
+import Image from "next/image";
+import { isSupabaseUrl } from "@/lib/photo";
 import { isCurrentlyOpen } from "@/lib/google-types";
 import { trackEvent } from "@/lib/analytics";
 import { formatDisplayName } from "@/lib/utils";
@@ -624,33 +626,89 @@ export default function RestaurantDetailClient({ params }: Props) {
       return false;
     }
 
-    // Trigger a full refetch of the detail page data (restaurant row, chain
-    // siblings, menu, orders, curator_ratings) so any chain write-through or
-    // linking done in the modal is reflected immediately.
-    setRefreshKey((k) => k + 1);
+    if (entry.chain_id === restaurant.chain_id) {
+      // Common case: only fields on this restaurant changed. Patch state in
+      // place — skip the full fetchData rerun.
+      setRestaurant({ ...restaurant, ...entry });
+    } else {
+      // Chain linkage changed — the modal may have cascaded updates across
+      // siblings. Refetch so menu/orders/chainIds stay consistent.
+      setRefreshKey((k) => k + 1);
+    }
     setShowEditModal(false);
     return true;
   }
 
   async function reloadOrders() {
     if (!restaurant) return;
-    const { data: menuData } = await supabase
-      .from("menu_items")
-      .select("*")
-      .eq("restaurant_id", restaurant.id)
-      .order("name");
-    const items = menuData ?? [];
+    // Menu items and orders are independent — fetch in parallel so the
+    // post-mutation refresh isn't five sequential round-trips.
+    const [menuResult, ordersResult] = await Promise.all([
+      supabase
+        .from("menu_items")
+        .select("*")
+        .eq("restaurant_id", restaurant.id)
+        .order("name"),
+      supabase
+        .from("item_orders")
+        .select("*")
+        .eq("restaurant_id", restaurant.id)
+        .order("ordered_at", { ascending: false }),
+    ]);
+    const items = menuResult.data ?? [];
+    const orders = ordersResult.data ?? [];
     setMenuItems(items);
-
-    const { data: ordersData } = await supabase
-      .from("item_orders")
-      .select("*")
-      .eq("restaurant_id", restaurant.id)
-      .order("ordered_at", { ascending: false });
-    const orders = ordersData ?? [];
     setItemOrders(orders);
 
     await loadRecommendationsAndNames(items, orders);
+  }
+
+  function handleOrderSaved(payload: OrderSavedPayload) {
+    if (payload.createdMenuItem) {
+      const created = payload.createdMenuItem;
+      setMenuItems((prev) =>
+        [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+    }
+    setItemOrders((prev) => {
+      const next = payload.isEdit
+        ? prev.map((o) => (o.id === payload.order.id ? payload.order : o))
+        : [payload.order, ...prev];
+      return next.sort((a, b) => b.ordered_at.localeCompare(a.ordered_at));
+    });
+    // First-time logger for this page: seed their display name so the UI
+    // labels their order with their name instead of "curator".
+    if (
+      !payload.isEdit &&
+      user &&
+      !ordererNames[user.id] &&
+      displayName
+    ) {
+      const label = formatDisplayName(displayName) || "Curator";
+      setOrdererNames((prev) => ({ ...prev, [user.id]: label }));
+    }
+  }
+
+  function optimisticToggleRecommendation(
+    menuItemId: number,
+    nowRecommended: boolean,
+  ) {
+    if (!user) return;
+    setRecommendations((prev) => {
+      const without = prev.filter(
+        (r) => !(r.menu_item_id === menuItemId && r.user_id === user.id),
+      );
+      if (!nowRecommended) return without;
+      return [
+        ...without,
+        {
+          id: -Date.now(),
+          menu_item_id: menuItemId,
+          user_id: user.id,
+          created_at: new Date().toISOString(),
+        },
+      ];
+    });
   }
 
   async function handleLogAgain(source: ItemOrder) {
@@ -1560,12 +1618,14 @@ export default function RestaurantDetailClient({ params }: Props) {
                         className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
                         aria-label={`View photos of ${item.menuItem.name}`}
                       >
-                        <img
+                        <Image
                           src={item.latestPhotoUrl}
                           alt={item.menuItem.name}
+                          width={64}
+                          height={64}
                           loading="lazy"
-                          decoding="async"
                           className="w-16 h-16 object-cover rounded-none border border-brd bg-bg2"
+                          unoptimized={!isSupabaseUrl(item.latestPhotoUrl)}
                         />
                       </button>
                     )}
@@ -1688,12 +1748,14 @@ export default function RestaurantDetailClient({ params }: Props) {
                               className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
                               aria-label={`View photo of ${group.menuItem.name}`}
                             >
-                              <img
+                              <Image
                                 src={group.latestPhotoUrl}
                                 alt={group.menuItem.name}
+                                width={64}
+                                height={64}
                                 loading="lazy"
-                                decoding="async"
                                 className="w-16 h-16 object-cover rounded-none border border-brd bg-bg2"
+                                unoptimized={!isSupabaseUrl(group.latestPhotoUrl)}
                               />
                             </button>
                           )}
@@ -1764,12 +1826,14 @@ export default function RestaurantDetailClient({ params }: Props) {
                               className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
                               aria-label={`View photos of ${group.menuItem.name}`}
                             >
-                              <img
+                              <Image
                                 src={group.latestPhotoUrl}
                                 alt={group.menuItem.name}
+                                width={64}
+                                height={64}
                                 loading="lazy"
-                                decoding="async"
                                 className="w-16 h-16 object-cover rounded-none border border-brd bg-bg2"
+                                unoptimized={!isSupabaseUrl(group.latestPhotoUrl)}
                               />
                             </button>
                           )}
@@ -1780,7 +1844,12 @@ export default function RestaurantDetailClient({ params }: Props) {
                           menuItemId={group.menuItem.id}
                           recommendedUserIds={group.recommenderIds}
                           recommenderNames={recommenderNames}
-                          onChange={reloadOrders}
+                          onLocalToggle={(now) =>
+                            optimisticToggleRecommendation(
+                              group.menuItem.id,
+                              now,
+                            )
+                          }
                         />
                       </div>
                       {!isSingle && expanded && (
@@ -1841,12 +1910,14 @@ export default function RestaurantDetailClient({ params }: Props) {
                                   className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
                                   aria-label={`View photo of ${group.menuItem.name}`}
                                 >
-                                  <img
+                                  <Image
                                     src={order.photo_url}
                                     alt={group.menuItem.name}
+                                    width={64}
+                                    height={64}
                                     loading="lazy"
-                                    decoding="async"
                                     className="w-16 h-16 object-cover rounded-none border border-brd bg-bg2"
+                                    unoptimized={!isSupabaseUrl(order.photo_url)}
                                     onError={(e) => {
                                       (
                                         e.target as HTMLImageElement
@@ -1909,12 +1980,14 @@ export default function RestaurantDetailClient({ params }: Props) {
                             className="shrink-0 p-0 border-none bg-transparent cursor-pointer"
                             aria-label={`View photo of ${menuItem?.name || "order"}`}
                           >
-                            <img
+                            <Image
                               src={order.photo_url}
-                              alt={menuItem?.name}
+                              alt={menuItem?.name ?? ""}
+                              width={64}
+                              height={64}
                               loading="lazy"
-                              decoding="async"
                               className="w-16 h-16 object-cover rounded-none border border-brd bg-bg2"
+                              unoptimized={!isSupabaseUrl(order.photo_url)}
                               onError={(e) => {
                                 (e.target as HTMLImageElement).style.display =
                                   "none";
@@ -2000,7 +2073,7 @@ export default function RestaurantDetailClient({ params }: Props) {
               setEditingOrder(null);
               setEditingMenuItem(null);
             }}
-            onSaved={reloadOrders}
+            onSaved={handleOrderSaved}
           />
         )}
 

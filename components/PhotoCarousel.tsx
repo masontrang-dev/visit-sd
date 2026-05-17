@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import useEmblaCarousel from "embla-carousel-react";
 import { formatRecencyTag } from "@/lib/utils";
+import { isSupabaseUrl } from "@/lib/photo";
 
 export type RestaurantPhoto = {
   url: string;
@@ -116,30 +117,26 @@ export default function PhotoCarousel({
               onClick={onPhotoClick ? () => handleSlideClick(i) : undefined}
             >
               {Math.abs(i - activeIndex) <= 1 &&
-                (photo.isStorefront ? (
-                  <Image
-                    src={photo.url}
-                    alt={photo.itemName ?? ""}
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-                    priority={priority && i === 0}
-                    className="object-cover"
-                    unoptimized
-                    draggable={false}
-                  />
-                ) : (
-                  <img
-                    src={photo.url}
-                    alt={photo.itemName ?? ""}
-                    loading="lazy"
-                    decoding="async"
-                    draggable={false}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.visibility = "hidden";
-                    }}
-                  />
-                ))}
+                (() => {
+                  const isLcpCandidate = priority && i === 0;
+                  return (
+                    <Image
+                      src={photo.url}
+                      alt={photo.itemName ?? ""}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                      priority={isLcpCandidate}
+                      loading={isLcpCandidate ? undefined : "lazy"}
+                      className="object-cover"
+                      unoptimized={!isSupabaseUrl(photo.url)}
+                      draggable={false}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.visibility =
+                          "hidden";
+                      }}
+                    />
+                  );
+                })()}
 
               {/* Bottom-left: item name caption */}
               {photo.itemName && (
