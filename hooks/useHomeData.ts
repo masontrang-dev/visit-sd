@@ -8,6 +8,7 @@ import {
   type MenuItem,
   type RestaurantVisit,
 } from "@/lib/supabase";
+import { computeWeightedCuratorRating } from "@/lib/ratings";
 import type { RestaurantPhoto } from "@/components/RestaurantGrid";
 
 // Module-level in-memory cache for the primary restaurant list. Survives React
@@ -112,7 +113,10 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
         query = query.eq("visibility", "public");
       }
       const { data } = (await query) as { data: Restaurant[] | null };
-      rows = data ?? [];
+      // my_rating is legacy: the grid now derives the curator rating from
+      // curator_ratings in Phase 2 below. Null it out so we never flash the
+      // stale DB value before Phase 2 fills it in.
+      rows = (data ?? []).map((r) => ({ ...r, my_rating: null }));
       setRestaurants(rows);
       setLoading(false);
       restaurantCache[cacheKey] = {
@@ -174,10 +178,14 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
       }>,
       supabase
         .from("curator_ratings")
-        .select("restaurant_id, note")
-        .in("restaurant_id", visibleRestaurantIds)
-        .not("note", "is", null) as Promise<{
-        data: { restaurant_id: number; note: string }[] | null;
+        .select("restaurant_id, note, rating")
+        .in("restaurant_id", visibleRestaurantIds) as Promise<{
+        data: {
+          restaurant_id: number;
+          note: string | null;
+          rating: number | null;
+        }[]
+          | null;
       }>,
     ]);
 
@@ -189,14 +197,32 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     (orderNotesResult.data ?? []).forEach((o) => {
       (index[o.restaurant_id] ??= []).push(o.notes);
     });
+    const ratingsByRestaurant: Record<number, number[]> = {};
     (curatorNotesResult.data ?? []).forEach((c) => {
-      (index[c.restaurant_id] ??= []).push(c.note);
+      if (c.note) (index[c.restaurant_id] ??= []).push(c.note);
+      if (c.rating != null) {
+        (ratingsByRestaurant[c.restaurant_id] ??= []).push(c.rating);
+      }
     });
     const flatIndex: Record<number, string> = {};
     Object.entries(index).forEach(([id, parts]) => {
       flatIndex[Number(id)] = parts.join(" ").toLowerCase();
     });
     setSearchIndex(flatIndex);
+
+    // Derive the grid's curator rating from curator_ratings (weighted), then
+    // re-set restaurants and refresh the cache so back-nav paints with the
+    // computed value instead of flashing empty ratings.
+    const mergedRows = rows.map((r) => ({
+      ...r,
+      my_rating: computeWeightedCuratorRating(ratingsByRestaurant[r.id] ?? []),
+    }));
+    rows = mergedRows;
+    setRestaurants(mergedRows);
+    restaurantCache[cacheKey] = {
+      restaurants: mergedRows,
+      timestamp: Date.now(),
+    };
 
     const recRows = recResult.data ?? [];
     const orderRows = orderResult.data ?? [];

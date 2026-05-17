@@ -483,7 +483,10 @@ function HomeContent() {
   const curatorRatingCounts = useMemo(() => {
     const m: Record<number, number> = {};
     visibilityScoped.forEach((r) => {
-      if (r.my_rating != null) m[r.my_rating] = (m[r.my_rating] ?? 0) + 1;
+      if (r.my_rating != null) {
+        const bucket = Math.round(r.my_rating);
+        m[bucket] = (m[bucket] ?? 0) + 1;
+      }
     });
     return m;
   }, [visibilityScoped]);
@@ -521,7 +524,7 @@ function HomeContent() {
         if (activeCuratorRatings.length > 0) {
           if (
             r.my_rating == null ||
-            !activeCuratorRatings.includes(r.my_rating)
+            !activeCuratorRatings.includes(Math.round(r.my_rating))
           )
             return false;
         } else if (!isAdmin) {

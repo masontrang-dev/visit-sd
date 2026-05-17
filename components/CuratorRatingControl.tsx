@@ -14,7 +14,7 @@ export default function CuratorRatingControl({
   return (
     <div className="flex-1 text-center py-3 px-3">
       <div className="font-display text-[clamp(32px,6vw,40px)] leading-none text-accent mb-1">
-        {loaded && avg !== null ? `${avg}/5` : "—"}
+        {loaded && avg !== null ? `${avg.toFixed(1)}/5` : "—"}
       </div>
       <div className="text-2xs uppercase tracking-wide text-txt2 mb-0.5">
         Curators&rsquo; rating

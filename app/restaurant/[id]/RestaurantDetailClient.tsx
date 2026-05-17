@@ -41,6 +41,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { isSupabaseUrl } from "@/lib/photo";
 import { isCurrentlyOpen } from "@/lib/google-types";
+import { computeWeightedCuratorRating } from "@/lib/ratings";
 import { trackEvent } from "@/lib/analytics";
 import { formatDisplayName } from "@/lib/utils";
 import { success } from "@/lib/haptics";
@@ -158,13 +159,14 @@ export default function RestaurantDetailClient({
   const [curatorRatingsLoaded, setCuratorRatingsLoaded] = useState(false);
   const [editingMyTake, setEditingMyTake] = useState(false);
 
-  // Average of the 1-5 ratings (ignoring note-only rows). Drives both the
-  // "Curators' rating" header and the public notes-section heading.
+  // Bayesian-weighted curator rating (matches the home grid). Excludes
+  // note-only rows. Drives both the "Curators' rating" header and the public
+  // notes-section heading.
   const curatorAvg = useMemo(() => {
-    const rated = curatorRatings.filter((r) => r.rating !== null);
-    if (rated.length === 0) return null;
-    const sum = rated.reduce((s, r) => s + (r.rating ?? 0), 0);
-    return sum / rated.length;
+    const rated = curatorRatings
+      .map((r) => r.rating)
+      .filter((v): v is number => v !== null);
+    return computeWeightedCuratorRating(rated);
   }, [curatorRatings]);
   const [isScrolled, setIsScrolled] = useState(false);
   const hasScrolled = useRef(false);
@@ -1441,7 +1443,7 @@ export default function RestaurantDetailClient({
           <div className="w-px bg-brd" />
           <CuratorRatingControl
             ratingsCount={curatorRatings.length}
-            avg={curatorAvg !== null ? Math.round(curatorAvg * 2) / 2 : null}
+            avg={curatorAvg}
             loaded={curatorRatingsLoaded}
           />
           <div className="w-px bg-brd" />

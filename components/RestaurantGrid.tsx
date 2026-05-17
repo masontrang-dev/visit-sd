@@ -332,7 +332,7 @@ const Card = memo(function Card({
         </div>
 
         {/* Ratings row */}
-        {(r.google_rating || r.my_rating) && (
+        {(r.google_rating != null || r.my_rating != null) && (
           <div className="flex items-center gap-2.5 mt-2 flex-wrap text-xs">
             {r.google_rating && (
               <div className="flex items-center gap-1">
@@ -343,13 +343,15 @@ const Card = memo(function Card({
                 <span className="text-txt2">Google</span>
               </div>
             )}
-            {r.google_rating && r.my_rating && (
+            {r.google_rating != null && r.my_rating != null && (
               <div className="w-px h-3 bg-brd" />
             )}
-            {r.my_rating && (
+            {r.my_rating != null && (
               <div className="flex items-center gap-1">
                 <span className="text-accent">★</span>
-                <span className="font-medium text-txt">{r.my_rating}/5</span>
+                <span className="font-medium text-txt">
+                  {r.my_rating.toFixed(1)}/5
+                </span>
                 <span className="text-txt2">Curators&rsquo;</span>
               </div>
             )}
