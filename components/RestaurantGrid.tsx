@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { VirtuosoGrid } from "react-virtuoso";
 import {
   type Restaurant,
   type RestaurantVisit,
@@ -22,6 +21,39 @@ import { formatFoodTag } from "@/lib/food-tags";
 import { isSupabaseUrl } from "@/lib/photo";
 
 export type { RestaurantPhoto };
+
+/**
+ * Tracks whether an element is within `rootMargin` of the viewport. Returns a
+ * ref to attach to the target plus a boolean that flips `true` the first time
+ * the element enters the buffered viewport and stays `true` thereafter
+ * (the observer disconnects so we never re-flicker on scroll-back).
+ *
+ * Pass `initial=true` for cards that should mount eagerly regardless of
+ * viewport (e.g. the LCP candidate).
+ */
+function useNearViewport(rootMargin: string, initial = false) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [near, setNear] = useState(initial);
+
+  useEffect(() => {
+    if (near) return;
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setNear(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [near, rootMargin]);
+
+  return [ref, near] as const;
+}
 
 type Props = {
   restaurants: Restaurant[];
@@ -79,6 +111,12 @@ function Card({
       ? haversineMiles(userLocation.lat, userLocation.lng, r.lat, r.lng)
       : null;
 
+  // Lazy-mount the photo/carousel area: 600px buffer means cards within ~2
+  // screens of the viewport are pre-mounted; once mounted, they stay so we
+  // never re-flicker on scroll-back. The LCP-priority card mounts eagerly
+  // so the first image starts loading immediately.
+  const [photoRef, photoNear] = useNearViewport("600px", priority);
+
   function formatDate(dateStr: string | null) {
     if (!dateStr) return "";
     const date = new Date(dateStr);
@@ -118,25 +156,28 @@ function Card({
           if (imageDisplayMode === "compact") {
             return (
               <div
+                ref={photoRef}
                 className="relative overflow-hidden h-[100px] bg-bg2"
                 style={{
                   backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${cuisineColor} 25%, transparent), var(--bg2))`,
                 }}
               >
-                <Image
-                  src={slides[0].url}
-                  alt={r.name}
-                  fill
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-                  priority={priority}
-                  className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  onError={(e) => {
-                    (
-                      e.target as HTMLImageElement
-                    ).parentElement!.parentElement!.style.display = "none";
-                  }}
-                  unoptimized={!isSupabaseUrl(slides[0].url)}
-                />
+                {photoNear && (
+                  <Image
+                    src={slides[0].url}
+                    alt={r.name}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                    priority={priority}
+                    className="object-cover transition-transform duration-300 group-hover:scale-105"
+                    onError={(e) => {
+                      (
+                        e.target as HTMLImageElement
+                      ).parentElement!.parentElement!.style.display = "none";
+                    }}
+                    unoptimized={!isSupabaseUrl(slides[0].url)}
+                  />
+                )}
                 <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-bg/40 to-transparent pointer-events-none" />
                 <div className="absolute top-2 left-2 flex gap-1.5">
                   {r.must_try && (
@@ -167,15 +208,28 @@ function Card({
             );
           }
 
-          return (
-            <PhotoCarousel
-              photos={slides}
-              priority={priority}
-              recencyTag={recencyTag}
-              openNow={openNow}
-              mustTry={!!r.must_try}
-              heroName={heroName}
-              cuisineColor={cuisineColor}
+          return photoNear ? (
+            <div ref={photoRef}>
+              <PhotoCarousel
+                photos={slides}
+                priority={priority}
+                recencyTag={recencyTag}
+                openNow={openNow}
+                mustTry={!!r.must_try}
+                heroName={heroName}
+                cuisineColor={cuisineColor}
+              />
+            </div>
+          ) : (
+            // Placeholder matches PhotoCarousel's default aspect/background so
+            // the card height is identical to the eventual rendered version —
+            // no layout shift when the real carousel mounts.
+            <div
+              ref={photoRef}
+              className="relative overflow-hidden aspect-[3/2] bg-bg2"
+              style={{
+                backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${cuisineColor} 25%, transparent), var(--bg2))`,
+              }}
             />
           );
         })()}
@@ -320,9 +374,19 @@ function Card({
 const gridClass =
   "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0 bg-brd border-l border-brd";
 
-const GRID_TOP_INDEX_KEY = "visitsd-grid-top-index";
-
-function InfiniteCardGrid({
+/**
+ * Plain CSS-Grid render of all restaurant cards. We deliberately do NOT
+ * virtualize: at ~100 items the per-card outer DOM is cheap, and native
+ * browser scroll restoration handles position perfectly across navigations.
+ * Memory savings come from `Card` lazy-mounting its photo/carousel area
+ * via `useNearViewport` — only cards within ~600px of the viewport
+ * construct an Embla instance + start loading images.
+ *
+ * Previously we used `VirtuosoGrid`, which caused bottom-of-list flicker as
+ * items re-measured during scroll. Lazy-mounting heavy subtrees while
+ * keeping the outer grid static eliminates that class of bug entirely.
+ */
+function FlatCardGrid({
   restaurants,
   cuisineColorMap,
   onEdit,
@@ -348,67 +412,15 @@ function InfiniteCardGrid({
   userLocation?: { lat: number; lng: number } | null;
 }) {
   const [activeHeroId, setActiveHeroId] = useState<number | null>(null);
-  const topIndexRef = useRef<number>(0);
-
-  // Read the saved top-most index once on mount and clear it so a hard
-  // refresh starts from the top. Storing just the index — rather than a
-  // full Virtuoso state snapshot — makes restoration robust to card
-  // height changes as photos / recommendations stream in (the previous
-  // restoreStateFrom approach caused visible jumping while data loaded).
-  const initialTopIndex = useMemo<number>(() => {
-    if (typeof window === "undefined") return 0;
-    try {
-      const raw = sessionStorage.getItem(GRID_TOP_INDEX_KEY);
-      if (!raw) return 0;
-      sessionStorage.removeItem(GRID_TOP_INDEX_KEY);
-      const n = parseInt(raw, 10);
-      return Number.isFinite(n) && n >= 0 ? n : 0;
-    } catch {
-      return 0;
-    }
-  }, []);
-
-  // Persist current top index on tab hide so browser back / swipe-back
-  // restore positions correctly even without onNavigate firing.
-  useEffect(() => {
-    const onVisibility = () => {
-      if (document.visibilityState !== "hidden") return;
-      try {
-        sessionStorage.setItem(
-          GRID_TOP_INDEX_KEY,
-          String(topIndexRef.current),
-        );
-      } catch {}
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, []);
-
   const handleNavigate = useCallback((id: number) => {
     setActiveHeroId(id);
-    try {
-      sessionStorage.setItem(
-        GRID_TOP_INDEX_KEY,
-        String(topIndexRef.current),
-      );
-    } catch {}
   }, []);
 
   return (
-    <VirtuosoGrid
-      useWindowScroll
-      data={restaurants}
-      initialTopMostItemIndex={initialTopIndex}
-      rangeChanged={({ startIndex }) => {
-        topIndexRef.current = startIndex;
-      }}
-      listClassName={gridClass}
-      computeItemKey={(_, r) => r.id}
-      // Render a buffer outside the visible viewport so quick scrolling
-      // doesn't reveal blank gaps. Larger overscan = more DOM, less blanking.
-      overscan={400}
-      itemContent={(i, r) => (
+    <div className={gridClass}>
+      {restaurants.map((r, i) => (
         <Card
+          key={r.id}
           r={r}
           cuisineColor={cuisineColorMap[r.cuisine || ""] || CUISINE_COLORS[0]}
           onEdit={onEdit}
@@ -428,8 +440,8 @@ function InfiniteCardGrid({
               : undefined
           }
         />
-      )}
-    />
+      ))}
+    </div>
   );
 }
 
@@ -481,7 +493,7 @@ export default function RestaurantGrid({
 
   if (!grouped) {
     return (
-      <InfiniteCardGrid
+      <FlatCardGrid
         restaurants={sorted}
         cuisineColorMap={cuisineColorMap}
         onEdit={onEdit}
