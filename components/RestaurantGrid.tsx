@@ -3,10 +3,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  VirtuosoGrid,
-  type GridStateSnapshot,
-} from "react-virtuoso";
+import { VirtuosoGrid } from "react-virtuoso";
 import {
   type Restaurant,
   type RestaurantVisit,
@@ -323,7 +320,7 @@ function Card({
 const gridClass =
   "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0 bg-brd border-l border-brd";
 
-const GRID_STATE_KEY = "visitsd-grid-virtuoso-state";
+const GRID_TOP_INDEX_KEY = "visitsd-grid-top-index";
 
 function InfiniteCardGrid({
   restaurants,
@@ -351,33 +348,35 @@ function InfiniteCardGrid({
   userLocation?: { lat: number; lng: number } | null;
 }) {
   const [activeHeroId, setActiveHeroId] = useState<number | null>(null);
-  const stateRef = useRef<GridStateSnapshot | null>(null);
+  const topIndexRef = useRef<number>(0);
 
-  // Read the saved Virtuoso scroll snapshot once on mount and immediately
-  // remove it from sessionStorage so a hard refresh starts from the top.
-  const initialState = useMemo<GridStateSnapshot | undefined>(() => {
-    if (typeof window === "undefined") return undefined;
+  // Read the saved top-most index once on mount and clear it so a hard
+  // refresh starts from the top. Storing just the index — rather than a
+  // full Virtuoso state snapshot — makes restoration robust to card
+  // height changes as photos / recommendations stream in (the previous
+  // restoreStateFrom approach caused visible jumping while data loaded).
+  const initialTopIndex = useMemo<number>(() => {
+    if (typeof window === "undefined") return 0;
     try {
-      const raw = sessionStorage.getItem(GRID_STATE_KEY);
-      if (!raw) return undefined;
-      sessionStorage.removeItem(GRID_STATE_KEY);
-      return JSON.parse(raw) as GridStateSnapshot;
+      const raw = sessionStorage.getItem(GRID_TOP_INDEX_KEY);
+      if (!raw) return 0;
+      sessionStorage.removeItem(GRID_TOP_INDEX_KEY);
+      const n = parseInt(raw, 10);
+      return Number.isFinite(n) && n >= 0 ? n : 0;
     } catch {
-      return undefined;
+      return 0;
     }
   }, []);
 
-  // Persist whatever the latest snapshot is whenever the tab is hidden so we
-  // restore correctly even if the user uses the browser back button (which
-  // doesn't fire onNavigate).
+  // Persist current top index on tab hide so browser back / swipe-back
+  // restore positions correctly even without onNavigate firing.
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState !== "hidden") return;
-      if (!stateRef.current) return;
       try {
         sessionStorage.setItem(
-          GRID_STATE_KEY,
-          JSON.stringify(stateRef.current),
+          GRID_TOP_INDEX_KEY,
+          String(topIndexRef.current),
         );
       } catch {}
     };
@@ -387,9 +386,11 @@ function InfiniteCardGrid({
 
   const handleNavigate = useCallback((id: number) => {
     setActiveHeroId(id);
-    if (!stateRef.current) return;
     try {
-      sessionStorage.setItem(GRID_STATE_KEY, JSON.stringify(stateRef.current));
+      sessionStorage.setItem(
+        GRID_TOP_INDEX_KEY,
+        String(topIndexRef.current),
+      );
     } catch {}
   }, []);
 
@@ -397,9 +398,9 @@ function InfiniteCardGrid({
     <VirtuosoGrid
       useWindowScroll
       data={restaurants}
-      restoreStateFrom={initialState}
-      stateChanged={(snap) => {
-        stateRef.current = snap;
+      initialTopMostItemIndex={initialTopIndex}
+      rangeChanged={({ startIndex }) => {
+        topIndexRef.current = startIndex;
       }}
       listClassName={gridClass}
       computeItemKey={(_, r) => r.id}

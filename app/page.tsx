@@ -127,6 +127,7 @@ function HomeContent() {
     visits,
     searchIndex,
     loading,
+    secondaryLoaded,
     reload,
   } = useHomeData(isAdmin, user);
   const {
@@ -662,7 +663,7 @@ function HomeContent() {
       )}
 
       <div className="relative z-0">
-        {loading ? (
+        {loading || !secondaryLoaded ? (
           <SkeletonGrid />
         ) : (
           <div className="relative">

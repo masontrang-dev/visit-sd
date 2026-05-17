@@ -20,6 +20,11 @@ export type HomeData = {
    * data that doesn't live on the restaurant row itself. */
   searchIndex: Record<number, string>;
   loading: boolean;
+  /** True once the secondary data (recommendations, photos, search index) has
+   * finished loading. Used by the home page to defer mounting the virtualized
+   * grid until card content is stable — without this, cards grow as data
+   * streams in and the windowed list visibly reflows. */
+  secondaryLoaded: boolean;
   reload: () => Promise<void>;
 };
 
@@ -34,6 +39,7 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
   const [visits, setVisits] = useState<Record<number, RestaurantVisit[]>>({});
   const [searchIndex, setSearchIndex] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
+  const [secondaryLoaded, setSecondaryLoaded] = useState(false);
 
   const loadVisits = useCallback(async () => {
     const { data } = await supabase
@@ -50,6 +56,7 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
   }, []);
 
   const load = useCallback(async () => {
+    setSecondaryLoaded(false);
     // Phase 1: fetch restaurants and render the grid immediately.
     let query = supabase
       .from("restaurants")
@@ -64,7 +71,10 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     setRestaurants(rows);
     setLoading(false);
 
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      setSecondaryLoaded(true);
+      return;
+    }
     const visibleRestaurantIds = rows.map((r) => r.id);
 
     // Phase 2: recommendations, order photos, and the per-restaurant search
@@ -209,6 +219,8 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
       });
       setRestaurantPhotos(buckets);
     }
+
+    setSecondaryLoaded(true);
   }, [isAdmin]);
 
   useEffect(() => {
@@ -230,6 +242,7 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     visits,
     searchIndex,
     loading,
+    secondaryLoaded,
     reload: load,
   };
 }
