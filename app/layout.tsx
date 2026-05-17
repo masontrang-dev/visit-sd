@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import ToastProvider from "@/components/Toast";
 import PageViewTracker from "@/components/PageViewTracker";
+import WelcomeModal from "@/components/WelcomeModal";
 
 const bebasNeue = Bebas_Neue({
   weight: "400",
@@ -70,6 +71,7 @@ export default function RootLayout({
         <AuthProvider>
           <ToastProvider>
             <PageViewTracker />
+            <WelcomeModal />
             {children}
           </ToastProvider>
         </AuthProvider>
