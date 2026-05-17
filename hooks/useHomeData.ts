@@ -8,7 +8,6 @@ import {
   type MenuItem,
   type RestaurantVisit,
 } from "@/lib/supabase";
-import { computeWeightedCuratorRating } from "@/lib/ratings";
 import type { RestaurantPhoto } from "@/components/RestaurantGrid";
 
 // Module-level in-memory cache for the primary restaurant list. Survives React
@@ -50,6 +49,10 @@ export type HomeData = {
    * order notes, curator take notes). Lets the client searchbar match against
    * data that doesn't live on the restaurant row itself. */
   searchIndex: Record<number, string>;
+  /** Number of non-null curator ratings per restaurant. Used as a tiebreaker
+   * in the default sort so a 5.0 from three curators ranks above a 5.0 from
+   * one. */
+  curatorRatingCountByRestaurant: Record<number, number>;
   loading: boolean;
   /** True once the secondary data (recommendations, photos, search index) has
    * finished loading. Used by the home page to defer mounting the virtualized
@@ -69,6 +72,8 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
   >({});
   const [visits, setVisits] = useState<Record<number, RestaurantVisit[]>>({});
   const [searchIndex, setSearchIndex] = useState<Record<number, string>>({});
+  const [curatorRatingCountByRestaurant, setCuratorRatingCountByRestaurant] =
+    useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const [secondaryLoaded, setSecondaryLoaded] = useState(false);
 
@@ -210,15 +215,22 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     });
     setSearchIndex(flatIndex);
 
-    // Derive the grid's curator rating from curator_ratings (weighted), then
-    // re-set restaurants and refresh the cache so back-nav paints with the
-    // computed value instead of flashing empty ratings.
-    const mergedRows = rows.map((r) => ({
-      ...r,
-      my_rating: computeWeightedCuratorRating(ratingsByRestaurant[r.id] ?? []),
-    }));
+    // Derive the grid's curator rating from curator_ratings (simple avg),
+    // then re-set restaurants and refresh the cache so back-nav paints with
+    // the computed value instead of flashing empty ratings.
+    const countByRestaurant: Record<number, number> = {};
+    const mergedRows = rows.map((r) => {
+      const rs = ratingsByRestaurant[r.id] ?? [];
+      countByRestaurant[r.id] = rs.length;
+      const avg =
+        rs.length > 0
+          ? Math.round((rs.reduce((a, b) => a + b, 0) / rs.length) * 10) / 10
+          : null;
+      return { ...r, my_rating: avg };
+    });
     rows = mergedRows;
     setRestaurants(mergedRows);
+    setCuratorRatingCountByRestaurant(countByRestaurant);
     restaurantCache[cacheKey] = {
       restaurants: mergedRows,
       timestamp: Date.now(),
@@ -325,6 +337,7 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     restaurantPhotos,
     visits,
     searchIndex,
+    curatorRatingCountByRestaurant,
     loading,
     secondaryLoaded,
     reload,

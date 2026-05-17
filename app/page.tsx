@@ -165,6 +165,7 @@ function HomeContent() {
     restaurantPhotos,
     visits,
     searchIndex,
+    curatorRatingCountByRestaurant,
     loading,
     secondaryLoaded,
     reload,
@@ -622,11 +623,23 @@ function HomeContent() {
         const ra = a.my_rating ?? -1;
         const rb = b.my_rating ?? -1;
         if (rb !== ra) return rb - ra;
+        // Tie-break by curator count: more reviewers agreeing on the same
+        // rating outranks fewer (e.g. 5.0 from three curators beats 5.0
+        // from one).
+        const ca = curatorRatingCountByRestaurant[a.id] ?? 0;
+        const cb = curatorRatingCountByRestaurant[b.id] ?? 0;
+        if (cb !== ca) return cb - ca;
         return (a.name || "").localeCompare(b.name || "");
       });
     }
     return arr;
-  }, [filtered, sortMode, lastVisitedByRestaurant, geoPosition]);
+  }, [
+    filtered,
+    sortMode,
+    lastVisitedByRestaurant,
+    geoPosition,
+    curatorRatingCountByRestaurant,
+  ]);
 
   const { displayList, chainLocationCounts } = useMemo(() => {
     if (sortMode === "near-me") {
