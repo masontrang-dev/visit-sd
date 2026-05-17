@@ -44,7 +44,11 @@ const nextConfig = {
     ],
   },
   experimental: {
-    viewTransition: true,
+    // Temporarily disabled — under investigation as a probable iOS Safari
+    // memory leak source. View Transition snapshots can retain old DOM
+    // bitmaps across navigations on iOS WebKit, causing tab crashes after
+    // repeated grid <-> detail navigation. Flip back after confirming.
+    viewTransition: false,
   },
   async headers() {
     return [

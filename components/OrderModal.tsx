@@ -8,7 +8,6 @@ import {
   type DrinkDetails,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
-import imageCompression from "browser-image-compression";
 
 export type OrderSavedPayload = {
   order: ItemOrder;
@@ -107,6 +106,20 @@ export default function OrderModal({
     editOrder?.ordered_at ?? new Date().toISOString().slice(0, 10),
   );
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  // Cached blob URL for the preview <img>. Recreating it on every render —
+  // the previous pattern — pinned each File in memory until the tab closed
+  // because the URL was never revoked. Mint one URL per file and revoke it
+  // when the file changes or the modal unmounts.
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(photoFile);
+    setPhotoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
   // Photos are per-visit and do not carry over from a prefill source.
   const [photoUrl, setPhotoUrl] = useState(
     isEditing ? (editOrder?.photo_url ?? "") : "",
@@ -308,6 +321,9 @@ export default function OrderModal({
       setUploading(true);
       let fileToUpload = photoFile;
       try {
+        const { default: imageCompression } = await import(
+          "browser-image-compression"
+        );
         fileToUpload = await imageCompression(photoFile, {
           maxSizeMB: 0.5,
           maxWidthOrHeight: 1920,
@@ -1061,7 +1077,7 @@ export default function OrderModal({
           </div>
           {(photoFile || photoUrl.trim()) && (
             <img
-              src={photoFile ? URL.createObjectURL(photoFile) : photoUrl.trim()}
+              src={photoPreviewUrl ?? photoUrl.trim()}
               alt="Preview"
               className="mt-2 w-full h-[120px] object-cover border border-brd"
               onError={(e) => {

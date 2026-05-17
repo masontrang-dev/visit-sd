@@ -788,32 +788,21 @@ export default function RestaurantDetailClient({ params }: Props) {
       return;
     }
 
-    // Reload visits
-    const { data: visitsData } = await supabase
-      .from("restaurant_visits")
-      .select("*")
-      .eq("restaurant_id", restaurant.id)
-      .order("visited_at", { ascending: false });
-
-    setVisits(visitsData ?? []);
-
-    // Update last_visited if needed
+    // `visits` is already sorted by visited_at desc — filtering preserves
+    // that order, so remaining[0] is the next most recent visit.
+    const remaining = visits.filter((v) => v.id !== visitId);
     const newLastVisited =
-      visitsData && visitsData.length > 0 ? visitsData[0].visited_at : null;
+      remaining.length > 0 ? remaining[0].visited_at : null;
+    setVisits(remaining);
+    setRestaurant({ ...restaurant, last_visited: newLastVisited });
 
-    await supabase
+    // Fire-and-forget. If this write fails the local state is still correct
+    // for this session; a subsequent page load would re-read the stale value.
+    void supabase
       .from("restaurants")
       .update({ last_visited: newLastVisited })
       .eq("id", restaurant.id);
 
-    // Reload restaurant data
-    const { data: restaurantData } = await supabase
-      .from("restaurants")
-      .select("*")
-      .eq("id", restaurant.id)
-      .single();
-
-    if (restaurantData) setRestaurant(restaurantData);
     setDeletingVisitId(null);
     toast("Visit deleted", "success");
   }
@@ -829,53 +818,61 @@ export default function RestaurantDetailClient({ params }: Props) {
     recommenderIds: string[];
   };
 
-  const dishGroups: DishGroup[] = menuItems.map((mi) => {
-    const orders = itemOrders.filter((o) => o.menu_item_id === mi.id);
-    const latestOrder = orders[0] ?? null;
-    const noteOrder =
-      orders.find((o) => (o.notes ?? "").trim().length > 0) ?? null;
-    const latestPhotoUrl =
-      orders.find((o) => (o.photo_url ?? "").trim().length > 0)?.photo_url ??
-      null;
-    const recommenderIds = recommendations
-      .filter((r) => r.menu_item_id === mi.id)
-      .map((r) => r.user_id);
-    return {
-      menuItem: mi,
-      orders,
-      latestOrder,
-      noteOrder,
-      latestPhotoUrl,
-      orderCount: orders.length,
-      recommenderIds,
-    };
-  });
+  const dishGroups = useMemo<DishGroup[]>(() => {
+    return menuItems.map((mi) => {
+      const orders = itemOrders.filter((o) => o.menu_item_id === mi.id);
+      const latestOrder = orders[0] ?? null;
+      const noteOrder =
+        orders.find((o) => (o.notes ?? "").trim().length > 0) ?? null;
+      const latestPhotoUrl =
+        orders.find((o) => (o.photo_url ?? "").trim().length > 0)?.photo_url ??
+        null;
+      const recommenderIds = recommendations
+        .filter((r) => r.menu_item_id === mi.id)
+        .map((r) => r.user_id);
+      return {
+        menuItem: mi,
+        orders,
+        latestOrder,
+        noteOrder,
+        latestPhotoUrl,
+        orderCount: orders.length,
+        recommenderIds,
+      };
+    });
+  }, [menuItems, itemOrders, recommendations]);
 
   // Public "What to order here": at least one curator recommends it.
-  const publicDishes = dishGroups
-    .filter((g) => g.recommenderIds.length > 0)
-    .sort((a, b) => {
-      if (b.recommenderIds.length !== a.recommenderIds.length)
-        return b.recommenderIds.length - a.recommenderIds.length;
-      return b.orderCount - a.orderCount;
-    });
+  const publicDishes = useMemo(() => {
+    return dishGroups
+      .filter((g) => g.recommenderIds.length > 0)
+      .sort((a, b) => {
+        if (b.recommenderIds.length !== a.recommenderIds.length)
+          return b.recommenderIds.length - a.recommenderIds.length;
+        return b.orderCount - a.orderCount;
+      });
+  }, [dishGroups]);
 
   // Curator "My history here": every dish with at least one order, sorted by order count.
-  const curatorDishes = dishGroups
-    .filter((g) => g.orderCount > 0)
-    .sort((a, b) => {
-      if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount;
-      const aLatest = a.latestOrder?.ordered_at ?? "";
-      const bLatest = b.latestOrder?.ordered_at ?? "";
-      return bLatest.localeCompare(aLatest);
-    });
+  const curatorDishes = useMemo(() => {
+    return dishGroups
+      .filter((g) => g.orderCount > 0)
+      .sort((a, b) => {
+        if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount;
+        const aLatest = a.latestOrder?.ordered_at ?? "";
+        const bLatest = b.latestOrder?.ordered_at ?? "";
+        return bLatest.localeCompare(aLatest);
+      });
+  }, [dishGroups]);
 
   // Usual-order badge: boba drink with >=3 orders that is >50% of boba orders at this shop.
-  const bobaOrders = itemOrders.filter((o) => {
-    const mi = menuItems.find((m) => m.id === o.menu_item_id);
-    return mi?.category === "boba";
-  });
-  const usualBadgeDishId = (() => {
+  const bobaOrders = useMemo(() => {
+    return itemOrders.filter((o) => {
+      const mi = menuItems.find((m) => m.id === o.menu_item_id);
+      return mi?.category === "boba";
+    });
+  }, [itemOrders, menuItems]);
+  const usualBadgeDishId = useMemo(() => {
     if (bobaOrders.length === 0) return null;
     const counts: Record<number, number> = {};
     bobaOrders.forEach((o) => {
@@ -887,7 +884,7 @@ export default function RestaurantDetailClient({ params }: Props) {
     if (!topId || topCount < 3) return null;
     if (topCount / bobaOrders.length <= 0.5) return null;
     return parseInt(topId);
-  })();
+  }, [bobaOrders]);
 
   function formatDrinkSummary(details: DrinkDetails | null): string {
     if (!details) return "";
@@ -1172,6 +1169,7 @@ export default function RestaurantDetailClient({ params }: Props) {
               photos={heroPhotos}
               priority
               aspectClass="aspect-[16/9] max-h-[320px]"
+              sizes="(max-width: 640px) 100vw, 640px"
               heroName={`hero-${restaurant.id}`}
               onPhotoClick={(i) => {
                 setLightbox({

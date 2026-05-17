@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import { useAuth } from "@/lib/auth-context";
-import imageCompression from "browser-image-compression";
 import ConfirmModal from "@/components/ConfirmModal";
 import { type Restaurant } from "@/lib/supabase";
 import {
@@ -85,6 +84,19 @@ export default function AddModal({
   );
   const [photoUrl, setPhotoUrl] = useState(editData?.photo_url ?? "");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  // Cache the preview blob URL so it is created once per file and revoked on
+  // change / unmount. Previously a new blob URL was minted on every render
+  // and never released, pinning each picked photo in memory.
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(photoFile);
+    setPhotoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
   const [uploading, setUploading] = useState(false);
   const [address, setAddress] = useState(editData?.address ?? "");
   const [googleMapsUrl, setGoogleMapsUrl] = useState(
@@ -337,6 +349,9 @@ export default function AddModal({
       // Compress image before upload
       let fileToUpload = photoFile;
       try {
+        const { default: imageCompression } = await import(
+          "browser-image-compression"
+        );
         const options = {
           maxSizeMB: 0.5, // Max 500KB
           maxWidthOrHeight: 1920, // Max dimension
@@ -1082,9 +1097,7 @@ export default function AddModal({
             </div>
             {(photoFile || photoUrl.trim()) && (
               <img
-                src={
-                  photoFile ? URL.createObjectURL(photoFile) : photoUrl.trim()
-                }
+                src={photoPreviewUrl ?? photoUrl.trim()}
                 alt="Preview"
                 className="mt-2 w-full h-[120px] object-cover border border-brd"
                 onError={(e) => {

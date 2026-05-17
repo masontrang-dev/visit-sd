@@ -23,7 +23,14 @@ type Props = {
   heroName?: string;
   cuisineColor?: string;
   onPhotoClick?: (index: number) => void;
+  /** `sizes` attribute for the underlying <Image>. Defaults to the grid-card
+   * breakpoints; pass a smaller value for the detail-page hero so Vercel
+   * serves a smaller variant (and Safari decodes fewer pixels into memory). */
+  sizes?: string;
 };
+
+const DEFAULT_SIZES =
+  "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw";
 
 export default function PhotoCarousel({
   photos,
@@ -35,6 +42,7 @@ export default function PhotoCarousel({
   heroName,
   cuisineColor,
   onPhotoClick,
+  sizes = DEFAULT_SIZES,
 }: Props) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: "start",
@@ -124,7 +132,7 @@ export default function PhotoCarousel({
                       src={photo.url}
                       alt={photo.itemName ?? ""}
                       fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                      sizes={sizes}
                       priority={isLcpCandidate}
                       loading={isLcpCandidate ? undefined : "lazy"}
                       className="object-cover"
