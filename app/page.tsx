@@ -16,6 +16,7 @@ import { supabase, type Restaurant } from "@/lib/supabase";
 import RestaurantGrid from "@/components/RestaurantGrid";
 import FilterBar from "@/components/FilterBar";
 import SurpriseBar from "@/components/SurpriseBar";
+import NearMeOrigin from "@/components/NearMeOrigin";
 
 // MapView pulls in @vis.gl/react-google-maps + @googlemaps/js-api-loader and
 // triggers fetches to maps.googleapis.com. Keep it out of the initial bundle —
@@ -276,6 +277,25 @@ function HomeContent() {
     request: requestGeo,
   } = useGeolocation();
 
+  const [manualNearMePosition, setManualNearMePosition] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [manualNearMeLabel, setManualNearMeLabel] = useState("");
+
+  const handleManualNearMeChange = useCallback(
+    (position: { lat: number; lng: number } | null, label: string) => {
+      setManualNearMePosition(position);
+      setManualNearMeLabel(label);
+    },
+    [],
+  );
+
+  // Whichever origin the user picked most recently wins. A manual address
+  // takes precedence over GPS so users can research a different neighborhood
+  // without revoking location permission.
+  const nearMePosition = manualNearMePosition ?? geoPosition;
+
   const { ids: wishlistIds } = useWishlist(user);
 
   // If the user signs out or clears their wishlist, don't leave the
@@ -285,10 +305,14 @@ function HomeContent() {
   }, [user, wishlistFilter, setWishlistFilter]);
 
   useEffect(() => {
-    if (sortMode === "near-me" && geoStatus === "idle") {
+    if (
+      sortMode === "near-me" &&
+      geoStatus === "idle" &&
+      !manualNearMePosition
+    ) {
       requestGeo();
     }
-  }, [sortMode, geoStatus, requestGeo]);
+  }, [sortMode, geoStatus, requestGeo, manualNearMePosition]);
 
   const [checkInRestaurant, setCheckInRestaurant] = useState<Restaurant | null>(
     null,
@@ -603,15 +627,15 @@ function HomeContent() {
         const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
         return tb - ta;
       });
-    } else if (sortMode === "near-me" && geoPosition) {
+    } else if (sortMode === "near-me" && nearMePosition) {
       arr.sort((a, b) => {
         const da =
           a.lat != null && a.lng != null
-            ? haversineMiles(geoPosition.lat, geoPosition.lng, a.lat, a.lng)
+            ? haversineMiles(nearMePosition.lat, nearMePosition.lng, a.lat, a.lng)
             : Infinity;
         const db =
           b.lat != null && b.lng != null
-            ? haversineMiles(geoPosition.lat, geoPosition.lng, b.lat, b.lng)
+            ? haversineMiles(nearMePosition.lat, nearMePosition.lng, b.lat, b.lng)
             : Infinity;
         return da - db;
       });
@@ -636,7 +660,7 @@ function HomeContent() {
     filtered,
     sortMode,
     lastVisitedByRestaurant,
-    geoPosition,
+    nearMePosition,
     curatorRatingCountByRestaurant,
   ]);
 
@@ -807,18 +831,15 @@ function HomeContent() {
         onSortModeChange={onSortModeChange}
         resultCount={filtered.length}
       />
-      {sortMode === "near-me" && geoStatus === "denied" && (
-        <p className="py-2 px-6 text-xs text-txt2">
-          Location permission denied — showing default order.
-        </p>
-      )}
-      {sortMode === "near-me" && geoStatus === "unsupported" && (
-        <p className="py-2 px-6 text-xs text-txt2">
-          Your browser doesn&apos;t support geolocation — showing default order.
-        </p>
-      )}
-      {sortMode === "near-me" && geoStatus === "requesting" && (
-        <p className="py-2 px-6 text-xs text-txt2">Getting your location…</p>
+      {sortMode === "near-me" && (
+        <NearMeOrigin
+          gpsPosition={geoPosition}
+          gpsStatus={geoStatus}
+          onRequestGps={requestGeo}
+          manualPosition={manualNearMePosition}
+          manualLabel={manualNearMeLabel}
+          onManualChange={handleManualNearMeChange}
+        />
       )}
 
       {addOpError && (
@@ -847,7 +868,7 @@ function HomeContent() {
                 restaurantPhotos={restaurantPhotos}
                 imageDisplayMode={imageDisplayMode}
                 visits={user ? visits : undefined}
-                userLocation={sortMode === "near-me" ? geoPosition : null}
+                userLocation={sortMode === "near-me" ? nearMePosition : null}
                 preserveOrder={true}
                 chainLocationCounts={chainLocationCounts}
               />
