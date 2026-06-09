@@ -831,7 +831,7 @@ function HomeContent() {
         onSortModeChange={onSortModeChange}
         resultCount={filtered.length}
       />
-      {sortMode === "near-me" && (
+      {(sortMode === "near-me" || viewMode === "map") && (
         <NearMeOrigin
           gpsPosition={geoPosition}
           gpsStatus={geoStatus}
@@ -839,6 +839,7 @@ function HomeContent() {
           manualPosition={manualNearMePosition}
           manualLabel={manualNearMeLabel}
           onManualChange={handleManualNearMeChange}
+          sortByDistance={sortMode === "near-me"}
         />
       )}
 
@@ -883,7 +884,19 @@ function HomeContent() {
                 }`}
                 aria-hidden={viewMode !== "map"}
               >
-                <MapView restaurants={sorted} allRestaurants={restaurants} />
+                <MapView
+                  restaurants={sorted}
+                  allRestaurants={restaurants}
+                  userLocation={nearMePosition}
+                  userLocationLabel={
+                    manualNearMePosition
+                      ? manualNearMeLabel
+                      : geoPosition
+                        ? "Your current location"
+                        : undefined
+                  }
+                  sortByDistance={sortMode === "near-me"}
+                />
               </div>
             )}
             {!isFiltered && viewMode === "list" && (

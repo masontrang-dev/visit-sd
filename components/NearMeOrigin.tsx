@@ -13,6 +13,10 @@ type Props = {
   manualPosition: Position | null;
   manualLabel: string;
   onManualChange: (position: Position | null, label: string) => void;
+  /** When true, the status text mentions distance sorting. When false (e.g.
+   * shown in map view with a non-distance sort), it just acknowledges the
+   * location. */
+  sortByDistance?: boolean;
 };
 
 // Bias autocomplete suggestions toward the San Diego area without restricting
@@ -31,6 +35,7 @@ export default function NearMeOrigin({
   manualPosition,
   manualLabel,
   onManualChange,
+  sortByDistance = false,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const onManualChangeRef = useRef(onManualChange);
@@ -92,22 +97,27 @@ export default function NearMeOrigin({
     onManualChange(null, "");
   }
 
+  const fallbackHint = sortByDistance
+    ? " — enter an address to sort by distance"
+    : " — enter an address to use as your location";
+
   let statusLine: string | null = null;
   if (usingManual) {
-    statusLine = `Sorting by distance from ${manualLabel}`;
+    statusLine = sortByDistance
+      ? `Sorting by distance from ${manualLabel}`
+      : `Using ${manualLabel} as your location`;
   } else if (gpsStatus === "requesting") {
     statusLine = "Getting your location…";
   } else if (usingGps) {
-    statusLine = "Sorting by distance from your current location";
+    statusLine = sortByDistance
+      ? "Sorting by distance from your current location"
+      : "Using your current location";
   } else if (gpsStatus === "denied") {
-    statusLine =
-      "Location permission denied — enter an address to sort by distance";
+    statusLine = `Location permission denied${fallbackHint}`;
   } else if (gpsStatus === "unsupported") {
-    statusLine =
-      "Geolocation unsupported — enter an address to sort by distance";
+    statusLine = `Geolocation unsupported${fallbackHint}`;
   } else if (gpsStatus === "error") {
-    statusLine =
-      "Couldn't get your location — enter an address to sort by distance";
+    statusLine = `Couldn't get your location${fallbackHint}`;
   }
 
   return (
