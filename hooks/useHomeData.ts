@@ -54,11 +54,6 @@ export type HomeData = {
    * one. */
   curatorRatingCountByRestaurant: Record<number, number>;
   loading: boolean;
-  /** True once the secondary data (recommendations, photos, search index) has
-   * finished loading. Used by the home page to defer mounting the virtualized
-   * grid until card content is stable — without this, cards grow as data
-   * streams in and the windowed list visibly reflows. */
-  secondaryLoaded: boolean;
   reload: () => Promise<void>;
 };
 
@@ -75,7 +70,6 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
   const [curatorRatingCountByRestaurant, setCuratorRatingCountByRestaurant] =
     useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
-  const [secondaryLoaded, setSecondaryLoaded] = useState(false);
 
   const loadVisits = useCallback(async () => {
     const { data } = await supabase
@@ -92,8 +86,6 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
   }, []);
 
   const load = useCallback(async () => {
-    setSecondaryLoaded(false);
-
     // Phase 1: fetch restaurants and render the grid immediately.
     // Cache hit path: skip the network round-trip entirely and paint from
     // the module-level cache. setLoading(false) without ever flipping to
@@ -131,7 +123,6 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     }
 
     if (rows.length === 0) {
-      setSecondaryLoaded(true);
       return;
     }
     const visibleRestaurantIds = rows.map((r) => r.id);
@@ -307,8 +298,6 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
       });
       setRestaurantPhotos(buckets);
     }
-
-    setSecondaryLoaded(true);
   }, [isAdmin]);
 
   // reload() is what callers invoke after a mutation or on pull-to-refresh —
@@ -339,7 +328,6 @@ export function useHomeData(isAdmin: boolean, user: User | null): HomeData {
     searchIndex,
     curatorRatingCountByRestaurant,
     loading,
-    secondaryLoaded,
     reload,
   };
 }

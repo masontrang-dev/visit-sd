@@ -360,7 +360,7 @@ const Card = memo(function Card({
 
         {/* Recommended dishes */}
         {topDishes.length > 0 && (
-          <div className="flex gap-1.5 mt-2 flex-wrap">
+          <div className="flex gap-1.5 mt-2 flex-wrap animate-fade-up">
             {topDishes.map((item) => (
               <span
                 key={item.id}
@@ -403,7 +403,7 @@ const Card = memo(function Card({
 
         {/* Visit summary (shown to any logged-in user who has visits loaded) */}
         {visitCount > 0 && (
-          <div className="mt-2 pt-2 border-t border-brd">
+          <div className="mt-2 pt-2 border-t border-brd animate-fade-up">
             <p className="text-xs text-txt2 tracking-tight">
               Visited {visitCount} time{visitCount !== 1 ? "s" : ""}
               {r.last_visited && (
