@@ -136,3 +136,6 @@ export async function POST(req: NextRequest) {
     results,
   });
 }
+
+// Vercel Cron sends GET requests; same auth and logic as POST.
+export const GET = POST;
