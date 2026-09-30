@@ -4,6 +4,10 @@
     {
       "path": "/api/refresh-google-data",
       "schedule": "0 6 1,15 * *"
+    },
+    {
+      "path": "/api/keep-alive",
+      "schedule": "0 12 */3 * *"
     }
   ]
 }
